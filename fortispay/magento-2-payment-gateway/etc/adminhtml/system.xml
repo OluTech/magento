@@ -1,0 +1,184 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
+    <system>
+        <section id="payment">
+            <group id="fortis" translate="label" type="text" sortOrder="1" showInDefault="1" showInWebsite="1"
+                   showInStore="1">
+                <label>Fortis</label>
+                <field id="active" translate="label" type="select" sortOrder="1" showInDefault="1" showInWebsite="1"
+                       showInStore="1">
+                    <label>Enabled</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="title" translate="label" type="text" sortOrder="2" showInDefault="1" showInWebsite="1"
+                       showInStore="1">
+                    <label>Title</label>
+                </field>
+                <field id="Successful_Order_status" translate="label" type="select" sortOrder="70" showInDefault="1"
+                       showInWebsite="1" showInStore="1">
+                    <label>Successful Order status</label>
+                    <source_model>Magento\Sales\Model\Config\Source\Order\Status</source_model>
+                </field>
+                <field id="test_mode" translate="label" type="select" sortOrder="3" showInDefault="1" showInWebsite="1"
+                       showInStore="1">
+                    <label>Test Mode</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="fortis_cc_vault_active" translate="label" type="select" sortOrder="3" showInDefault="1" showInWebsite="1"
+                       showInStore="1">
+                    <label>Enable Card Vaulting</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Select Yes to enable credit card vaulting</comment>
+                </field>
+                <field id="user_id" translate="label" type="obscure" sortOrder="4" showInDefault="1" showInWebsite="1"
+                       showInStore="1">
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                    <label>User ID</label>
+                </field>
+                <field id="user_api_key" translate="label" type="obscure" sortOrder="4" showInDefault="1"
+                       showInWebsite="1" showInStore="1">
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                    <label>User API Key</label>
+                </field>
+                <field id="product_transaction_id" translate="label" type="obscure" sortOrder="4" showInDefault="1"
+                       showInWebsite="1" showInStore="1">
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                    <label>CC Product ID (optional)</label>
+                </field>
+                <field id="order_intention" translate="label" type="select" sortOrder="5" showInDefault="1"
+                       showInWebsite="1" showInStore="1">
+                    <label>Order Intention</label>
+                    <source_model>Fortis\Fortis\Model\IntentionType</source_model>
+                    <comment>'Sale' processes transaction immediately'</comment>
+                </field>
+                <field id="fortis_theme" translate="label" type="select" sortOrder="6" showInDefault="1"
+                       showInWebsite="1" showInStore="1">
+                    <label>Theme</label>
+                    <source_model>Fortis\Fortis\Model\FortisTheme</source_model>
+                </field>
+                <field id="fortis_environment" translate="label" type="select" sortOrder="6" showInDefault="1"
+                       showInWebsite="1" showInStore="1">
+                    <label>Environment</label>
+                    <source_model>Fortis\Fortis\Model\FortisEnvironment</source_model>
+                    <comment>Choose 'Sandbox' for testing non-live transactions</comment>
+                </field>
+                <field id="fortis_floating_labels" translate="label" type="select" sortOrder="6" showInDefault="1"
+                       showInWebsite="1" showInStore="0">
+                    <label>Floating Labels</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Select "Yes" to enable floating labels within the form fields</comment>
+                </field>
+                <field id="fortis_validation_animation" translate="label" type="select" sortOrder="6" showInDefault="1"
+                       showInWebsite="1" showInStore="0">
+                    <label>Validation Animation</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Select "Yes" to enable warning animations on field validation</comment>
+                </field>
+                <field id="fortis_color_button_selected_background" translate="label" type="text" sortOrder="7"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Button Selected Background</label>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
+                </field>
+                <field id="fortis_color_button_selected_text" translate="label" type="text" sortOrder="7"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Button Selected Text</label>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
+                </field>
+                <field id="fortis_color_button_action_background" translate="label" type="text" sortOrder="7"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Button Action Background</label>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
+                </field>
+                <field id="fortis_color_button_action_text" translate="label" type="text" sortOrder="7"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Button Action Text</label>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
+                </field>
+                <field id="fortis_color_button_background" translate="label" type="text" sortOrder="7"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Button Background</label>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
+                </field>
+                <field id="fortis_color_button_text" translate="label" type="text" sortOrder="7"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Button Text</label>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
+                </field>
+                <field id="fortis_color_field_background" translate="label" type="text" sortOrder="7"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Field Background</label>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
+                </field>
+                <field id="fortis_color_field_border" translate="label" type="text" sortOrder="7"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Field Border</label>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
+                </field>
+                <field id="fortis_color_text" translate="label" type="text" sortOrder="7"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Text</label>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
+                </field>
+                <field id="fortis_color_link" translate="label" type="text" sortOrder="7"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Link</label>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
+                </field>
+                <field id="fortis_font_size" translate="label" type="text" sortOrder="8"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Font Size</label>
+                    <comment>Font size set on root of document (in px)</comment>
+                </field>
+                <field id="fortis_margin_spacing" translate="label" type="text" sortOrder="8"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Margin Spacing</label>
+                    <comment>Increase or decrease to make the layout more or less spacious</comment>
+                </field>
+                <field id="fortis_border_radius" translate="label" type="text" sortOrder="8"
+                       showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Border Radius</label>
+                    <comment>Radius used on tabs, inputs and other components</comment>
+                </field>
+                <field id="allowed_carrier" translate="label" type="multiselect" sortOrder="9" showInDefault="1"
+                       showInWebsite="1" showInStore="1">
+                    <label>Allowed Shipping Methods</label>
+                    <source_model>Magento\Shipping\Model\Config\Source\Allmethods</source_model>
+                </field>
+                <field id="allowspecific" translate="label" type="allowspecific" sortOrder="9" showInDefault="1"
+                       showInWebsite="1" showInStore="1">
+                    <label>Payment from Applicable Countries</label>
+                    <source_model>Magento\Payment\Model\Config\Source\Allspecificcountries</source_model>
+                </field>
+                <field id="specificcountry" translate="label" type="multiselect" sortOrder="9" showInDefault="1"
+                       showInWebsite="1" showInStore="1">
+                    <label>Payment from Specific Countries</label>
+                    <source_model>Magento\Directory\Model\Config\Source\Country</source_model>
+                    <can_be_empty>1</can_be_empty>
+                </field>
+                <field id="instructions" translate="label" sortOrder="10" showInDefault="1" showInWebsite="1"
+                       showInStore="1">
+                    <label>Instructions</label>
+                </field>
+                <field id="order_email" translate="label" type="select" sortOrder="10" showInDefault="1"
+                       showInWebsite="1" showInStore="0">
+                    <label>Send Order Email</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Select "Yes" to Notify Users when successful order is created</comment>
+                </field>
+
+                <field id="invoice_email" translate="label" type="select" sortOrder="12" showInDefault="1"
+                       showInWebsite="1" showInStore="0">
+                    <label>Send Invoice Email</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Select "Yes" to Notify Users when successful invoice is created</comment>
+                </field>
+                <field id="sort_order" translate="label" type="text" sortOrder="13" showInDefault="1" showInWebsite="1"
+                       showInStore="1">
+                    <label>Sort Order</label>
+                    <frontend_class>validate-number</frontend_class>
+                </field>
+            </group>
+        </section>
+    </system>
+</config>
