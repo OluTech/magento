@@ -14,10 +14,10 @@
   },
   "autoload": {
     "files": [
-      "fortispay/magento-2-payment-gateway/registration.php"
+      "registration.php"
     ],
     "psr-4": {
-      "Fortis\\Fortis\\": "fortispay/magento-2-payment-gateway"
+      "Fortis\\Fortis\\": ""
     }
   }
 }
