@@ -1,6 +1,6 @@
 <?php
 
-namespace Fortispay\Fortis\Helper;
+namespace Fortis\Fortis\Helper;
 
 use Magento\Framework\App\Config\BaseFactory;
 use Magento\Framework\App\Helper\AbstractHelper;

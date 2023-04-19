@@ -5,7 +5,7 @@
             
         <referenceBlock name="content">
             <block
-                    class="\Fortispay\Fortis\Block\Payment\Request"
+                    class="\Fortis\Fortis\Block\Payment\Request"
                     name="fortis"
                     template="redirect.phtml"
                     cacheable="false"/>

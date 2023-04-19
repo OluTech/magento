@@ -1,12 +1,12 @@
 <?php
 
-namespace Fortispay\Fortis\Controller\Notify;
+namespace Fortis\Fortis\Controller\Notify;
 
 use Exception;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\View\Result\PageFactory;
-use Fortispay\Fortis\Controller\AbstractFortis;
-use Fortispay\Fortis\Model\Config;
+use Fortis\Fortis\Controller\AbstractFortis;
+use Fortis\Fortis\Model\Config;
 
 class Indexm220 extends AbstractFortis
 {

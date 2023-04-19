@@ -17,7 +17,7 @@
       "registration.php"
     ],
     "psr-4": {
-      "Fortispay\\Fortis\\": ""
+      "Fortis\\Fortis\\": ""
     }
   }
 }

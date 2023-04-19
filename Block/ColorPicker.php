@@ -1,6 +1,6 @@
 <?php
 
-namespace Fortispay\Fortis\Block;
+namespace Fortis\Fortis\Block;
 
 use Magento\Backend\Block\Template\Context;
 use Magento\Config\Block\System\Config\Form\Field;

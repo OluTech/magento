@@ -1,6 +1,6 @@
 <?php
 
-namespace Fortispay\Fortis\Controller\Notify;
+namespace Fortis\Fortis\Controller\Notify;
 
 use Magento\Framework\App\CsrfAwareActionInterface;
 use Magento\Framework\App\Request\InvalidRequestException;

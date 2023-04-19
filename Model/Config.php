@@ -2,7 +2,7 @@
 
 // @codingStandardsIgnoreFile
 
-namespace Fortispay\Fortis\Model;
+namespace Fortis\Fortis\Model;
 
 use Magento\Directory\Helper\Data;
 use Magento\Framework\App\Config\ScopeConfigInterface;
@@ -14,7 +14,7 @@ use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Config model that is aware of all \Fortispay\Fortis payment methods
+ * Config model that is aware of all \Fortis\Fortis payment methods
  * Works with Fortis-specific system configuration
  * @SuppressWarnings(PHPMD.ExcesivePublicCount)
  * @SuppressWarnings(PHPMD.ExcessiveClassComplexity)

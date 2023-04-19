@@ -5,7 +5,7 @@
     </head>
     <body>
         <referenceContainer name="content">
-            <block class="Fortispay\Fortis\Block\Payment\Request" name="fortis_redirect"
+            <block class="Fortis\Fortis\Block\Payment\Request" name="fortis_redirect"
                    template="Fortis_Fortis::redirect.phtml" cacheable="false"/>
         </referenceContainer>
     </body>

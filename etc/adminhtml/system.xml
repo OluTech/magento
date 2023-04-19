@@ -49,18 +49,18 @@
                 <field id="order_intention" translate="label" type="select" sortOrder="5" showInDefault="1"
                        showInWebsite="1" showInStore="1">
                     <label>Order Intention</label>
-                    <source_model>Fortispay\Fortis\Model\IntentionType</source_model>
+                    <source_model>Fortis\Fortis\Model\IntentionType</source_model>
                     <comment>'Sale' processes transaction immediately'</comment>
                 </field>
                 <field id="fortis_theme" translate="label" type="select" sortOrder="6" showInDefault="1"
                        showInWebsite="1" showInStore="1">
                     <label>Theme</label>
-                    <source_model>Fortispay\Fortis\Model\FortisTheme</source_model>
+                    <source_model>Fortis\Fortis\Model\FortisTheme</source_model>
                 </field>
                 <field id="fortis_environment" translate="label" type="select" sortOrder="6" showInDefault="1"
                        showInWebsite="1" showInStore="1">
                     <label>Environment</label>
-                    <source_model>Fortispay\Fortis\Model\FortisEnvironment</source_model>
+                    <source_model>Fortis\Fortis\Model\FortisEnvironment</source_model>
                     <comment>Choose 'Sandbox' for testing non-live transactions</comment>
                 </field>
                 <field id="fortis_floating_labels" translate="label" type="select" sortOrder="6" showInDefault="1"
@@ -78,52 +78,52 @@
                 <field id="fortis_color_button_selected_background" translate="label" type="text" sortOrder="7"
                        showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Button Selected Background</label>
-                    <frontend_model>Fortispay\Fortis\Block\ColorPicker</frontend_model>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
                 </field>
                 <field id="fortis_color_button_selected_text" translate="label" type="text" sortOrder="7"
                        showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Button Selected Text</label>
-                    <frontend_model>Fortispay\Fortis\Block\ColorPicker</frontend_model>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
                 </field>
                 <field id="fortis_color_button_action_background" translate="label" type="text" sortOrder="7"
                        showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Button Action Background</label>
-                    <frontend_model>Fortispay\Fortis\Block\ColorPicker</frontend_model>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
                 </field>
                 <field id="fortis_color_button_action_text" translate="label" type="text" sortOrder="7"
                        showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Button Action Text</label>
-                    <frontend_model>Fortispay\Fortis\Block\ColorPicker</frontend_model>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
                 </field>
                 <field id="fortis_color_button_background" translate="label" type="text" sortOrder="7"
                        showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Button Background</label>
-                    <frontend_model>Fortispay\Fortis\Block\ColorPicker</frontend_model>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
                 </field>
                 <field id="fortis_color_button_text" translate="label" type="text" sortOrder="7"
                        showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Button Text</label>
-                    <frontend_model>Fortispay\Fortis\Block\ColorPicker</frontend_model>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
                 </field>
                 <field id="fortis_color_field_background" translate="label" type="text" sortOrder="7"
                        showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Field Background</label>
-                    <frontend_model>Fortispay\Fortis\Block\ColorPicker</frontend_model>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
                 </field>
                 <field id="fortis_color_field_border" translate="label" type="text" sortOrder="7"
                        showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Field Border</label>
-                    <frontend_model>Fortispay\Fortis\Block\ColorPicker</frontend_model>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
                 </field>
                 <field id="fortis_color_text" translate="label" type="text" sortOrder="7"
                        showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Text</label>
-                    <frontend_model>Fortispay\Fortis\Block\ColorPicker</frontend_model>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
                 </field>
                 <field id="fortis_color_link" translate="label" type="text" sortOrder="7"
                        showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Link</label>
-                    <frontend_model>Fortispay\Fortis\Block\ColorPicker</frontend_model>
+                    <frontend_model>Fortis\Fortis\Block\ColorPicker</frontend_model>
                 </field>
                 <field id="fortis_font_size" translate="label" type="text" sortOrder="8"
                        showInDefault="1" showInWebsite="1" showInStore="0">

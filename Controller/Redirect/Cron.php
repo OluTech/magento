@@ -1,8 +1,8 @@
 <?php
 
-namespace Fortispay\Fortis\Controller\Redirect;
+namespace Fortis\Fortis\Controller\Redirect;
 
-use Fortispay\Fortis\Controller\AbstractFortis;
+use Fortis\Fortis\Controller\AbstractFortis;
 
 /**
  * Responsible for loading page content.

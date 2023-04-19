@@ -1,6 +1,6 @@
 <?php
 
-namespace Fortispay\Fortis\Helper;
+namespace Fortis\Fortis\Helper;
 
 use Exception;
 use Magento\Directory\Model\CurrencyFactory;
@@ -19,7 +19,7 @@ use Magento\Sales\Model\Order\Payment\Transaction\Builder;
 use Magento\Sales\Model\Service\InvoiceService;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
-use Fortispay\Fortis\Model\Config as FortisConfig;
+use Fortis\Fortis\Model\Config as FortisConfig;
 use Psr\Log\LoggerInterface;
 use SimpleXMLElement;
 use Magento\Framework\Encryption\EncryptorInterface;
@@ -105,7 +105,7 @@ class Data extends AbstractHelper
      * @param Context $context
      * @param \Magento\Payment\Helper\Data $paymentData
      * @param BaseFactory $configFactory
-     * @param \Fortispay\Fortis\Model\Config $fortisconfig
+     * @param \Fortis\Fortis\Model\Config $fortisconfig
      * @param StoreManagerInterface $storeManager
      * @param CurrencyFactory $currencyFactory
      * @param \Magento\Sales\Model\Order\Payment\Transaction\Builder $_transactionBuilder
