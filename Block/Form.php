@@ -1,15 +1,15 @@
 <?php
 
-namespace Fortis\Fortis\Block;
+namespace Fortispay\Fortis\Block;
 
 use Magento\Customer\Helper\Session\CurrentCustomer;
 use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\Element\Template\Context;
-use Fortis\Fortis\Helper\Data;
-use Fortis\Fortis\Model\Config;
-use Fortis\Fortis\Model\ConfigFactory;
-use Fortis\Fortis\Model\Fortis\Checkout;
+use Fortispay\Fortis\Helper\Data;
+use Fortispay\Fortis\Model\Config;
+use Fortispay\Fortis\Model\ConfigFactory;
+use Fortispay\Fortis\Model\Fortis\Checkout;
 
 class Form extends \Magento\Payment\Block\Form
 {

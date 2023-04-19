@@ -1,8 +1,8 @@
 <?php
 
-namespace Fortis\Fortis\Observer;
+namespace Fortispay\Fortis\Observer;
 
-use Fortis\Fortis\Model\FortisApi;
+use Fortispay\Fortis\Model\FortisApi;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Event\Observer;

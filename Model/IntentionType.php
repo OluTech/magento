@@ -1,6 +1,6 @@
 <?php
 
-namespace Fortis\Fortis\Model;
+namespace Fortispay\Fortis\Model;
 
 use Magento\Framework\Option\ArrayInterface;
 

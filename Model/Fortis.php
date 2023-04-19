@@ -1,9 +1,9 @@
 <?php
 
-namespace Fortis\Fortis\Model;
+namespace Fortispay\Fortis\Model;
 
-use Fortis\Fortis\CountryData;
-use Fortis\Fortis\Helper\Data;
+use Fortispay\Fortis\CountryData;
+use Fortispay\Fortis\Helper\Data;
 use Magento\Checkout\Model\Session;
 use Magento\Framework\Api\AttributeValueFactory;
 use Magento\Framework\Api\ExtensionAttributesFactory;
@@ -58,15 +58,15 @@ class Fortis extends AbstractMethod
     /**
      * @var string
      */
-    protected $_formBlockType = 'Fortis\Fortis\Block\Form';
+    protected $_formBlockType = 'Fortispay\Fortis\Block\Form';
     /**
      * @var string
      */
-    protected $_infoBlockType = 'Fortis\Fortis\Block\Payment\Info';
+    protected $_infoBlockType = 'Fortispay\Fortis\Block\Payment\Info';
     /**
      * @var string
      */
-    protected $_configType = 'Fortis\Fortis\Model\Config';
+    protected $_configType = 'Fortispay\Fortis\Model\Config';
     /**
      * Payment Method feature
      *
