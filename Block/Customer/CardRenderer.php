@@ -1,6 +1,6 @@
 <?php
 
-namespace Fortispay\Fortis\Block\Customer;
+namespace Fortis\Fortis\Block\Customer;
 
 use Magento\Framework\View\Element\Template;
 use Magento\Vault\Api\Data\PaymentTokenInterface;

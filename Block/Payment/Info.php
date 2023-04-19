@@ -1,10 +1,10 @@
 <?php
 
-namespace Fortispay\Fortis\Block\Payment;
+namespace Fortis\Fortis\Block\Payment;
 
 use Magento\Framework\View\Element\Template\Context;
 use Magento\Payment\Model\Config;
-use Fortispay\Fortis\Model\InfoFactory;
+use Fortis\Fortis\Model\InfoFactory;
 
 /**
  * Fortis common payment info block
@@ -25,7 +25,7 @@ class Info extends \Magento\Payment\Block\Info
     /**
      * @param Context $context
      * @param Config $paymentConfig
-     * @param \Fortispay\Fortis\Model\InfoFactory $fortisInfoFactory
+     * @param \Fortis\Fortis\Model\InfoFactory $fortisInfoFactory
      * @param array $data
      */
     public function __construct(

@@ -1,8 +1,8 @@
 <?php
 
-namespace Fortispay\Fortis\Model;
+namespace Fortis\Fortis\Model;
 
-use Fortispay\Fortis\Helper\Data as FortisHelper;
+use Fortis\Fortis\Helper\Data as FortisHelper;
 use Magento\Checkout\Model\ConfigProviderInterface;
 use Magento\Customer\Helper\Session\CurrentCustomer;
 use Magento\Framework\App\RequestInterface;

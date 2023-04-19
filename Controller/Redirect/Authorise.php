@@ -1,10 +1,10 @@
 <?php
 
-namespace Fortispay\Fortis\Controller\Redirect;
+namespace Fortis\Fortis\Controller\Redirect;
 
 use Exception;
-use Fortispay\Fortis\Controller\AbstractFortis;
-use Fortispay\Fortis\Model\FortisApi;
+use Fortis\Fortis\Controller\AbstractFortis;
+use Fortis\Fortis\Model\FortisApi;
 use Magento\Sales\Model\Order\Invoice;
 use Magento\Sales\Model\Order\Payment\Transaction;
 

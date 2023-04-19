@@ -1,6 +1,6 @@
 <?php
 
-namespace Fortispay\Fortis\Controller;
+namespace Fortis\Fortis\Controller;
 
 use Magento\Checkout\Controller\Express\RedirectLoginInterface;
 use Magento\Checkout\Model\Session as CheckoutSession;
@@ -31,9 +31,9 @@ use Magento\Sales\{Api\Data\TransactionSearchResultInterfaceFactory,
     Model\Service\InvoiceService
 };
 use Magento\Store\Model\StoreManagerInterface;
-use Fortispay\Fortis\Helper\Data as FortisHelper;
-use Fortispay\Fortis\Model\Config;
-use Fortispay\Fortis\Model\Fortis;
+use Fortis\Fortis\Helper\Data as FortisHelper;
+use Fortis\Fortis\Model\Config;
+use Fortis\Fortis\Model\Fortis;
 use Psr\Log\LoggerInterface;
 
 
@@ -70,7 +70,7 @@ abstract class AbstractFortism220 extends AppAction implements RedirectLoginInte
      *
      * @var string
      */
-    protected $_configType = 'Fortispay\Fortis\Model\Config';
+    protected $_configType = 'Fortis\Fortis\Model\Config';
 
     /** Config method type @var string */
     protected $_configMethod = Config::METHOD_CODE;

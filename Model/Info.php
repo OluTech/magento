@@ -2,7 +2,7 @@
 
 // @codingStandardsIgnoreFile
 
-namespace Fortispay\Fortis\Model;
+namespace Fortis\Fortis\Model;
 
 /**
  * Fortis payment information model

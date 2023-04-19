@@ -1,20 +1,20 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
-    <virtualType name="Fortispay\Fortis\Model\Session\Storage" type="Magento\Framework\Session\Storage">
+    <virtualType name="Fortis\Fortis\Model\Session\Storage" type="Magento\Framework\Session\Storage">
         <arguments>
             <argument name="namespace" xsi:type="string">fortis</argument>
         </arguments>
     </virtualType>
-    <virtualType name="Fortispay\Fortis\Model\Session" type="Magento\Framework\Session\Generic">
+    <virtualType name="Fortis\Fortis\Model\Session" type="Magento\Framework\Session\Generic">
         <arguments>
-            <argument name="storage" xsi:type="object">Fortispay\Fortis\Model\Session\Storage</argument>
+            <argument name="storage" xsi:type="object">Fortis\Fortis\Model\Session\Storage</argument>
         </arguments>
     </virtualType>
 
-    <type name="Fortispay\Fortis\Controller\AbstractFortis">
+    <type name="Fortis\Fortis\Controller\AbstractFortis">
         <arguments>
-            <argument name="fortisSession" xsi:type="object">Fortispay\Fortis\Model\Session</argument>
+            <argument name="fortisSession" xsi:type="object">Fortis\Fortis\Model\Session</argument>
         </arguments>
     </type>
 
@@ -26,7 +26,7 @@
         </arguments>
     </type>
 
-    <type name="Fortispay\Fortis\Block\Payment\Info">
+    <type name="Fortis\Fortis\Block\Payment\Info">
         <arguments>
             <argument name="data" xsi:type="array">
                 <item xsi:type="string" name="is_secure_mode">1</item>
@@ -38,7 +38,7 @@
         <arguments>
             <argument name="configProviders" xsi:type="array">
                 <item name="fortis_fortis_config_provider" xsi:type="object">
-                    Fortispay\Fortis\Model\FortisConfigProvider
+                    Fortis\Fortis\Model\FortisConfigProvider
                 </item>
             </argument>
         </arguments>

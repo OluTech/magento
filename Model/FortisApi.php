@@ -1,8 +1,8 @@
 <?php
 
-namespace Fortispay\Fortis\Model;
+namespace Fortis\Fortis\Model;
 
-use Fortispay\Fortis\Model\Config;
+use Fortis\Fortis\Model\Config;
 use Magento\Framework\Exception\LocalizedException;
 
 class FortisApi

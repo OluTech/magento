@@ -3,25 +3,25 @@
         xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
     <event name="payment_method_assign_data_fortis">
         <observer name="fortis_payment_data_assign"
-                  instance="Fortispay\Fortis\Observer\SaveVaultInfoToOrderObserver"/>
+                  instance="Fortis\Fortis\Observer\SaveVaultInfoToOrderObserver"/>
         <observer name="fortis_payment_type_data_assign"
-                  instance="Fortispay\Fortis\Observer\SavePaymentTypeToOrderObserver"/>
+                  instance="Fortis\Fortis\Observer\SavePaymentTypeToOrderObserver"/>
     </event>
     <event name="sales_order_payment_pay">
         <observer name="fortis_create_vault_payment"
-                  instance="Fortispay\Fortis\Observer\CreateVaultPayment"/>
+                  instance="Fortis\Fortis\Observer\CreateVaultPayment"/>
     </event>
     <event name="sales_order_payment_cancel_invoice">
         <observer name="fortis_cancel_vault_authorisation"
-                  instance="Fortispay\Fortis\Observer\CancelOrderAuthorisation"/>
+                  instance="Fortis\Fortis\Observer\CancelOrderAuthorisation"/>
     </event>
     <event name="order_cancel_after">
         <observer name="fortis_order_cancel_after"
-                  instance="Fortispay\Fortis\Observer\OrderCancelAfter"/>
+                  instance="Fortis\Fortis\Observer\OrderCancelAfter"/>
     </event>
     <event name="sales_order_payment_refund">
         <observer name="fortis_purchase_refund"
-                  instance="Fortispay\Fortis\Observer\SaleRefund"/>
+                  instance="Fortis\Fortis\Observer\SaleRefund"/>
     </event>
 </config>
 

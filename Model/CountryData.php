@@ -1,6 +1,6 @@
 <?php
 
-namespace Fortispay\Fortis\Model;
+namespace Fortis\Fortis\Model;
 
 
 class CountryData
