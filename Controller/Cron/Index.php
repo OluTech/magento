@@ -1,6 +1,6 @@
 <?php
 
-namespace Fortis\Fortis\Controller\Cron;
+namespace Fortispay\Fortis\Controller\Cron;
 
 use DateInterval;
 use DateTime;
@@ -9,7 +9,7 @@ use Magento\Framework\App\ObjectManager;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\Order\Invoice;
 use Magento\Sales\Model\Order\Payment\Transaction;
-use Fortis\Fortis\Controller\AbstractFortis;
+use Fortispay\Fortis\Controller\AbstractFortis;
 
 
 /**
@@ -63,7 +63,7 @@ class Index extends AbstractFortis
             $transactionId = $transaction->getData('txn_id');
 
             if ( ! empty($transactionId) & $PaymentTitle == "FORTIS_FORTIS") {
-                $_fortishelper = ObjectManager::getInstance()->get('\Fortis\Fortis\Helper\Data');
+                $_fortishelper = ObjectManager::getInstance()->get('\Fortispay\Fortis\Helper\Data');
                 $result         = $_fortishelper->getQueryResult($transactionId);
 
                 if (isset($result['ns2PaymentType'])) {

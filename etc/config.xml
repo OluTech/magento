@@ -9,7 +9,7 @@
                 <instructions>Pay using Fortis provider</instructions>
                 <payment_action>Authorization</payment_action>
                 <test>1</test>
-                <model>Fortis\Fortis\Model\Fortis</model>
+                <model>Fortispay\Fortis\Model\Fortis</model>
                 <can_authorize_vault>1</can_authorize_vault>
                 <is_gateway>0</is_gateway>
                 <can_order>1</can_order>

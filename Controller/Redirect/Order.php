@@ -1,9 +1,9 @@
 <?php
 
-namespace Fortis\Fortis\Controller\Redirect;
+namespace Fortispay\Fortis\Controller\Redirect;
 
 use Magento\Framework\Controller\ResultFactory;
-use Fortis\Fortis\Controller\AbstractFortis;
+use Fortispay\Fortis\Controller\AbstractFortis;
 
 class Order extends AbstractFortis
 {

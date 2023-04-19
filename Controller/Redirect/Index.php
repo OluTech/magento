@@ -1,10 +1,10 @@
 <?php
 
-namespace Fortis\Fortis\Controller\Redirect;
+namespace Fortispay\Fortis\Controller\Redirect;
 
 use Exception;
-use Fortis\Fortis\Controller\AbstractFortis;
-use Fortis\Fortis\Model\Config;
+use Fortispay\Fortis\Controller\AbstractFortis;
+use Fortispay\Fortis\Model\Config;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\View\Result\PageFactory;
 

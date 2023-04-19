@@ -1,6 +1,6 @@
 <?php
 
-namespace Fortis\Fortis\Model;
+namespace Fortispay\Fortis\Model;
 
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Payment\Model\Method\ConfigInterface;

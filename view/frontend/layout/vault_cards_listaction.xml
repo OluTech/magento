@@ -4,7 +4,7 @@
     <body>
         <referenceContainer name="content">
             <referenceBlock name="vault.cards.list">
-                <block class="Fortis\Fortis\Block\Customer\CardRenderer" name="fortis.card.renderer"
+                <block class="Fortispay\Fortis\Block\Customer\CardRenderer" name="fortis.card.renderer"
                        template="Magento_Vault::customer_account/credit_card.phtml"/>
             </referenceBlock>
         </referenceContainer>
