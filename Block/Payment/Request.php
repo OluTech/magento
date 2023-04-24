@@ -1,9 +1,9 @@
 <?php
 
-namespace Fortis\Fortis\Block\Payment;
+namespace Fortispay\Fortis\Block\Payment;
 
-use Fortis\Fortis\Model\Fortis;
-use Fortis\Fortis\Model\FortisApi;
+use Fortispay\Fortis\Model\Fortis;
+use Fortispay\Fortis\Model\FortisApi;
 use Magento\Checkout\Model\Session;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\Encryption\EncryptorInterface;
@@ -15,7 +15,7 @@ use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\Element\Template\Context;
 use Magento\Sales\Model\Order\Address;
 use Magento\Sales\Model\OrderFactory;
-use Fortis\Fortis\Model\Config;
+use Fortispay\Fortis\Model\Config;
 
 class Request extends Template
 {

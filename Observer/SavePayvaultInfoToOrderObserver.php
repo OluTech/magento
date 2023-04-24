@@ -1,6 +1,6 @@
 <?php
 
-namespace Fortis\Fortis\Observer;
+namespace Fortispay\Fortis\Observer;
 
 use Magento\Framework\Event\Observer;
 use Magento\Payment\Observer\AbstractDataAssignObserver;

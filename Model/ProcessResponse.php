@@ -1,9 +1,9 @@
 <?php
 
-namespace Fortis\Fortis\Model;
+namespace Fortispay\Fortis\Model;
 
 use Exception;
-use Fortis\Fortis\Controller\AbstractFortism220;
+use Fortispay\Fortis\Controller\AbstractFortism220;
 use Magento\Sales\Model\Order\Invoice;
 use Magento\Sales\Model\Order\Payment\Transaction;
 
