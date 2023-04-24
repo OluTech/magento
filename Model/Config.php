@@ -179,7 +179,7 @@ class Config extends AbstractConfig
      */
     public function getPaymentMarkImageUrl()
     {
-        return $this->_assetRepo->getUrl('Fortis_Fortis::images/logo.png');
+        return $this->_assetRepo->getUrl('Fortispay_Fortis::images/logo.png');
     }
 
     /**

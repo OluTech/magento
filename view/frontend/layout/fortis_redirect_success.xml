@@ -3,7 +3,7 @@
     <body>
         <referenceContainer name="content">
             <block class="Fortispay\Fortis\Block\Payment\Request" name="fortis_redirect_success"
-                   template="Fortis_Fortis::success.phtml" cacheable="false"/>
+                   template="Fortispay_Fortis::success.phtml" cacheable="false"/>
         </referenceContainer>
     </body>
 </page>

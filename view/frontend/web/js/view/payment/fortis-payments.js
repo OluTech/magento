@@ -13,7 +13,7 @@ define(
     rendererList.push(
       {
         type: 'fortis',
-        component: 'Fortis_Fortis/js/view/payment/method-renderer/fortis-method'
+        component: 'Fortispay_Fortis/js/view/payment/method-renderer/fortis-method'
       }
     )
     /** Add view logic here if needed */

@@ -19,7 +19,7 @@
                                                             <item name="children" xsi:type="array">
                                                                 <item name="fortis-fortis-payments" xsi:type="array">
                                                                     <item name="component" xsi:type="string">
-                                                                        Fortis_Fortis/js/view/payment/fortis-payments
+                                                                        Fortispay_Fortis/js/view/payment/fortis-payments
                                                                     </item>
                                                                     <item name="methods" xsi:type="array">
                                                                         <item name="fortis" xsi:type="array">

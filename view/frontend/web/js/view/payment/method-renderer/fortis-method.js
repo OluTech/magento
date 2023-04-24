@@ -26,7 +26,7 @@ define(
 
     return Component.extend({
       defaults: {
-        template: 'Fortis_Fortis/payment/fortis'
+        template: 'Fortispay_Fortis/payment/fortis'
       },
       getData: function () {
         let fortisPaymentType = $('input[name=fortis-payment-type]:checked').val();
