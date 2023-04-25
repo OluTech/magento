@@ -2,6 +2,7 @@
 
 namespace Fortispay\Fortis\Block\Payment;
 
+use Exception;
 use Fortispay\Fortis\Model\Fortis;
 use Fortispay\Fortis\Model\FortisApi;
 use Magento\Checkout\Model\Session;
@@ -15,7 +16,7 @@ use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\Element\Template\Context;
 use Magento\Sales\Model\Order\Address;
 use Magento\Sales\Model\OrderFactory;
-use Fortispay\Fortis\Model\Config;
+use Magento\Framework\Controller\ResultFactory;
 
 class Request extends Template
 {
@@ -54,19 +55,30 @@ class Request extends Template
     /**
      * @var Reader $reader
      */
-    protected $reader;
+    protected Reader $reader;
+
     /**
-     * @var \Magento\Framework\Encryption\EncryptorInterface
+     * @var EncryptorInterface
      */
     private EncryptorInterface $encryptor;
 
     /**
+     * @var ResultFactory $resultFactory
+     */
+    protected $resultFactory;
+
+    /**
+     * Construct
+     *
      * @param Context $context
      * @param OrderFactory $orderFactory
-     * @param Session $checkoutSession
+     * @param CheckoutSession $checkoutSession
      * @param ReadFactory $readFactory
      * @param Reader $reader
      * @param Fortis $paymentMethod
+     * @param EncryptorInterface $encryptor
+     * @param MessageManagerInterface $messageManager
+     * @param ResultFactory $resultFactory
      * @param array $data
      */
     public function __construct(
@@ -78,8 +90,9 @@ class Request extends Template
         Fortis $paymentMethod,
         EncryptorInterface $encryptor,
         MessageManagerInterface $messageManager,
+        ResultFactory $resultFactory,
         array $data = []
-    ){
+    ) {
         $this->_orderFactory    = $orderFactory;
         $this->_checkoutSession = $checkoutSession;
         parent::__construct($context, $data);
@@ -89,8 +102,14 @@ class Request extends Template
         $this->_paymentMethod  = $paymentMethod;
         $this->encryptor       = $encryptor;
         $this->messageManager  = $messageManager;
+        $this->resultFactory  = $resultFactory;
     }
 
+    /**
+     * Prepare Layout
+     *
+     * @return Request
+     */
     public function _prepareLayout(): Request
     {
         $order          = $this->_checkoutSession->getLastRealOrder();
@@ -107,14 +126,14 @@ class Request extends Template
 
         if ($action === 'sale') {
             $returnUrl = $this->_urlBuilder->getUrl(
-                    'fortis/redirect/success',
-                    self::SECURE
-                ) . '?gid=' . $order->getRealOrderId();
+                'fortis/redirect/success',
+                self::SECURE
+            ) . '?gid=' . $order->getRealOrderId();
         } elseif ($action === 'auth-only') {
             $returnUrl = $this->_urlBuilder->getUrl(
-                    'fortis/redirect/authorise',
-                    self::SECURE
-                ) . '?gid=' . $order->getRealOrderId();
+                'fortis/redirect/authorise',
+                self::SECURE
+            ) . '?gid=' . $order->getRealOrderId();
         }
 
         $vaultHash = $additionalData['fortis-vault-method'] ?? '';
@@ -150,15 +169,17 @@ class Request extends Template
 
                 $transactionResult = $api->doTokenisedTransaction($intentData, $user_id, $user_api_key);
                 $transactionResult = json_decode($transactionResult);
-                if (
-                    strpos($transactionResult->type ?? '', 'Error') !== false
+                if (strpos($transactionResult->type ?? '', 'Error') !== false
                     || isset($transactionResult->errors)
                 ) {
                     throw new LocalizedException(__('Error: Please use a different saved card or a new card.'));
                 }
                 $returnUrl .= '&tid=' . $transactionResult->data->id;
-                header("Location: $returnUrl");
-                exit;
+
+                $redirect = $this->resultFactory->create(\Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT);
+                $redirect->setUrl($returnUrl);
+
+                return $redirect;
             } catch (LocalizedException $e) {
                 $this->_logger->error($e->getMessage());
                 $this->messageManager->addExceptionMessage($e, $e->getMessage());
@@ -166,8 +187,8 @@ class Request extends Template
                 $this->_checkoutSession->restoreQuote();
 
                 return parent::_prepareLayout();
-            } catch (\Exception $exception) {
-                echo $exception;
+            } catch (Exception $exception) {
+                return $exception;
             }
         }
 
@@ -186,7 +207,7 @@ class Request extends Template
             $this->_checkoutSession->restoreQuote();
 
             return parent::_prepareLayout();
-        } catch (\Exception $exception) {
+        } catch (Exception $exception) {
             Log::error($exception->getMessage());
         }
         $client_token            = $config['token'];
@@ -297,17 +318,19 @@ SUBMIT;
 SUBMIT;
 
         $this->setMessage('Redirecting to Fortis')
-            ->setId('fortis_checkout')
-            ->setName('fortis_checkout')
-            ->setFormMethod('POST')
-            ->setFormData($this->_paymentMethod->getStandardCheckoutFormFields())
-            ->setSubmitForm($submit);
+             ->setId('fortis_checkout')
+             ->setName('fortis_checkout')
+             ->setFormMethod('POST')
+             ->setFormData($this->_paymentMethod->getStandardCheckoutFormFields())
+             ->setSubmitForm($submit);
 
         return parent::_prepareLayout();
     }
 
     /**
-     * @param \Magento\Sales\Model\Order\Address $addressAll
+     * Get Addresses
+     *
+     * @param Address $addressAll
      *
      * @return array
      */

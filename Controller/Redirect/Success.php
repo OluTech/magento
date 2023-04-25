@@ -7,6 +7,7 @@ use Fortispay\Fortis\Controller\AbstractFortis;
 use Fortispay\Fortis\Model\FortisApi;
 use Magento\Sales\Model\Order\Invoice;
 use Magento\Sales\Model\Order\Payment\Transaction;
+use stdClass;
 
 /**
  * Responsible for loading page content.
@@ -26,6 +27,9 @@ class Success extends AbstractFortis
      */
     private $redirectToCartPageString;
 
+    /**
+     * @var array|string[]
+     */
     private array $responseCodes = [
         1500 => 'DENY',
         1510 => 'CALL',
@@ -61,22 +65,27 @@ class Success extends AbstractFortis
         1627 => 'SYSTEM_ERROR',
         1628 => 'BAD_MERCH_ID',
         1629 => 'DUPLICATE_BATCH',
-        1630 => 'REJECTED_BATCH (First attempt at batch close will fail with a transaction in the batch for $6.30. The second batch close attempt will succeed.)',
+        1630 => 'REJECTED_BATCH (First attempt at batch close will fail with a transaction in the batch for $6.30. 
+        The second batch close attempt will succeed.)',
         1631 => 'ACCOUNT_CLOSED'
     ];
 
     /**
      * Execute on fortis/redirect/success
+     *
+     * @return string|void
      */
     public function execute()
     {
-        $data      = json_decode(file_get_contents('php://input'));
+        $json = $this->request->getContent();
+        $GET = $this->request->getParams();
+        $data = json_decode($json);
         $tokenised = false;
-        $orderId   = (int)$_GET['gid'];
+        $orderId   = (int)$GET['gid'];
         if (!$data) {
             $tokenised = true;
-            $data      = new \stdClass();
-            $data->id  = $_GET['tid'];
+            $data      = new stdClass();
+            $data->id  = $GET['tid'];
         }
 
         $pre = __METHOD__ . " : ";
@@ -112,7 +121,9 @@ class Success extends AbstractFortis
             $fortisTransaction = $api->getTransaction($data->id, $user_id, $user_api_key)->data;
 
             if (!$tokenised && ($fortisTransaction->product_transaction_id !== $product_transaction_id_order)) {
-                throw new \Exception('Product transaction ids do not match');
+                throw new \Magento\Framework\Exception\RuntimeException(
+                    __('Product transaction ids do not match')
+                );
             }
             $status = $fortisTransaction->status_code;
             switch ($status) {
@@ -167,13 +178,15 @@ class Success extends AbstractFortis
                     $order->setState($status)->setStatus($status)->save();
                     // Invoice capture code completed
                     if (!$tokenised) {
-                        echo json_encode(
+                        return json_encode(
                             ['redirectTo' => $this->redirectToSuccessPageString]
                         );
-                        exit;
                     } else {
-                        header("Location:" . $this->redirectToSuccessPageString);
-                        exit;
+                        $redirect = $this->resultFactory->create(
+                            \Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT
+                        );
+                        $redirect->setUrl($this->redirectToSuccessPageString);
+                        return $redirect;
                     }
                     break;
                 default:
@@ -188,15 +201,16 @@ class Success extends AbstractFortis
                     $this->_checkoutSession->restoreQuote();
                     $this->createTransaction($data);
                     if (!$tokenised) {
-                        echo json_encode(
+                        return json_encode(
                             ['redirectTo' => $this->redirectToCartPageString]
                         );
-                        exit;
                     } else {
-                        header("Location:" . $this->redirectToCartPageString);
-                        exit;
+                        $redirect = $this->resultFactory->create(
+                            \Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT
+                        );
+                        $redirect->setUrl($this->redirectToCartPageString);
+                        return $redirect;
                     }
-                    exit;
                     break;
             }
         } catch (Exception $e) {
@@ -204,18 +218,20 @@ class Success extends AbstractFortis
             $this->createTransaction($data);
             $this->_logger->error($pre . $e->getMessage());
             $this->messageManager->addExceptionMessage($e, __('We can\'t start Fortis Checkout.'));
-            echo $this->redirectToSuccessPageString;
+            return $this->redirectToSuccessPageString;
         }
 
         return '';
     }
 
     /**
-     * @param $paymentData
+     * Create Transaction
+     *
+     * @param object|array $paymentData
      *
      * @return int|void
      */
-    public function createTransaction($paymentData = [])
+    public function createTransaction(object|array $paymentData = [])
     {
         try {
             // Get payment object from order object
@@ -256,11 +272,23 @@ class Success extends AbstractFortis
         }
     }
 
-    public function getOrderByIncrementId($incrementId)
+    /**
+     * Get Order by Increment Id
+     *
+     * @param int $incrementId
+     *
+     * @return \Magento\Sales\Model\Order
+     */
+    public function getOrderByIncrementId(int $incrementId)
     {
         return $this->order->loadByIncrementId($incrementId);
     }
 
+    /**
+     * Set Last Order Details
+     *
+     * @return void
+     */
     public function setlastOrderDetails()
     {
         $orderId      = $this->getRequest()->getParam('gid');
@@ -270,11 +298,13 @@ class Success extends AbstractFortis
         $this->_checkoutSession->setData('last_success_quote_id', $order->getQuoteId());
         $this->_checkoutSession->setData('last_quote_id', $order->getQuoteId());
         $this->_checkoutSession->setData('last_real_order_id', $orderId);
-        $_SESSION['customer_base']['customer_id']           = $order->getCustomerId();
-        $_SESSION['default']['visitor_data']['customer_id'] = $order->getCustomerId();
-        $_SESSION['customer_base']['customer_id']           = $order->getCustomerId();
     }
 
+    /**
+     * Get order
+     *
+     * @return \Magento\Sales\Model\Order
+     */
     private function getOrder()
     {
         if (!$this->_order->getId()) {
@@ -286,12 +316,20 @@ class Success extends AbstractFortis
         }
     }
 
+    /**
+     * Redirect If Order Not Found
+     *
+     * @return void
+     */
     private function redirectIfOrderNotFound()
     {
         if (!$this->_order->getId()) {
             // Redirect to Cart if Order not found
-            echo $this->redirectToSuccessPageString;
-            exit;
+            $redirect = $this->resultFactory->create(
+                \Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT
+            );
+            $redirect->setUrl($this->redirectToSuccessPageString);
+            return $redirect;
         }
     }
 }

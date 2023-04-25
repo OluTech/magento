@@ -2,12 +2,17 @@
 
 namespace Fortispay\Fortis\Controller\Redirect;
 
-use Magento\Framework\Controller\ResultFactory;
 use Fortispay\Fortis\Controller\AbstractFortis;
+use Magento\Framework\Controller\ResultFactory;
 
 class Order extends AbstractFortis
 {
 
+    /**
+     * Execute
+     *
+     * @return mixed
+     */
     public function execute()
     {
         $this->resultFactory->create(ResultFactory::TYPE_PAGE);

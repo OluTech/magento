@@ -28,5 +28,4 @@ class Info
 
         return sprintf('#%s%s', $outputValue, $outputValue == $label ? '' : ': ' . $label);
     }
-
 }

@@ -9,9 +9,11 @@ use Magento\Quote\Api\Data\PaymentInterface;
 class SaveVaultInfoToOrderObserver extends AbstractDataAssignObserver
 {
 
-    const VAULT_NAME_INDEX = 'fortis-vault-method';
+    public const VAULT_NAME_INDEX = 'fortis-vault-method';
 
     /**
+     * Execute
+     *
      * @param Observer $observer
      *
      * @return void

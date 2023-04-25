@@ -31,8 +31,8 @@ class IntentionType implements ArrayInterface
     public function toArray()
     {
         return [
-            'sale'         => __('Sale'),
-            'auth-only'    => __('Authorisation Only'),
+            'sale'      => __('Sale'),
+            'auth-only' => __('Authorisation Only'),
         ];
     }
 }

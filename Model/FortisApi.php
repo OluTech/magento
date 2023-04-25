@@ -2,8 +2,8 @@
 
 namespace Fortispay\Fortis\Model;
 
-use Fortispay\Fortis\Model\Config;
 use Magento\Framework\Exception\LocalizedException;
+use stdClass;
 
 class FortisApi
 {
@@ -11,9 +11,20 @@ class FortisApi
     public const DEVELOPER_ID         = 'Mgv24PRD';
     public const FORTIS_API_SANDBOX   = "https://api.sandbox.fortis.tech";
     public const FORTIS_API           = "https://api.fortis.tech";
+    /**
+     * @var string
+     */
     private string $developerId;
+    /**
+     * @var string
+     */
     private string $fortisApi;
 
+    /**
+     * Construct
+     *
+     * @param string $environment
+     */
     public function __construct(string $environment)
     {
         if ($environment === 'production') {
@@ -26,6 +37,8 @@ class FortisApi
     }
 
     /**
+     * Get Client Token
+     *
      * @param array $intentData
      * @param string $user_id
      * @param string $user_api_key
@@ -38,18 +51,22 @@ class FortisApi
     }
 
     /**
+     * Get Transaction
+     *
      * @param string $transactionId
      * @param string $user_id
      * @param string $user_api_key
      *
-     * @return \stdClass
+     * @return stdClass
      */
-    public function getTransaction(string $transactionId, string $user_id, string $user_api_key): \stdClass
+    public function getTransaction(string $transactionId, string $user_id, string $user_api_key): stdClass
     {
         return $this->transactionRetrieve($transactionId, $user_id, $user_api_key);
     }
 
     /**
+     * Do Tokenised Transaction
+     *
      * @param array $intentData
      * @param string $user_id
      * @param string $user_api_key
@@ -62,6 +79,8 @@ class FortisApi
     }
 
     /**
+     * Do Auth Transaction
+     *
      * @param array $intentData
      * @param string $user_id
      * @param string $user_api_key
@@ -74,6 +93,8 @@ class FortisApi
     }
 
     /**
+     * Get Token Body
+     *
      * @param string $token
      *
      * @return false|string
@@ -81,23 +102,44 @@ class FortisApi
     public function getTokenBody(string $token)
     {
         $parts = explode('.', $token);
-
+        // phpcs:ignore Magento2.Functions.DiscouragedFunction
         $body = base64_decode($parts[1]);
+        // phpcs:ignore Magento2.Security.LanguageConstruct.ExitUsage
 
         return $body;
     }
 
+    /**
+     * Refund Transaction Amount
+     *
+     * @param array $intentData
+     * @param string $user_id
+     * @param string $user_api_key
+     *
+     * @return bool|string|null
+     */
     public function refundTransactionAmount(array $intentData, string $user_id, string $user_api_key)
     {
         return $this->refundTransaction($intentData, $user_id, $user_api_key);
     }
 
+    /**
+     * Refund Auth Amount
+     *
+     * @param array $intentData
+     * @param string $user_id
+     * @param string $user_api_key
+     *
+     * @return bool|string|null
+     */
     public function refundAuthAmount(array $intentData, string $user_id, string $user_api_key)
     {
         return $this->voidAuthTransaction($intentData, $user_id, $user_api_key);
     }
 
     /**
+     * Get Fortis Api
+     *
      * @return string
      */
     public function getFortisApi(): string
@@ -106,6 +148,8 @@ class FortisApi
     }
 
     /**
+     * Get Developer Id
+     *
      * @return string
      */
     public function getDeveloperId(): string
@@ -114,6 +158,8 @@ class FortisApi
     }
 
     /**
+     * Transaction Intention
+     *
      * @param array $intentData
      * @param string $user_id
      * @param string $user_api_key
@@ -167,7 +213,7 @@ class FortisApi
         $response = json_decode($response);
         if (!isset($response->data)) {
             $statusCode = 'Unknown';
-            $title = 'Unknown';
+            $title      = 'Unknown';
             if (isset($response->statusCode)) {
                 $statusCode = $response->statusCode;
             }
@@ -181,13 +227,15 @@ class FortisApi
     }
 
     /**
+     * Transaction Retrieve
+     *
      * @param string $transactionId
      * @param string $user_id
      * @param string $user_api_key
      *
-     * @return \stdClass
+     * @return stdClass
      */
-    private function transactionRetrieve(string $transactionId, string $user_id, string $user_api_key): \stdClass
+    private function transactionRetrieve(string $transactionId, string $user_id, string $user_api_key): stdClass
     {
         $developer_id = $this->developerId;
         $url          = $this->fortisApi . "/v1/transactions/$transactionId";
@@ -234,6 +282,8 @@ class FortisApi
     }
 
     /**
+     * Tokenised Transaction
+     *
      * @param array $intentData
      * @param string $user_id
      * @param string $user_api_key
@@ -290,6 +340,15 @@ class FortisApi
         return $response;
     }
 
+    /**
+     * Refund Transaction
+     *
+     * @param array $intentData
+     * @param string $user_id
+     * @param string $user_api_key
+     *
+     * @return bool|string|null
+     */
     private function refundTransaction(array $intentData, string $user_id, string $user_api_key)
     {
         $developer_id = $this->developerId;
@@ -340,6 +399,15 @@ class FortisApi
         return $response;
     }
 
+    /**
+     * Void Auth Transaction
+     *
+     * @param array $intentData
+     * @param string $user_id
+     * @param string $user_api_key
+     *
+     * @return bool|string|null
+     */
     private function voidAuthTransaction(array $intentData, string $user_id, string $user_api_key)
     {
         $developer_id = $this->developerId;
@@ -391,6 +459,8 @@ class FortisApi
     }
 
     /**
+     * Auth Transaction
+     *
      * @param array $intentData
      * @param string $user_id
      * @param string $user_api_key

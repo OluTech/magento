@@ -9,9 +9,11 @@ use Magento\Quote\Api\Data\PaymentInterface;
 class SavePaymentTypeToOrderObserver extends AbstractDataAssignObserver
 {
 
-    const FORTIS_PAYMENT_TYPE = 'fortis-payment-type';
+    public const FORTIS_PAYMENT_TYPE = 'fortis-payment-type';
 
     /**
+     * Execute
+     *
      * @param Observer $observer
      *
      * @return void

@@ -2,10 +2,8 @@
 
 namespace Fortispay\Fortis\Block\Customer;
 
-use Magento\Framework\View\Element\Template;
 use Magento\Vault\Api\Data\PaymentTokenInterface;
 use Magento\Vault\Block\AbstractCardRenderer;
-
 
 class CardRenderer extends AbstractCardRenderer
 {
@@ -23,6 +21,8 @@ class CardRenderer extends AbstractCardRenderer
     }
 
     /**
+     * Get Number Last 4 Digits
+     *
      * @return string
      * @since 100.1.0
      */
@@ -32,6 +32,8 @@ class CardRenderer extends AbstractCardRenderer
     }
 
     /**
+     * Get Exp Date
+     *
      * @return string
      * @since 100.1.0
      */
@@ -41,6 +43,8 @@ class CardRenderer extends AbstractCardRenderer
     }
 
     /**
+     * Get Icon Url
+     *
      * @return string
      * @since 100.1.0
      */
@@ -50,6 +54,8 @@ class CardRenderer extends AbstractCardRenderer
     }
 
     /**
+     * Get Icon Height
+     *
      * @return int
      * @since 100.1.0
      */
@@ -59,6 +65,8 @@ class CardRenderer extends AbstractCardRenderer
     }
 
     /**
+     * Get Icon Width
+     *
      * @return int
      * @since 100.1.0
      */

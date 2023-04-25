@@ -2,14 +2,13 @@
 
 namespace Fortispay\Fortis\Block;
 
-use Magento\Customer\Helper\Session\CurrentCustomer;
-use Magento\Framework\Locale\ResolverInterface;
-use Magento\Framework\View\Element\Template;
-use Magento\Framework\View\Element\Template\Context;
 use Fortispay\Fortis\Helper\Data;
 use Fortispay\Fortis\Model\Config;
 use Fortispay\Fortis\Model\ConfigFactory;
 use Fortispay\Fortis\Model\Fortis\Checkout;
+use Magento\Customer\Helper\Session\CurrentCustomer;
+use Magento\Framework\Locale\ResolverInterface;
+use Magento\Framework\View\Element\Template\Context;
 
 class Form extends \Magento\Payment\Block\Form
 {
@@ -69,9 +68,9 @@ class Form extends \Magento\Payment\Block\Form
         $this->_fortisData         = $fortisData;
         $this->fortisConfigFactory = $fortisConfigFactory;
         $this->_localeResolver     = $localeResolver;
-        $this->_config              = null;
-        $this->_isScopePrivate      = true;
-        $this->currentCustomer      = $currentCustomer;
+        $this->_config             = null;
+        $this->_isScopePrivate     = true;
+        $this->currentCustomer     = $currentCustomer;
         parent::__construct($context, $data);
         $this->_logger->debug($pre . "eof");
     }
@@ -101,5 +100,4 @@ class Form extends \Magento\Payment\Block\Form
         $this->_config = $this->fortisConfigFactory->create()->setMethod($this->getMethodCode());
         parent::_construct();
     }
-
 }

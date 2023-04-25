@@ -3,11 +3,13 @@
 namespace Fortispay\Fortis\Helper;
 
 use Exception;
+use Fortispay\Fortis\Model\Config as FortisConfig;
 use Magento\Directory\Model\CurrencyFactory;
 use Magento\Framework\App\Config\BaseFactory;
 use Magento\Framework\App\Helper\AbstractHelper;
 use Magento\Framework\App\Helper\Context;
 use Magento\Framework\DB\Transaction as DBTransaction;
+use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Quote\Model\Quote;
 use Magento\Sales\Api\Data\TransactionSearchResultInterfaceFactory;
 use Magento\Sales\Model\Order;
@@ -19,10 +21,8 @@ use Magento\Sales\Model\Order\Payment\Transaction\Builder;
 use Magento\Sales\Model\Service\InvoiceService;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
-use Fortispay\Fortis\Model\Config as FortisConfig;
 use Psr\Log\LoggerInterface;
 use SimpleXMLElement;
-use Magento\Framework\Encryption\EncryptorInterface;
 
 /**
  * Fortis Data helper
@@ -30,8 +30,11 @@ use Magento\Framework\Encryption\EncryptorInterface;
 class Data extends AbstractHelper
 {
     // TODO: Change url
-    const APIURL = "https://";
+    public const APIURL = "https://";
 
+    /**
+     * @var array|string[]
+     */
     public static array $encryptedConfigKeys = [
         'user_id',
         'user_api_key',
@@ -97,24 +100,27 @@ class Data extends AbstractHelper
      */
     private $_fortisconfig;
     /**
-     * @var \Magento\Framework\Encryption\EncryptorInterface
+     * @var EncryptorInterface
      */
     private EncryptorInterface $encryptor;
 
     /**
+     * Construct
+     *
      * @param Context $context
      * @param \Magento\Payment\Helper\Data $paymentData
      * @param BaseFactory $configFactory
-     * @param \Fortispay\Fortis\Model\Config $fortisconfig
+     * @param FortisConfig $fortisconfig
      * @param StoreManagerInterface $storeManager
      * @param CurrencyFactory $currencyFactory
-     * @param \Magento\Sales\Model\Order\Payment\Transaction\Builder $_transactionBuilder
-     * @param \Magento\Sales\Api\Data\TransactionSearchResultInterfaceFactory $transactionSearchResultInterfaceFactory
-     * @param \Magento\Sales\Model\Order\Email\Sender\OrderSender $OrderSender
-     * @param \Magento\Framework\DB\Transaction $dbTransaction
-     * @param \Magento\Sales\Model\Service\InvoiceService $invoiceService
-     * @param \Magento\Sales\Model\Order\Email\Sender\InvoiceSender $invoiceSender
+     * @param Builder $_transactionBuilder
+     * @param TransactionSearchResultInterfaceFactory $transactionSearchResultInterfaceFactory
+     * @param OrderSender $OrderSender
+     * @param DBTransaction $dbTransaction
+     * @param InvoiceService $invoiceService
+     * @param InvoiceSender $invoiceSender
      * @param array $methodCodes
+     * @param EncryptorInterface $encryptor
      */
     public function __construct(
         Context $context,
@@ -137,11 +143,11 @@ class Data extends AbstractHelper
         $pre = __METHOD__ . " : ";
         $this->_logger->debug($pre . 'bof, methodCodes is : ', $methodCodes);
 
-        $this->_paymentData   = $paymentData;
-        $this->methodCodes    = $methodCodes;
-        $this->configFactory  = $configFactory;
+        $this->_paymentData  = $paymentData;
+        $this->methodCodes   = $methodCodes;
+        $this->configFactory = $configFactory;
         $this->_fortisconfig = $fortisconfig;
-        $this->encryptor = $encryptor;
+        $this->encryptor     = $encryptor;
 
         /* Currency Converter */
         $this->storeManager    = $storeManager;
@@ -159,6 +165,8 @@ class Data extends AbstractHelper
     }
 
     /**
+     * Should Ask To Create Billing Agreement
+     *
      * Check whether customer should be asked confirmation whether to sign a billing agreement
      * should always return false.
      *
@@ -196,11 +204,17 @@ class Data extends AbstractHelper
         return $result;
     }
 
-    /*
-    ** Convert Currency to Order Currency
-    ** If both currency are same dont do any changes
-    ** store_currency_code & order_currency_code are fields in sales_order table
-    */
+    /**
+     * Convert Currency to Order Currency
+     *
+     * If both currency are same dont do any changes
+     * store_currency_code & order_currency_code are fields in sales_order table
+     *
+     * @param object $order
+     * @param float|int $price
+     *
+     * @return float|int
+     */
     public function convertToOrderCurrency($order, $price)
     {
         $storeCurrency = $order->getStoreCurrencyCode();
@@ -214,6 +228,14 @@ class Data extends AbstractHelper
         return $price;
     }
 
+    /**
+     * Get Transaction Data
+     *
+     * @param object $payment
+     * @param int $txn_id
+     *
+     * @return \Magento\Framework\DataObject
+     */
     public function getTransactionData($payment, $txn_id)
     {
         $transactionSearchResult = $this->transactionSearchResultInterfaceFactory;
@@ -221,7 +243,15 @@ class Data extends AbstractHelper
         return $transactionSearchResult->create()->addPaymentIdFilter($payment->getId())->getFirstItem();
     }
 
-    public function createTransaction($order = null, $paymentData = array())
+    /**
+     * Create Transaction
+     *
+     * @param object|null $order
+     * @param array $paymentData
+     *
+     * @return int|void
+     */
+    public function createTransaction($order = null, $paymentData = [])
     {
         try {
             // Get payment object from order object
@@ -262,35 +292,63 @@ class Data extends AbstractHelper
         }
     }
 
+    /**
+     * Get Config Data
+     *
+     * @param mixed $field
+     *
+     * @return mixed
+     */
     public function getConfigData($field)
     {
         return $this->_fortisconfig->getConfig($field);
     }
 
+    /**
+     * Get Fortis Credentials
+     *
+     * @return array
+     */
     public function getFortisCredentials()
     {
         // If NOT test mode, use normal credentials
         // TODO: Update
-        $cred = array();
+        $cred = [];
 
         return $cred;
     }
 
+    /**
+     * Get Query Result
+     *
+     * @param int $transaction_id
+     *
+     * @return mixed
+     */
     public function getQueryResult($transaction_id)
     {
         $queryFields = $this->prepareQueryXml($transaction_id);
         $response    = $this->curlPost(self::APIURL, $queryFields);
         $respArray   = $this->formatXmlToArray($response);
+
         return $respArray['ns2SingleFollowUpResponse']['ns2QueryResponse']['ns2Status'];
     }
 
+    /**
+     * Curl Post
+     *
+     * @param string $url
+     * @param string $xml
+     *
+     * @return bool|string
+     */
     public function curlPost($url, $xml)
     {
         $curl = curl_init();
 
         curl_setopt_array(
             $curl,
-            array(
+            [
                 CURLOPT_URL            => self::APIURL,
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_ENCODING       => "",
@@ -300,11 +358,11 @@ class Data extends AbstractHelper
                 CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_1_1,
                 CURLOPT_CUSTOMREQUEST  => "POST",
                 CURLOPT_POSTFIELDS     => "$xml",
-                CURLOPT_HTTPHEADER     => array(
+                CURLOPT_HTTPHEADER     => [
                     "Content-Type: text/xml",
                     "SOAPAction: WebPaymentRequest"
-                ),
-            )
+                ],
+            ]
         );
 
         $response = curl_exec($curl);
@@ -314,6 +372,14 @@ class Data extends AbstractHelper
         return $response;
     }
 
+    /**
+     * Format Xml To Array
+     *
+     * @param string $response
+     *
+     * @return mixed
+     * @throws Exception
+     */
     public function formatXmlToArray($response)
     {
         $response = preg_replace("/(<\/?)(\w+):([^>]*>)/", "$1$2$3", $response);
@@ -323,13 +389,28 @@ class Data extends AbstractHelper
         return json_decode(json_encode((array)$body), true);
     }
 
+    /**
+     * Prepare Query Xml
+     *
+     * @param string $pay_request_id
+     *
+     * @return string
+     */
     public function prepareQueryXml($pay_request_id)
     {
-        $cred      = $this->getFortisCredentials();
+        $cred = $this->getFortisCredentials();
 
         return '';
     }
 
+    /**
+     * Update Payment Status
+     *
+     * @param object $order
+     * @param array $resp
+     *
+     * @return void
+     */
     public function updatePaymentStatus($order, $resp)
     {
         if (is_array($resp) && !empty($resp)) {
@@ -353,6 +434,14 @@ class Data extends AbstractHelper
         }
     }
 
+    /**
+     * Generate Invoice
+     *
+     * @param object $order
+     *
+     * @return void
+     * @throws \Magento\Framework\Exception\LocalizedException
+     */
     public function generateInvoice($order)
     {
         $order_successful_email = $this->getConfigData('order_email');

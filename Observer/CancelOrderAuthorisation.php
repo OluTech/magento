@@ -4,31 +4,32 @@ namespace Fortispay\Fortis\Observer;
 
 use Fortispay\Fortis\Model\FortisApi;
 use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\Order\Payment\Transaction;
 use Magento\Sales\Model\Order\Payment\Transaction\Builder;
-use Magento\Framework\Encryption\EncryptorInterface;
 
 class CancelOrderAuthorisation implements ObserverInterface
 {
     /**
-     * @var \Magento\Framework\App\Config\ScopeConfigInterface
+     * @var ScopeConfigInterface
      */
     protected ScopeConfigInterface $scopeConfig;
     /**
-     * @var \Magento\Sales\Model\Order\Payment\Transaction\Builder
+     * @var Builder
      */
     private Builder $transactionBuilder;
     /**
-     * @var \Magento\Framework\Encryption\EncryptorInterface
+     * @var EncryptorInterface
      */
     private EncryptorInterface $encryptor;
 
     /**
-     * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
-     * @param \Magento\Sales\Model\Order\Payment\Transaction\Builder $transactionBuilder
+     * @param ScopeConfigInterface $scopeConfig
+     * @param Builder $transactionBuilder
+     * @param EncryptorInterface $encryptor
      */
     public function __construct(
         ScopeConfigInterface $scopeConfig,
@@ -41,6 +42,8 @@ class CancelOrderAuthorisation implements ObserverInterface
     }
 
     /**
+     * Execute
+     *
      * @param Observer $observer
      *
      * @return void

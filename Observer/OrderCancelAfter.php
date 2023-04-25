@@ -2,6 +2,7 @@
 
 namespace Fortispay\Fortis\Observer;
 
+use Exception;
 use Fortispay\Fortis\Model\FortisApi;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
@@ -15,21 +16,22 @@ class OrderCancelAfter extends AbstractDataAssignObserver
 {
 
     /**
-     * @var \Magento\Framework\App\Config\ScopeConfigInterface
+     * @var ScopeConfigInterface
      */
     private ScopeConfigInterface $scopeConfig;
     /**
-     * @var \Magento\Sales\Model\Order\Payment\Transaction\Builder
+     * @var Builder
      */
     private Builder $transactionBuilder;
     /**
-     * @var \Magento\Framework\Encryption\EncryptorInterface
+     * @var EncryptorInterface
      */
     private EncryptorInterface $encryptor;
 
     /**
-     * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
-     * @param \Magento\Sales\Model\Order\Payment\Transaction\Builder $transactionBuilder
+     * @param ScopeConfigInterface $scopeConfig
+     * @param Builder $transactionBuilder
+     * @param EncryptorInterface $encryptor
      */
     public function __construct(
         ScopeConfigInterface $scopeConfig,
@@ -42,6 +44,8 @@ class OrderCancelAfter extends AbstractDataAssignObserver
     }
 
     /**
+     * Execute
+     *
      * @param Observer $observer
      *
      * @return void
@@ -65,7 +69,7 @@ class OrderCancelAfter extends AbstractDataAssignObserver
 
             $d          = json_decode($d);
             $authAmount = $d->data->auth_amount;
-        } catch (\Exception $exception) {
+        } catch (Exception $exception) {
             return;
         }
 

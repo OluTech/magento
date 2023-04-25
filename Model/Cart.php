@@ -20,7 +20,7 @@ class Cart extends \Magento\Payment\Model\Cart
     {
         $this->_collectItemsAndAmounts();
 
-        if ( ! $this->_areAmountsValid) {
+        if (!$this->_areAmountsValid) {
             $subtotal = $this->getSubtotal() + $this->getTax();
 
             if (empty($this->_transferFlags[self::AMOUNT_SHIPPING])) {
@@ -67,6 +67,7 @@ class Cart extends \Magento\Payment\Model\Cart
     }
 
     /**
+     * Validate
      *
      * @return void
      */
@@ -106,7 +107,7 @@ class Cart extends \Magento\Payment\Model\Cart
 
         $areItemsValid = $areItemsValid && $this->_areAmountsValid;
 
-        if ( ! $areItemsValid) {
+        if (!$areItemsValid) {
             $this->_salesModelItems = [];
             $this->_customItems     = [];
         }

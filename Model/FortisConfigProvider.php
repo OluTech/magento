@@ -73,14 +73,27 @@ class FortisConfigProvider implements ConfigProviderInterface
      * @var RequestInterface
      */
     protected $request;
+
+    /**
+     * @var PaymentTokenManagement
+     */
     private $paymentTokenManagement;
 
     /**
+     * Construct
+     *
+     * @param LoggerInterface $logger
      * @param ConfigFactory $configFactory
      * @param ResolverInterface $localeResolver
      * @param CurrentCustomer $currentCustomer
      * @param FortisHelper $fortisHelper
      * @param PaymentHelper $paymentHelper
+     * @param Repository $assetRepo
+     * @param UrlInterface $urlBuilder
+     * @param RequestInterface $request
+     * @param PaymentTokenManagement $paymentTokenManagement
+     *
+     * @throws LocalizedException
      */
     public function __construct(
         LoggerInterface $logger,
@@ -116,6 +129,8 @@ class FortisConfigProvider implements ConfigProviderInterface
     }
 
     /**
+     * Get Config
+     *
      * {@inheritdoc}
      */
     public function getConfig()
@@ -129,11 +144,11 @@ class FortisConfigProvider implements ConfigProviderInterface
             foreach ($cardList as $card) {
                 if ($card['is_active'] == 1 && $card['is_visible'] == 1) {
                     $cardDetails = json_decode($card['details']);
-                    $cards[]     = array(
+                    $cards[]     = [
                         'masked_cc' => $cardDetails->maskedCC,
                         'token'     => $card['public_hash'],
                         'card_type' => $cardDetails->type,
-                    );
+                    ];
                     $cardCount++;
                 }
             }
@@ -151,7 +166,7 @@ class FortisConfigProvider implements ConfigProviderInterface
                     'isVault'                   => $isVault,
                     'saved_card_data'           => json_encode($cards),
                     'card_count'                => $cardCount,
-                    'redirectUrl' => $this->urlBuilder->getRedirectUrl('fortis/redirect'),
+                    'redirectUrl'               => $this->urlBuilder->getRedirectUrl('fortis/redirect'),
                 ],
             ],
         ];

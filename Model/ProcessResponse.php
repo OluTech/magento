@@ -3,15 +3,26 @@
 namespace Fortispay\Fortis\Model;
 
 use Exception;
-use Fortispay\Fortis\Controller\AbstractFortism220;
+use Magento\Sales\Model\Order;
 use Magento\Sales\Model\Order\Invoice;
 use Magento\Sales\Model\Order\Payment\Transaction;
 
 class ProcessResponse
 {
+    /**
+     * @var string
+     */
     private string $redirectToSuccessPageString;
 
-    public function processResponse($data, $order)
+    /**
+     * Process Response
+     *
+     * @param object $data
+     * @param object $order
+     *
+     * @return string|void
+     */
+    public function processResponse(object $data, object $order)
     {
         $pre = __METHOD__ . " : ";
 //        $this->_logger->debug($pre . 'bof');
@@ -40,7 +51,7 @@ class ProcessResponse
             $transaction  = $api->getTransaction($data->id, $user_id, $user_api_key)->data;
 
             if ($transaction->product_transaction_id !== $product_transaction_id_order) {
-                throw new \Exception('Product transaction ids do not match');
+                throw new \Magento\Framework\Exception\RuntimeException('Product transaction ids do not match');
             }
             $status = $transaction->reason_code_id;
             switch ($status) {
@@ -49,7 +60,7 @@ class ProcessResponse
                     $model = $this->_paymentMethod;
                     $model->saveVaultData($order, $data);
 
-                    $status = \Magento\Sales\Model\Order::STATE_PROCESSING;
+                    $status = Order::STATE_PROCESSING;
                     if ($this->getConfigData('Successful_Order_status') != "") {
                         $status = $this->getConfigData('Successful_Order_status');
                     }
@@ -93,10 +104,9 @@ class ProcessResponse
 
                     $order->setState($status)->setStatus($status)->save();
                     // Invoice capture code completed
-                    echo json_encode(
+                    return json_encode(
                         ['redirectTo' => $this->redirectToSuccessPageString]
                     );
-                    exit;
             }
 
             $order = $this->orderRepository->get($order->getId());
@@ -104,34 +114,33 @@ class ProcessResponse
                 $status = 1;
                 switch ($status) {
                     case 1:
-
                     case 2:
                         $this->messageManager->addNotice('Transaction has been declined.');
                         $this->_order->addStatusHistoryComment(
                             __(
-                                'Redirect Response, Transaction has been declined, Pay_Request_Id: ' . $data['PAY_REQUEST_ID']
+                                'Redirect Response, Transaction has been declined, Pay_Request_Id: ' .
+                                $data['PAY_REQUEST_ID']
                             )
                         )->setIsCustomerNotified(false);
                         $this->_order->cancel()->save();
                         $this->_checkoutSession->restoreQuote();
                         // Save Transaction Response
                         $this->createTransaction($data);
-                        echo $this->redirectToCartPageString;
-                        exit;
+                        return $this->redirectToCartPageString;
                     case 0:
                     case 4:
                         $this->messageManager->addNotice('Transaction has been cancelled');
                         $this->_order->addStatusHistoryComment(
                             __(
-                                'Redirect Response, Transaction has been cancelled, Pay_Request_Id: ' . $data['PAY_REQUEST_ID']
+                                'Redirect Response, Transaction has been cancelled, Pay_Request_Id: ' .
+                                $data['PAY_REQUEST_ID']
                             )
                         )->setIsCustomerNotified(false);
                         $this->_order->cancel()->save();
                         $this->_checkoutSession->restoreQuote();
                         // Save Transaction Response
                         $this->createTransaction($data);
-                        echo $this->redirectToCartPageString;
-                        exit;
+                        return $this->redirectToCartPageString;
                     default:
                         // Save Transaction Response
                         $this->createTransaction($data);
@@ -143,13 +152,20 @@ class ProcessResponse
             $this->createTransaction($data);
             $this->_logger->error($pre . $e->getMessage());
             $this->messageManager->addExceptionMessage($e, __('We can\'t start Fortis Checkout.'));
-            echo $this->redirectToSuccessPageString;
+            return $this->redirectToSuccessPageString;
         }
 
         return '';
     }
 
-    public function createTransaction($paymentData = [])
+    /**
+     * Create Transaction
+     *
+     * @param array $paymentData
+     *
+     * @return void
+     */
+    public function createTransaction(array $paymentData = [])
     {
         try {
             // Get payment object from order object
@@ -190,12 +206,16 @@ class ProcessResponse
         }
     }
 
+    /**
+     * Tedirect If Order Not Found
+     *
+     * @return void
+     */
     private function redirectIfOrderNotFound()
     {
         if (!$this->_order->getId()) {
             // Redirect to Cart if Order not found
-            echo $this->redirectToSuccessPageString;
-            exit;
+            return $this->redirectToSuccessPageString;
         }
     }
 }

@@ -31,8 +31,8 @@ class FortisEnvironment implements ArrayInterface
     public function toArray()
     {
         return [
-            'sandbox'         => __('Sandbox'),
-            'production'    => __('Production'),
+            'sandbox'    => __('Sandbox'),
+            'production' => __('Production'),
         ];
     }
 }

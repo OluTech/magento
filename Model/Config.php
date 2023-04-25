@@ -25,11 +25,10 @@ class Config extends AbstractConfig
     /**
      * @var Fortis this is a model which we will use.
      */
-    const METHOD_CODE = 'fortis';
+    public const METHOD_CODE = 'fortis';
 
     /**
-     * Core
-     * data @var Data
+     * @var Data
      */
     protected $directoryHelper;
 
@@ -38,6 +37,9 @@ class Config extends AbstractConfig
      */
     protected $_storeManager;
 
+    /**
+     * @var string[]
+     */
     protected $_supportedBuyerCountryCodes = ['ZA'];
 
     /**
@@ -67,12 +69,15 @@ class Config extends AbstractConfig
     protected $scopeConfig;
 
     /**
+     * Construct
+     *
      * @param ScopeConfigInterface $scopeConfig
      * @param Data $directoryHelper
      * @param StoreManagerInterface $storeManager
-     * @param array $params
      * @param LoggerInterface $logger
-     * @param Repository
+     * @param Repository $assetRepo
+     *
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
      */
     public function __construct(
         ScopeConfigInterface $scopeConfig,
@@ -91,20 +96,6 @@ class Config extends AbstractConfig
         $this->setMethod($METHOD_CODE);
         $currentStoreId = $this->_storeManager->getStore()->getStoreId();
         $this->setStoreId($currentStoreId);
-    }
-
-    /**
-     * Check whether method available for checkout or not
-     * Logic based on merchant country, methods dependence
-     *
-     * @param string|null $methodCode
-     *
-     * @return bool
-     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
-     */
-    public function isMethodAvailable($methodCode = null)
-    {
-        return parent::isMethodAvailable($methodCode);
     }
 
     /**
@@ -128,6 +119,8 @@ class Config extends AbstractConfig
     }
 
     /**
+     * Is Method Supported For Country
+     *
      * Check whether method supported for specified country or not
      * Use $_methodCode and merchant country by default
      *
@@ -183,8 +176,7 @@ class Config extends AbstractConfig
     }
 
     /**
-     * Get "What Is Fortis" localized URL
-     * Supposed to be used with "mark" as popup window
+     * Get "What Is Fortis" localized URL; Supposed to be used with "mark" as popup window
      *
      * @return string
      */
@@ -249,7 +241,14 @@ class Config extends AbstractConfig
         return $supported;
     }
 
-    public function getConfig($field)
+    /**
+     * Get Config
+     *
+     * @param mixed $field
+     *
+     * @return mixed
+     */
+    public function getConfig(mixed $field)
     {
         $storeScope = ScopeInterface::SCOPE_STORE;
         $path       = 'payment/' . Config::METHOD_CODE . '/' . $field;
@@ -268,11 +267,10 @@ class Config extends AbstractConfig
     /**
      * Get Api Credential for Fortis Payment
      **/
-
     public function getApiCredentials(): array
     {
         // TODO: Update for Fortis
-        $data                 = array();
+        $data                 = [];
         $data['user_api_key'] = $this->getConfig('user_api_key');
         $data['user_id']      = $this->getConfig('user_id');
 

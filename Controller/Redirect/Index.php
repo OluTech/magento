@@ -16,11 +16,14 @@ use Magento\Framework\View\Result\PageFactory;
  */
 class Index extends AbstractFortis
 {
-    const CARTURL = 'checkout/cart';
+
+    public const CARTURL = 'checkout/cart';
+
     /**
      * @var PageFactory
      */
     protected $resultPageFactory;
+
     /**
      * Config method type
      *
@@ -54,7 +57,7 @@ class Index extends AbstractFortis
                              ->setPaymentFormData($order ?? null);
 
         $formData = $block->getSubmitForm();
-        if (! $formData) {
+        if (!$formData) {
             $this->_logger->error("We can\'t start Fortis Checkout.");
             $this->_redirect(self::CARTURL);
         }

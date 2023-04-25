@@ -31,7 +31,7 @@ class FortisTheme implements ArrayInterface
     public function toArray()
     {
         return [
-            'default'         => __('Default'),
+            'default' => __('Default'),
             'dark'    => __('Dark'),
         ];
     }

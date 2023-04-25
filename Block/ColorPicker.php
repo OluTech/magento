@@ -9,16 +9,14 @@ use Magento\Framework\View\Helper\SecureHtmlRenderer;
 
 class ColorPicker extends Field
 {
-    /**
-     * @param \Magento\Backend\Block\Template\Context $context
-     * @param array $data
-     * @param \Magento\Framework\View\Helper\SecureHtmlRenderer|null $secureRenderer
-     */
-    public function __construct(Context $context, array $data = [], ?SecureHtmlRenderer $secureRenderer = null)
-    {
-        parent::__construct($context, $data, $secureRenderer);
-    }
 
+    /**
+     * Get Elements HTML
+     *
+     * @param AbstractElement $element
+     *
+     * @return string
+     */
     protected function _getElementHtml(AbstractElement $element)
     {
         return '<input type="color" id="' .

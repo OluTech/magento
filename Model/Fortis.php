@@ -2,6 +2,10 @@
 
 namespace Fortispay\Fortis\Model;
 
+use DateInterval;
+use DateTime;
+use DateTimeZone;
+use Exception;
 use Fortispay\Fortis\CountryData;
 use Fortispay\Fortis\Helper\Data;
 use Magento\Checkout\Model\Session;
@@ -41,7 +45,6 @@ use Magento\Vault\Api\PaymentTokenManagementInterface;
 use Magento\Vault\Api\PaymentTokenRepositoryInterface;
 use Magento\Vault\Model\CreditCardTokenFactory;
 use Magento\Vault\Model\ResourceModel\PaymentToken as PaymentTokenResourceModel;
-use SimpleXMLElement;
 
 /**
  * @SuppressWarnings(PHPMD.TooManyFields)
@@ -49,166 +52,8 @@ use SimpleXMLElement;
  */
 class Fortis extends AbstractMethod
 {
-    const        SECURE = ['_secure' => true];
-    public const FFFFFF = '#ffffff';
-    /**
-     * @var string
-     */
-    protected $_code = Config::METHOD_CODE;
-    /**
-     * @var string
-     */
-    protected $_formBlockType = 'Fortispay\Fortis\Block\Form';
-    /**
-     * @var string
-     */
-    protected $_infoBlockType = 'Fortispay\Fortis\Block\Payment\Info';
-    /**
-     * @var string
-     */
-    protected $_configType = 'Fortispay\Fortis\Model\Config';
-    /**
-     * Payment Method feature
-     *
-     * @var bool
-     */
-    protected $_isInitializeNeeded = true;
-    /**
-     * Availability option
-     *
-     * @var bool
-     */
-    protected $_isGateway = false;
-    /**
-     * Availability option
-     *
-     * @var bool
-     */
-    protected $_canOrder = true;
-    /**
-     * Availability option
-     *
-     * @var bool
-     */
-    protected $_canAuthorize = true;
-    /**
-     * Availability option
-     *
-     * @var bool
-     */
-    protected $_canCapture = true;
-    /**
-     * Availability option
-     *
-     * @var bool
-     */
-    protected $_canVoid = false;
-    /**
-     * Availability option
-     *
-     * @var bool
-     */
-    protected $_canUseInternal = true;
-    /**
-     * Availability option
-     *
-     * @var bool
-     */
-    protected $_canUseCheckout = true;
-    /**
-     * Availability option
-     *
-     * @var bool
-     */
-    protected $_canFetchTransactionInfo = true;
-    /**
-     * Availability option
-     *
-     * @var bool
-     */
-    protected $_canReviewPayment = true;
-    /**
-     * Website Payments Pro instance
-     *
-     * @var Config $config
-     */
-    protected $_config;
-    /**
-     * Payment additional information key for payment action
-     *
-     * @var string
-     */
-    protected $_isOrderPaymentActionKey = 'is_order_action';
-    /**
-     * Payment additional information key for number of used authorizations
-     *
-     * @var string
-     */
-    protected $_authorizationCountKey = 'authorization_count';
-    /**
-     * @var StoreManagerInterface
-     */
-    protected $_storeManager;
-    /**
-     * @var UrlInterface
-     */
-    protected $_urlBuilder;
-    /**
-     * @var UrlInterface
-     */
-    protected $_formKey;
-    /**
-     * @var Session
-     */
-    protected $_checkoutSession;
-    /**
-     * @var LocalizedExceptionFactory
-     */
-    protected $_exception;
-    /**
-     * @var TransactionRepositoryInterface
-     */
-    protected $transactionRepository;
-    /**
-     * @var BuilderInterface
-     */
-    protected $transactionBuilder;
-    protected $creditCardTokenFactory;
-    protected $paymentTokenRepository;
-    /**
-     * @var PaymentTokenManagementInterface
-     */
-    protected PaymentTokenManagementInterface $paymentTokenManagement;
-    /**
-     * @var EncryptorInterface
-     */
-    protected $encryptor;
-    /**
-     * @var Payment
-     */
-    protected $payment;
-    /**
-     * Availability option
-     *
-     * @var bool
-     */
-    protected $_canRefund               = true;
-    protected $_canRefundInvoicePartial = true;
-    /**
-     * @var PaymentTokenResourceModel
-     */
-    protected $paymentTokenResourceModel;
-    protected $transactions;
-    /**
-     * \Magento\Payment\Helper\Data $paymentData,
-     */
-    protected $_paymentData;
-
-    /**
-     * @var OrderRepositoryInterface $orderRepository
-     */
-    protected $orderRepository;
-
+    public const        SECURE = ['_secure' => true];
+    public const        FFFFFF = '#ffffff';
     /**
      * @var array|string[]
      */
@@ -246,32 +91,246 @@ class Fortis extends AbstractMethod
         'fortis_border_radius',
     ];
 
+    /**
+     * @var array|string[]
+     */
     public static array $encryptedConfigKeys = [
         'user_id',
         'user_api_key',
     ];
 
     /**
+     * @var string
+     */
+    protected $_code = Config::METHOD_CODE;
+
+    /**
+     * @var string
+     */
+    protected $_formBlockType = \Fortispay\Fortis\Block\Form::class;
+
+    /**
+     * @var string
+     */
+    protected $_infoBlockType = \Fortispay\Fortis\Block\Payment\Info::class;
+
+    /**
+     * @var string
+     */
+    protected $_configType = Fortispay\Fortis\Model\Config::class;
+
+    /**
+     * Payment Method feature
+     *
+     * @var bool
+     */
+    protected $_isInitializeNeeded = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_isGateway = false;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canOrder = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canAuthorize = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canCapture = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canVoid = false;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canUseInternal = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canUseCheckout = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canFetchTransactionInfo = true;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canReviewPayment = true;
+
+    /**
+     * Website Payments Pro instance
+     *
+     * @var Config $config
+     */
+    protected $_config;
+
+    /**
+     * Payment additional information key for payment action
+     *
+     * @var string
+     */
+    protected $_isOrderPaymentActionKey = 'is_order_action';
+
+    /**
+     * Payment additional information key for number of used authorizations
+     *
+     * @var string
+     */
+    protected $_authorizationCountKey = 'authorization_count';
+
+    /**
+     * @var StoreManagerInterface
+     */
+    protected $_storeManager;
+
+    /**
+     * @var UrlInterface
+     */
+    protected $_urlBuilder;
+
+    /**
+     * @var UrlInterface
+     */
+    protected $_formKey;
+
+    /**
+     * @var Session
+     */
+    protected $_checkoutSession;
+
+    /**
+     * @var LocalizedExceptionFactory
+     */
+    protected $_exception;
+
+    /**
+     * @var TransactionRepositoryInterface
+     */
+    protected $transactionRepository;
+
+    /**
+     * @var BuilderInterface
+     */
+    protected $transactionBuilder;
+
+    /**
+     * @var CreditCardTokenFactory
+     */
+    protected $creditCardTokenFactory;
+
+    /**
+     * @var PaymentTokenRepositoryInterface
+     */
+    protected $paymentTokenRepository;
+
+    /**
+     * @var PaymentTokenManagementInterface
+     */
+    protected PaymentTokenManagementInterface $paymentTokenManagement;
+
+    /**
+     * @var EncryptorInterface
+     */
+    protected $encryptor;
+
+    /**
+     * @var Payment
+     */
+    protected $payment;
+
+    /**
+     * Availability option
+     *
+     * @var bool
+     */
+    protected $_canRefund = true;
+
+    /**
+     * @var bool
+     */
+    protected $_canRefundInvoicePartial = true;
+
+    /**
+     * @var PaymentTokenResourceModel
+     */
+    protected $paymentTokenResourceModel;
+
+    /**
+     * @var TransactionSearchResultInterfaceFactory
+     */
+    protected $transactions;
+
+    /**
+     * @var Data
+     */
+    protected $_paymentData;
+
+    /**
+     * @var OrderRepositoryInterface $orderRepository
+     */
+    protected $orderRepository;
+
+    /**
+     * Construct
+     *
      * @param Context $context
      * @param Registry $registry
      * @param ExtensionAttributesFactory $extensionFactory
      * @param AttributeValueFactory $customAttributeFactory
      * @param \Magento\Payment\Helper\Data $paymentData
+     * @param Data $fortisData
      * @param ScopeConfigInterface $scopeConfig
      * @param Logger $logger
      * @param ConfigFactory $configFactory
      * @param StoreManagerInterface $storeManager
      * @param UrlInterface $urlBuilder
      * @param FormKey $formKey
-     * @param CartFactory $cartFactory
      * @param Session $checkoutSession
      * @param LocalizedExceptionFactory $exception
      * @param TransactionRepositoryInterface $transactionRepository
      * @param BuilderInterface $transactionBuilder
-     * @param AbstractResource $resource
-     * @param AbstractDb $resourceCollection
+     * @param CreditCardTokenFactory $CreditCardTokenFactory
+     * @param PaymentTokenRepositoryInterface $PaymentTokenRepositoryInterface
+     * @param PaymentTokenManagementInterface $paymentTokenManagement
+     * @param EncryptorInterface $encryptor
+     * @param PaymentTokenResourceModel $paymentTokenResourceModel
+     * @param TransactionSearchResultInterfaceFactory $transactions
+     * @param OrderRepositoryInterface $orderRepository
+     * @param AbstractResource|null $resource
+     * @param AbstractDb|null $resourceCollection
      * @param array $data
-     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
         Context $context,
@@ -300,7 +359,7 @@ class Fortis extends AbstractMethod
         AbstractResource $resource = null,
         AbstractDb $resourceCollection = null,
         array $data = []
-    ){
+    ) {
         parent::__construct(
             $context,
             $registry,
@@ -334,16 +393,10 @@ class Fortis extends AbstractMethod
         $this->_config = $configFactory->create($parameters);
     }
 
-    public function pay($invoice)
-    {
-    }
-
     /**
-     * Store setter
-     * Also updates store ID in config object
+     * Store setter; also updates store ID in config object
      *
      * @param Store|int $store
-     *
      * @return $this
      */
     public function setStore($store)
@@ -395,7 +448,11 @@ class Fortis extends AbstractMethod
 
     /**
      * This is where we compile data posted by the form
+     *
+     * @param bool $saveAccount
+     *
      * @return array
+     * @throws Exception
      */
     public function getFortisOrderToken(bool $saveAccount)
     {
@@ -442,9 +499,11 @@ class Fortis extends AbstractMethod
     }
 
     /**
+     * Get Fortis Credentials
+     *
      * @return array
      */
-    public function getFortrisCredentials(): array
+    public function getFortisCredentials(): array
     {
         $creds = [];
         foreach (self::$configKeys as $key) {
@@ -459,6 +518,10 @@ class Fortis extends AbstractMethod
     }
 
     /**
+     * Prepare Fields
+     *
+     * @param Order $order
+     *
      * @return array
      */
     public function prepareFields(Order $order): array
@@ -469,7 +532,7 @@ class Fortis extends AbstractMethod
 
         $this->_logger->debug($pre . 'serverMode : ' . $this->getConfigData('test_mode'));
 
-        $cred = $this->getFortrisCredentials();
+        $cred = $this->getFortisCredentials();
 
         $user_id      = $cred['user_id'];
         $user_api_key = $cred['user_api_key'];
@@ -484,7 +547,7 @@ class Fortis extends AbstractMethod
             ],
             'appearance_options' => [
                 'colorButtonSelectedBackground' => $cred['fortis_color_button_selected_background'] ?? '#363636',
-                'colorButtonSelectedText'       => isset($cred['fortis_color_button_selected_text']) ? $cred['fortis_color_button_selected_text'] : self::FFFFFF,
+                'colorButtonSelectedText'       => $cred['fortis_color_button_selected_text'] ?? self::FFFFFF,
                 'colorButtonActionBackground'   => $cred['fortis_color_button_action_background'] ?? '#00d1b2',
                 'colorButtonActionText'         => $cred['fortis_color_button_action_text'] ?? self::FFFFFF,
                 'colorButtonBackground'         => $cred['fortis_color_button_background'] ?? self::FFFFFF,
@@ -505,19 +568,24 @@ class Fortis extends AbstractMethod
         $action = $this->getConfigData('order_intention');
         if ($action === 'sale') {
             $returnUrl = $this->_urlBuilder->getUrl(
-                    'fortis/redirect/success',
-                    self::SECURE
-                ) . '?gid=' . $order->getRealOrderId();
+                'fortis/redirect/success',
+                self::SECURE
+            ) . '?gid=' . $order->getRealOrderId();
         } else {
             $returnUrl = $this->_urlBuilder->getUrl(
-                    'fortis/redirect/authorise',
-                    self::SECURE
-                ) . '?gid=' . $order->getRealOrderId();
+                'fortis/redirect/authorise',
+                self::SECURE
+            ) . '?gid=' . $order->getRealOrderId();
         }
 
         return [$user_id, $user_api_key, $action, $options, $returnUrl];
     }
 
+    /**
+     * Get Order Place Redirect Url
+     *
+     * @return string
+     */
     public function getOrderPlaceRedirectUrl()
     {
         return $this->getCheckoutRedirectUrl();
@@ -527,8 +595,6 @@ class Fortis extends AbstractMethod
      * Checkout redirect URL getter for onepage checkout (hardcode)
      *
      * @return string
-     * @see Quote\Payment::getCheckoutRedirectUrl()
-     * @see \Magento\Checkout\Controller\Onepage::savePaymentAction()
      */
     public function getCheckoutRedirectUrl()
     {
@@ -536,11 +602,12 @@ class Fortis extends AbstractMethod
     }
 
     /**
+     * Initialize
      *
      * @param string $paymentAction
      * @param object $stateObject
      *
-     * @return $this
+     * @return Fortis
      */
     public function initialize($paymentAction, $stateObject)
     {
@@ -568,7 +635,14 @@ class Fortis extends AbstractMethod
         return $this->paymentTokenResourceModel->addLinkToOrderPayment($paymentTokenId, $orderPaymentId);
     }
 
-    public function getCountryDetails($code2)
+    /**
+     * Get Country Details
+     *
+     * @param mixed $code2
+     *
+     * @return mixed|void
+     */
+    public function getCountryDetails(mixed $code2)
     {
         $countries = CountryData::getCountries();
 
@@ -655,24 +729,37 @@ class Fortis extends AbstractMethod
 
                 return false;
             }
-        } catch (\Exception $exception) {
+        } catch (Exception $exception) {
             $order->addStatusHistoryComment(__("Refund not successful"))->save();
 
             return false;
         }
     }
 
-    public function getOrderbyOrderId($order_id)
+    /**
+     * Get Order by Order Id
+     *
+     * @param int $order_id
+     *
+     * @return \Magento\Sales\Api\Data\OrderInterface
+     */
+    public function getOrderbyOrderId(int $order_id)
     {
         return $this->orderRepository->get($order_id);
     }
 
     /**
-     * @inheritdoc
+     * Fetch Transaction Info
+     *
+     * @param InfoInterface $payment
+     * @param int $transactionId
+     *
+     * @return array|mixed
+     * @throws LocalizedException
      */
     public function fetchTransactionInfo(InfoInterface $payment, $transactionId)
     {
-        $state = ObjectManager::getInstance()->get('\Magento\Framework\App\State');
+        $state = ObjectManager::getInstance()->get(\Magento\Framework\App\State::class);
         if ($state->getAreaCode() == Area::AREA_ADMINHTML) {
             $order_id = $payment->getOrder()->getId();
             $order    = $this->getOrderbyOrderId($order_id);
@@ -693,13 +780,20 @@ class Fortis extends AbstractMethod
         return $result;
     }
 
+    /**
+     * Get Standard Checkout Form Fields
+     *
+     * @return string
+     */
     public function getStandardCheckoutFormFields()
     {
         return 'TODO';
     }
 
     /**
-     * @return \Magento\Vault\Api\PaymentTokenManagementInterface
+     * Get Payment Token Management
+     *
+     * @return PaymentTokenManagementInterface
      */
     public function getPaymentTokenManagement(): PaymentTokenManagementInterface
     {
@@ -707,56 +801,16 @@ class Fortis extends AbstractMethod
     }
 
     /**
-     * @return mixed
-     */
-    protected function getStoreName()
-    {
-        return $this->_scopeConfig->getValue(
-            'general/store_information/name',
-            ScopeInterface::SCOPE_STORE
-        );
-    }
-
-    /**
-     * Place an order with authorization or capture action
+     * Save Vault Data
      *
-     * @param Payment $payment
-     * @param float $amount
-     *
-     * @return $this
-     */
-    protected function _placeOrder(Payment $payment, $amount)
-    {
-        $pre = __METHOD__ . " : ";
-        $this->_logger->debug($pre . 'bof');
-    }
-
-    /**
-     * Get transaction with type order
-     *
-     * @param OrderPaymentInterface $payment
-     *
-     * @return false|TransactionInterface
-     */
-    protected function getOrderTransaction($payment)
-    {
-        return $this->transactionRepository->getByTransactionType(
-            Transaction::TYPE_ORDER,
-            $payment->getId(),
-            $payment->getOrder()->getId()
-        );
-    }
-
-    /**
-     * @param $order
-     * @param $data
+     * @param object $order
+     * @param object $data
      *
      * @return void
      */
-    public function saveVaultData($order, $data)
+    public function saveVaultData(object $order, object $data)
     {
-        if (
-            ((int)($this->getConfigData('fortis_cc_vault_active') ?? 0) !== 1) ||
+        if (((int)($this->getConfigData('fortis_cc_vault_active') ?? 0) !== 1) ||
             !isset($data->saved_account)
         ) {
             return;
@@ -802,35 +856,56 @@ class Fortis extends AbstractMethod
     }
 
     /**
-     * @param Payment $payment
+     * Get Store Name
      *
-     * @return string
+     * @return mixed
      */
-    private function getExpirationDate($month, $year)
+    protected function getStoreName()
     {
-        $expDate = new \DateTime(
-            $year
-            . '-'
-            . $month
-            . '-'
-            . '01'
-            . ' '
-            . '00:00:00',
-            new \DateTimeZone('UTC')
+        return $this->_scopeConfig->getValue(
+            'general/store_information/name',
+            ScopeInterface::SCOPE_STORE
         );
-        $expDate->add(new \DateInterval('P1M'));
+    }
 
-        return $expDate->format('Y-m-d 00:00:00');
+    /**
+     * Place an order with authorization or capture action
+     *
+     * @param Payment $payment
+     * @param float $amount
+     *
+     * @return $this
+     */
+    protected function _placeOrder(Payment $payment, $amount)
+    {
+        $pre = __METHOD__ . " : ";
+        $this->_logger->debug($pre . 'bof');
+    }
+
+    /**
+     * Get transaction with type order
+     *
+     * @param OrderPaymentInterface $payment
+     *
+     * @return false|TransactionInterface
+     */
+    protected function getOrderTransaction($payment)
+    {
+        return $this->transactionRepository->getByTransactionType(
+            Transaction::TYPE_ORDER,
+            $payment->getId(),
+            $payment->getOrder()->getId()
+        );
     }
 
     /**
      * Generate vault payment public hash
      *
-     * @param $paymentToken
+     * @param object $paymentToken
      *
      * @return string
      */
-    protected function generatePublicHash($paymentToken)
+    protected function generatePublicHash(object $paymentToken)
     {
         $hashKey = $paymentToken->getGatewayToken();
         if ($paymentToken->getCustomerId()) {
@@ -839,8 +914,34 @@ class Fortis extends AbstractMethod
         $paymentToken->getTokenDetails();
 
         $hashKey .= $paymentToken->getPaymentMethodCode() . $paymentToken->getType() . $paymentToken->getGatewayToken(
-            ) . $paymentToken->getTokenDetails();
+        ) . $paymentToken->getTokenDetails();
 
         return $this->encryptor->getHash($hashKey);
+    }
+
+    /**
+     * Get Expiration Date
+     *
+     * @param string $month
+     * @param string $year
+     *
+     * @return string
+     * @throws Exception
+     */
+    private function getExpirationDate(string $month, string $year)
+    {
+        $expDate = new DateTime(
+            $year
+            . '-'
+            . $month
+            . '-'
+            . '01'
+            . ' '
+            . '00:00:00',
+            new DateTimeZone('UTC')
+        );
+        $expDate->add(new DateInterval('P1M'));
+
+        return $expDate->format('Y-m-d 00:00:00');
     }
 }

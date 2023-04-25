@@ -15,11 +15,11 @@ abstract class AbstractConfig implements ConfigInterface
     /**
      * Payment actions
      */
-    const PAYMENT_ACTION_SALE = 'Sale';
+    public const PAYMENT_ACTION_SALE = 'Sale';
 
-    const PAYMENT_ACTION_AUTH = 'Authorization';
+    public const PAYMENT_ACTION_AUTH = 'Authorization';
 
-    const PAYMENT_ACTION_ORDER = 'Order';
+    public const PAYMENT_ACTION_ORDER = 'Order';
     /**#@-*/
     /**
      * Core store config
@@ -117,9 +117,9 @@ abstract class AbstractConfig implements ConfigInterface
      * Returns payment configuration value
      *
      * @param string $key
-     * @param null $storeId
+     * @param string|null $storeId
      *
-     * @return null|string
+     * @return string|null
      *
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
@@ -168,7 +168,7 @@ abstract class AbstractConfig implements ConfigInterface
     /**
      * Check whether method available for checkout or not
      *
-     * @param null $methodCode
+     * @param string|null $methodCode
      *
      * @return bool
      */

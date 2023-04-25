@@ -19,15 +19,13 @@ class Cron extends AbstractHelper
     protected $_logger;
 
     /**
+     * Construct
+     *
      * @param Context $context
-     * @param \Magento\Payment\Helper\Data $paymentData
-     * @param BaseFactory $configFactory
-     * @param array $methodCodes
      */
     public function __construct(
         Context $context
     ) {
         $this->_logger = $context->getLogger();
     }
-
 }
