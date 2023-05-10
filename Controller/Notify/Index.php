@@ -39,11 +39,11 @@ class Index extends AbstractFortis implements CsrfAwareActionInterface
         } catch (LocalizedException $e) {
             $this->_logger->error($pre . $e->getMessage());
             $this->messageManager->addExceptionMessage($e, $e->getMessage());
-            $this->_redirect('checkout/cart');
+            return $this->getRedirectToCartObject();
         } catch (Exception $e) {
             $this->_logger->error($pre . $e->getMessage());
             $this->messageManager->addExceptionMessage($e, __('We can\'t start Fortis Checkout.'));
-            $this->_redirect('checkout/cart');
+            return $this->getRedirectToCartObject();
         }
 
         return $page_object;
@@ -63,5 +63,10 @@ class Index extends AbstractFortis implements CsrfAwareActionInterface
     public function validateForCsrf(RequestInterface $request): ?bool
     {
         return true;
+    }
+
+    public function getResponse()
+    {
+        return $this->getResponse();
     }
 }

@@ -86,4 +86,9 @@ class Index extends AbstractFortis
             }
         }
     }
+
+    public function getResponse()
+    {
+        return $this->getResponse();
+    }
 }

@@ -17,8 +17,6 @@ use Magento\Framework\View\Result\PageFactory;
 class Index extends AbstractFortis
 {
 
-    public const CARTURL = 'checkout/cart';
-
     /**
      * @var PageFactory
      */
@@ -45,11 +43,11 @@ class Index extends AbstractFortis
         } catch (LocalizedException $e) {
             $this->_logger->error($pre . $e->getMessage());
             $this->messageManager->addExceptionMessage($e, $e->getMessage());
-            $this->_redirect(self::CARTURL);
+            return $this->getRedirectToCartObject();
         } catch (Exception $e) {
             $this->_logger->error($pre . $e->getMessage());
             $this->messageManager->addExceptionMessage($e, __('We can\'t start Fortis Checkout.'));
-            $this->_redirect(self::CARTURL);
+            return $this->getRedirectToCartObject();
         }
 
         $block = $page_object->getLayout()
@@ -57,11 +55,17 @@ class Index extends AbstractFortis
                              ->setPaymentFormData($order ?? null);
 
         $formData = $block->getSubmitForm();
-        if (!$formData) {
+        $successURL = $block->getSuccessURL();
+        if (!$formData && !$successURL) {
             $this->_logger->error("We can\'t start Fortis Checkout.");
-            $this->_redirect(self::CARTURL);
+            return $this->getRedirectToCartObject();
         }
 
         return $page_object;
+    }
+
+    public function getResponse()
+    {
+        return $this->getResponse();
     }
 }

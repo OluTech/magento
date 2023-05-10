@@ -100,7 +100,7 @@ class Success extends AbstractFortis
         $orderHistories = $order->getAllStatusHistory();
         foreach ($orderHistories as $history) {
             if ($comment = $history->getComment()) {
-                if (strpos($comment, 'product_transaction_id') === 0) {
+                if (str_starts_with($comment, 'product_transaction_id')) {
                     $product_transaction_id_order = explode(':', $comment)[1];
                 }
                 break;
@@ -178,9 +178,11 @@ class Success extends AbstractFortis
                     $order->setState($status)->setStatus($status)->save();
                     // Invoice capture code completed
                     if (!$tokenised) {
-                        return json_encode(
-                            ['redirectTo' => $this->redirectToSuccessPageString]
-                        );
+                        $resultJson = $this->resultJsonFactory->create();
+                        return $resultJson->setData([
+                            'redirectTo' => $this->redirectToSuccessPageString,
+                        ]);
+
                     } else {
                         $redirect = $this->resultFactory->create(
                             \Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT
@@ -201,9 +203,10 @@ class Success extends AbstractFortis
                     $this->_checkoutSession->restoreQuote();
                     $this->createTransaction($data);
                     if (!$tokenised) {
-                        return json_encode(
-                            ['redirectTo' => $this->redirectToCartPageString]
-                        );
+                        $resultJson = $this->resultJsonFactory->create();
+                        return $resultJson->setData([
+                            'redirectTo' => $this->redirectToCartPageString,
+                        ]);
                     } else {
                         $redirect = $this->resultFactory->create(
                             \Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT
@@ -331,5 +334,10 @@ class Success extends AbstractFortis
             $redirect->setUrl($this->redirectToSuccessPageString);
             return $redirect;
         }
+    }
+
+    public function getResponse()
+    {
+        return $this->getResponse();
     }
 }

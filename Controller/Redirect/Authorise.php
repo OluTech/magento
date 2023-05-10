@@ -99,7 +99,7 @@ class Authorise extends AbstractFortis
         $orderHistories = $order->getAllStatusHistory();
         foreach ($orderHistories as $history) {
             if ($comment = $history->getComment()) {
-                if (strpos($comment, 'product_transaction_id') === 0) {
+                if (str_starts_with($comment, 'product_transaction_id')) {
                     $product_transaction_id_order = explode(':', $comment)[1];
                 }
                 break;
@@ -177,9 +177,10 @@ class Authorise extends AbstractFortis
                     $order->setState($status)->setStatus($status)->save();
                     // Invoice capture code completed
                     if (!$tokenised) {
-                        return json_encode(
-                            ['redirectTo' => $this->redirectToSuccessPageString]
-                        );
+                        $resultJson = $this->resultJsonFactory->create();
+                        return $resultJson->setData([
+                            'redirectTo' => $this->redirectToSuccessPageString,
+                        ]);
                     } else {
                         $redirect = $this->resultFactory->create(
                             \Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT
@@ -200,11 +201,10 @@ class Authorise extends AbstractFortis
                     $this->_checkoutSession->restoreQuote();
                     $this->createTransaction($data);
                     if (!$tokenised) {
-                        $redirect = $this->resultFactory->create(
-                            \Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT
-                        );
-                        $redirect->setUrl($this->redirectToCartPageString);
-                        return $redirect;
+                        $resultJson = $this->resultJsonFactory->create();
+                        return $resultJson->setData([
+                            'redirectTo' => $this->redirectToCartPageString,
+                        ]);
                     } else {
                         $redirect = $this->resultFactory->create(
                             \Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT
@@ -232,7 +232,7 @@ class Authorise extends AbstractFortis
      *
      * @return int|void
      */
-    public function createTransaction(array $rawData = [])
+    public function createTransaction(stdClass $rawData)
     {
         try {
             $paymentData = $rawData->data;
@@ -331,5 +331,10 @@ class Authorise extends AbstractFortis
             // Redirect to Cart if Order not found
             return $this->redirectToSuccessPageString;
         }
+    }
+
+    public function getResponse()
+    {
+        return $this->getResponse();
     }
 }

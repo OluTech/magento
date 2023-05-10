@@ -67,6 +67,8 @@ class Request extends Template
      */
     protected $resultFactory;
 
+    private string $successURL;
+
     /**
      * Construct
      *
@@ -105,12 +107,7 @@ class Request extends Template
         $this->resultFactory  = $resultFactory;
     }
 
-    /**
-     * Prepare Layout
-     *
-     * @return Request
-     */
-    public function _prepareLayout(): Request
+    public function _prepareLayout()
     {
         $order          = $this->_checkoutSession->getLastRealOrder();
         $orderData      = $order->getPayment()->getData();
@@ -124,6 +121,7 @@ class Request extends Template
 
         $action = $this->_paymentMethod->getConfigData('order_intention');
 
+        $returnUrl = "";
         if ($action === 'sale') {
             $returnUrl = $this->_urlBuilder->getUrl(
                 'fortis/redirect/success',
@@ -167,18 +165,24 @@ class Request extends Template
                     $intentData['product_transaction_id'] = $productTransactionId;
                 }
 
-                $transactionResult = $api->doTokenisedTransaction($intentData, $user_id, $user_api_key);
+                if ($action === "auth-only") {
+                    $transactionResult = $api->doAuthTransaction($intentData, $user_id, $user_api_key);
+                } else {
+                    $transactionResult = $api->doTokenisedTransaction($intentData, $user_id, $user_api_key);
+                }
+
                 $transactionResult = json_decode($transactionResult);
                 if (strpos($transactionResult->type ?? '', 'Error') !== false
                     || isset($transactionResult->errors)
                 ) {
                     throw new LocalizedException(__('Error: Please use a different saved card or a new card.'));
                 }
-                $returnUrl .= '&tid=' . $transactionResult->data->id;
 
+                $returnUrl .= '&tid=' . $transactionResult->data->id;
                 $redirect = $this->resultFactory->create(\Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT);
                 $redirect->setUrl($returnUrl);
 
+                $this->successURL = $returnUrl;
                 return $redirect;
             } catch (LocalizedException $e) {
                 $this->_logger->error($e->getMessage());
@@ -186,7 +190,7 @@ class Request extends Template
                 $this->setMessage($e->getMessage());
                 $this->_checkoutSession->restoreQuote();
 
-                return parent::_prepareLayout();
+                return $e;
             } catch (Exception $exception) {
                 return $exception;
             }
@@ -303,7 +307,7 @@ SUBMIT;
                 window.location.href = redirect.redirectTo;
             }, 2000);
           } else {
-            
+
           }
         })
 
@@ -325,6 +329,12 @@ SUBMIT;
              ->setSubmitForm($submit);
 
         return parent::_prepareLayout();
+    }
+
+    public function getSuccessURL(): ?string
+    {
+        return (isset($this->successURL) ? ('<script>window.top.location.href="' . $this->successURL . '";</script>') : $this->getSubmitForm());
+
     }
 
     /**

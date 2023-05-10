@@ -27,4 +27,9 @@ class Order extends AbstractFortis
 
         return $response;
     }
+
+    public function getResponse()
+    {
+        return $this->getResponse();
+    }
 }

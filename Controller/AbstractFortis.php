@@ -9,13 +9,18 @@ use Magento\Checkout\Controller\Express\RedirectLoginInterface;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Customer\Model\Session as CustomerSession;
 use Magento\Customer\Model\Url;
-use Magento\Framework\App\Action\Action as AppAction;
-use Magento\Framework\App\Action\Context;
+use Magento\Framework\App\Action\HttpGetActionInterface;
+use Magento\Framework\App\Action\HttpPostActionInterface;
+use Magento\Framework\App\CsrfAwareActionInterface;
+use Magento\Framework\App\Request\InvalidRequestException;
+use Magento\Framework\App\RequestInterface;
 use Magento\Framework\App\State;
+use Magento\Framework\Controller\ResultFactory;
 use Magento\Framework\DB\Transaction as DBTransaction;
 use Magento\Framework\DB\TransactionFactory;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Message\ManagerInterface;
 use Magento\Framework\Session\Generic;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Framework\Url\Helper\Data;
@@ -33,16 +38,13 @@ use Magento\Sales\Model\ResourceModel\Order\CollectionFactory;
 use Magento\Sales\Model\Service\InvoiceService;
 use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface;
-use Magento\Framework\App\CsrfAwareActionInterface;
-use Magento\Framework\App\Request\InvalidRequestException;
-use Magento\Framework\App\RequestInterface;
-use Magento\Framework\Controller\ResultFactory;
+use Magento\Framework\Controller\Result\JsonFactory;
 
 /**
  * Checkout Controller
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
-abstract class AbstractFortis extends AppAction implements RedirectLoginInterface, CsrfAwareActionInterface
+abstract class AbstractFortis implements HttpGetActionInterface, HttpPostActionInterface, RedirectLoginInterface, CsrfAwareActionInterface
 {
     /**
      * @var array|string[]
@@ -216,8 +218,12 @@ abstract class AbstractFortis extends AppAction implements RedirectLoginInterfac
      */
     protected $resultFactory;
 
+    protected ManagerInterface $messageManager;
+
+    public const CARTURL = 'checkout/cart';
+    protected JsonFactory $resultJsonFactory;
+
     /**
-     * @param Context $context
      * @param PageFactory $pageFactory
      * @param CustomerSession $customerSession
      * @param CheckoutSession $checkoutSession
@@ -246,9 +252,9 @@ abstract class AbstractFortis extends AppAction implements RedirectLoginInterfac
      * @param EncryptorInterface $encryptor
      * @param RequestInterface $request
      * @param ResultFactory $resultFactory
+     * @param ManagerInterface $messageManager
      */
     public function __construct(
-        Context $context,
         PageFactory $pageFactory,
         CustomerSession $customerSession,
         CheckoutSession $checkoutSession,
@@ -276,7 +282,9 @@ abstract class AbstractFortis extends AppAction implements RedirectLoginInterfac
         TransactionSearchResultInterfaceFactory $transactionSearchResultInterfaceFactory,
         EncryptorInterface $encryptor,
         RequestInterface $request,
-        ResultFactory $resultFactory
+        ResultFactory $resultFactory,
+        ManagerInterface $messageManager,
+        JsonFactory $resultJsonFactory
     ) {
         $pre = __METHOD__ . " : ";
 
@@ -309,11 +317,11 @@ abstract class AbstractFortis extends AppAction implements RedirectLoginInterfac
         $this->encryptor                               = $encryptor;
         $this->request                                 = $request;
         $this->resultFactory                           = $resultFactory;
+        $this->messageManager                          = $messageManager;
+        $this->resultJsonFactory                       = $resultJsonFactory;
 
         $this->state         = $state;
         $this->_fortishelper = $fortishelper;
-
-        parent::__construct($context);
 
         $this->_logger->debug($pre . 'eof');
     }
@@ -474,5 +482,12 @@ abstract class AbstractFortis extends AppAction implements RedirectLoginInterfac
     public function validateForCsrf(RequestInterface $request): ?bool
     {
         return true;
+    }
+
+    public function getRedirectToCartObject(): \Magento\Framework\Controller\ResultInterface
+    {
+        $redirect = $this->resultFactory->create(\Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT);
+        $redirect->setUrl(self::CARTURL);
+        return $redirect;
     }
 }

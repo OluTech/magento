@@ -6,6 +6,7 @@ use Fortispay\Fortis\Helper\Data;
 use Fortispay\Fortis\Model\Config;
 use Fortispay\Fortis\Model\ConfigFactory;
 use Fortispay\Fortis\Model\Fortis\Checkout;
+use Psr\Log\LoggerInterface;
 use Magento\Customer\Helper\Session\CurrentCustomer;
 use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\View\Element\Template\Context;
@@ -61,9 +62,11 @@ class Form extends \Magento\Payment\Block\Form
         ResolverInterface $localeResolver,
         Data $fortisData,
         CurrentCustomer $currentCustomer,
+        LoggerInterface $logger,
         array $data = []
     ) {
         $pre = __METHOD__ . " : ";
+        $this->_logger = $logger;
         $this->_logger->debug($pre . 'bof');
         $this->_fortisData         = $fortisData;
         $this->fortisConfigFactory = $fortisConfigFactory;

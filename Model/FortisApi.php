@@ -7,7 +7,7 @@ use stdClass;
 
 class FortisApi
 {
-    public const DEVELOPER_ID_SANDBOX = 'mcoYRDJA';
+    public const DEVELOPER_ID_SANDBOX = 'Mgv2TEST';
     public const DEVELOPER_ID         = 'Mgv24PRD';
     public const FORTIS_API_SANDBOX   = "https://api.sandbox.fortis.tech";
     public const FORTIS_API           = "https://api.fortis.tech";
