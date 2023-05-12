@@ -5,6 +5,7 @@ namespace Fortispay\Fortis\Controller\Redirect;
 use Exception;
 use Fortispay\Fortis\Controller\AbstractFortis;
 use Fortispay\Fortis\Model\FortisApi;
+use Magento\Sales\Api\Data\TransactionInterface;
 use Magento\Sales\Model\Order\Invoice;
 use Magento\Sales\Model\Order\Payment\Transaction;
 use stdClass;
@@ -128,7 +129,7 @@ class Authorise extends AbstractFortis
                 case 1000:  // Success
                     // Check for stored card and save if necessary
                     $model = $this->_paymentMethod;
-                    $model->saveVaultData($order, $fortrisTransaction);
+                    $model->saveVaultData($order, $data);
 
                     $status = \Magento\Sales\Model\Order::STATE_PROCESSING;
                     if ($this->getConfigData('Successful_Order_status') != "") {
@@ -144,38 +145,14 @@ class Authorise extends AbstractFortis
                         )->setIsCustomerNotified(true)->save();
                     }
 
+                    // Save Transaction Response
+                    $this->createTransaction($rawTransaction);
+
                     $order->setPaymentAuthorizationAmount($fortrisTransaction->auth_amount / 100.0);
                     $order->setPayment();
 
-                    // Capture invoice when authorisation is successful
-                    $invoice = $this->_invoiceService->prepareInvoice($order);
-                    $invoice->setRequestedCaptureCase(Invoice::NOT_CAPTURE);
-                    $invoice->register();
-
-                    // Save the invoice to the order
-                    $transaction = $this->dbTransaction
-                        ->addObject($invoice)
-                        ->addObject($invoice->getOrder());
-
-                    $transaction->save();
-
-                    // Magento\Sales\Model\Order\Email\Sender\InvoiceSender
-                    $send_invoice_email = $model->getConfigData('invoice_email');
-                    if ($send_invoice_email != '0') {
-                        $this->invoiceSender->send($invoice);
-                        $order->addStatusHistoryComment(
-                            __('Notified customer about invoice #%1.', $invoice->getId())
-                        )->setIsCustomerNotified(true)->save();
-                    }
-
-                    // Save Transaction Response
-                    $transactionId = $this->createTransaction($rawTransaction);
-
-                    $invoice->setTransactionId($transactionId);
-                    $invoice->save();
-
                     $order->setState($status)->setStatus($status)->save();
-                    // Invoice capture code completed
+
                     if (!$tokenised) {
                         $resultJson = $this->resultJsonFactory->create();
                         return $resultJson->setData([
@@ -242,6 +219,7 @@ class Authorise extends AbstractFortis
             $payment->setAmountPaid(0.00);
             $payment->setLastTransId($paymentData->id)
                     ->setTransactionId($paymentData->id)
+                    ->setIsTransactionClosed(false)
                     ->setAdditionalInformation(
                         [Transaction::RAW_DETAILS => json_encode($rawData)]
                     );
@@ -260,7 +238,7 @@ class Authorise extends AbstractFortis
                                  )
                                  ->setFailSafe(true)
                 // Build method creates the transaction and returns the object
-                                 ->build(Transaction::TYPE_AUTH);
+                                 ->build(TransactionInterface::TYPE_AUTH);
 
             $payment->addTransactionCommentsToOrder(
                 $transaction,

@@ -23,5 +23,9 @@
         <observer name="fortis_purchase_refund"
                   instance="Fortispay\Fortis\Observer\SaleRefund"/>
     </event>
+    <event name="sales_order_invoice_pay">
+        <observer name="fortis_capture_auth"
+                  instance="Fortispay\Fortis\Observer\OrderAuthCaptured"/>
+    </event>
 </config>
 
