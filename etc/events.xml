@@ -27,5 +27,9 @@
         <observer name="fortis_capture_auth"
                   instance="Fortispay\Fortis\Observer\OrderAuthCaptured"/>
     </event>
+    <event name="vault_payment_token_save_commit_after">
+        <observer name="fortis_delete_saved_vault"
+                  instance="Fortispay\Fortis\Observer\DeleteSavedVault"/>
+    </event>
 </config>
 

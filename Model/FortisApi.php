@@ -578,4 +578,68 @@ class FortisApi
     {
         return $this->completeAuthTransaction($intentData, $user_id, $user_api_key);
     }
+
+    private function tokenCCDelete($intentData, $user_id, $user_api_key): bool|string|null
+    {
+        $developer_id = $this->developerId;
+        $url          = $this->fortisApi . "/v1/tokens/" . $intentData["tokenId"];
+
+        unset($intentData['tokenId']);
+
+        $curl = curl_init($url);
+        curl_setopt_array(
+            $curl,
+            [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_ENCODING       => "",
+                CURLOPT_MAXREDIRS      => 10,
+                CURLOPT_TIMEOUT        => 0,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_1_1,
+                CURLOPT_CUSTOMREQUEST  => "DELETE",
+                CURLOPT_POSTFIELDS     => json_encode($intentData),
+                CURLOPT_HTTPHEADER     => [
+                    "Content-Type: application/json",
+                    "user-id: $user_id",
+                    "user-api-key: $user_api_key",
+                    "developer-id: $developer_id",
+                ],
+            ]
+        );
+
+        $cnt           = 0;
+        $intentCreated = false;
+        $curlError     = null;
+        $response      = null;
+        while (!$intentCreated && $cnt < 5) {
+            $response     = curl_exec($curl);
+            $responseCode = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+            if ($responseCode !== 200) {
+                $curlError = curl_error($curl);
+                $cnt++;
+            }
+            $intentCreated = true;
+        }
+
+        if (!$intentCreated) {
+            // Do something with this error
+            return $curlError;
+        }
+
+        return $response;
+    }
+
+    /**
+     * Do Complete Auth Transaction
+     *
+     * @param array $intentData
+     * @param string $user_id
+     * @param string $user_api_key
+     *
+     * @return string
+     */
+    public function doTokenCCDelete(array $intentData, string $user_id, string $user_api_key): string
+    {
+        return $this->tokenCCDelete($intentData, $user_id, $user_api_key);
+    }
 }
