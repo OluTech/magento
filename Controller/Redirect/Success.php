@@ -120,6 +120,10 @@ class Success extends AbstractFortis
             $user_api_key      = $this->getConfigData('user_api_key');
             $fortisTransaction = $api->getTransaction($data->id, $user_id, $user_api_key)->data;
 
+            if ($tokenised) {
+                $data = $fortisTransaction;
+            }
+
             if (!$tokenised && ($fortisTransaction->product_transaction_id !== $product_transaction_id_order)) {
                 throw new \Magento\Framework\Exception\RuntimeException(
                     __('Product transaction ids do not match')
