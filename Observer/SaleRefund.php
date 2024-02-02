@@ -2,6 +2,7 @@
 
 namespace Fortispay\Fortis\Observer;
 
+use Fortispay\Fortis\Model\Config;
 use Fortispay\Fortis\Model\FortisApi;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
@@ -99,20 +100,27 @@ class SaleRefund implements ObserverInterface
      * @var ScopeConfigInterface
      */
     private ScopeConfigInterface $scopeConfig;
+    /**
+     * @var \Fortispay\Fortis\Model\Config
+     */
+    private Config $config;
 
     /**
      * @param ScopeConfigInterface $scopeConfig
      * @param LoggerInterface $logger
      * @param EncryptorInterface $encryptor
+     * @param \Fortispay\Fortis\Model\Config $config
      */
     public function __construct(
         ScopeConfigInterface $scopeConfig,
         LoggerInterface $logger,
-        EncryptorInterface $encryptor
+        EncryptorInterface $encryptor,
+        Config $config
     ) {
         $this->logger      = $logger;
         $this->encryptor   = $encryptor;
         $this->scopeConfig = $scopeConfig;
+        $this->config      = $config;
     }
 
     /**
@@ -131,16 +139,32 @@ class SaleRefund implements ObserverInterface
         $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_api_key'));
         $type         = $this->scopeConfig->getValue('payment/fortis/order_intention');
 
+        $paymentMethod         = 'cc';
+        $additionalInformation = $payment->getAdditionalInformation();
+        if (!empty($additionalInformation) && !empty($additionalInformation['raw_details_info'])) {
+            $additionalInfo = json_decode($additionalInformation['raw_details_info']);
+            $paymentMethod  = $additionalInfo->payment_method;
+        }
+
         $intentData = [
             'transaction_amount' => $refundAmount,
             'transactionId'      => $payment->getLastTransId(),
             'description'        => $order->getIncrementId(),
         ];
-        $api        = new FortisApi($this->scopeConfig->getValue('payment/fortis/fortis_environment'));
+        $api        = new FortisApi($this->config);
         if ($type === 'auth-only') {
-            $response = $api->refundAuthAmount($intentData, $user_id, $user_api_key);
+            $api->refundAuthAmount($intentData, $user_id, $user_api_key);
         } else {
-            $response = $api->refundTransactionAmount($intentData, $user_id, $user_api_key);
+            if ($paymentMethod !== 'ach') {
+                $api->refundTransactionAmount($intentData, $user_id, $user_api_key);
+            } else {
+                $intentData = [
+                    'transaction_amount'      => $refundAmount,
+                    'description'             => $order->getIncrementId(),
+                    'previous_transaction_id' => $additionalInfo?->id,
+                ];
+                $api->achRefundTransactionAmount($intentData);
+            }
         }
     }
 }

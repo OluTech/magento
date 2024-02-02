@@ -24,7 +24,7 @@
                    type="checkbox"
                    value="true"/>
             <label class="label" data-bind="attr: {'for': getCode() + '_enable_vault'}">
-                <span><!-- ko i18n: 'Remember my credit card number'--><!-- /ko --></span>
+                <span><!-- ko i18n: 'Remember my payment method details'--><!-- /ko --></span>
             </label>
         </div>
         <!-- /ko -->
@@ -33,15 +33,25 @@
             <select id="fortis-saved_cards" name="fortis-saved_cards">
                 <!-- ko foreach: { data: JSON.parse(getFortisSavedCardList()), as: 'card' } -->
                 <option data-bind="attr: {'value': card.token}">
-                    <!-- ko i18n: "Use " --><!-- /ko -->
-                    <!-- ko i18n: card.card_type --><!-- /ko -->
-                    <!-- ko i18n: " ending in " --><!-- /ko -->
-                    <!-- ko i18n: card.masked_cc --><!-- /ko -->
+                    <!-- ko i18n: card.text --><!-- /ko -->
                 </option>
                 <!-- /ko -->
-                <option data-bind="attr: {'value': 'new-save'}"><!-- ko i18n: "Use a new Card" --><!-- /ko --></option>
-                <option data-bind="attr: {'value': 'new'}"><!-- ko i18n: "Use a new Card & don't save" -->
-                    <!-- /ko --></option>
+                <option data-bind="attr: {'value': 'new-save'}">
+                    <!-- ko if: !achIsEnabled(); -->
+                    <!-- ko i18n: "Use a new Card and save" --><!-- /ko -->
+                    <!-- /ko -->
+                    <!-- ko if: achIsEnabled(); -->
+                    <!-- ko i18n: "Use a new Payment Method and save" --><!-- /ko -->
+                    <!-- /ko -->
+                </option>
+                <option data-bind="attr: {'value': 'new'}">
+                    <!-- ko if: !achIsEnabled(); -->
+                    <!-- ko i18n: "Use a new Card and don't save" --><!-- /ko -->
+                    <!-- /ko -->
+                    <!-- ko if: achIsEnabled(); -->
+                    <!-- ko i18n: "Use a new Payment Method and don't save" --><!-- /ko -->
+                    <!-- /ko -->
+                </option>
             </select>
         </div>
         <!-- /ko -->
@@ -55,6 +65,11 @@
         <div class="checkout-agreements-block">
             <!-- ko foreach: $parent.getRegion('before-place-order') -->
             <!-- ko template: getTemplate() --><!-- /ko -->
+            <!--/ko-->
+        </div>
+        <div>
+            <!-- ko if: isFramed(); -->
+            <div id="fortis-framed-2567"></div>
             <!--/ko-->
         </div>
         <div class="actions-toolbar" style="display:block;">

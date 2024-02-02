@@ -3,9 +3,11 @@
 namespace Fortispay\Fortis\Model;
 
 use Exception;
+use Magento\Framework\Exception\RuntimeException;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\Order\Invoice;
 use Magento\Sales\Model\Order\Payment\Transaction;
+use Psr\Log\LoggerInterface;
 
 class ProcessResponse
 {
@@ -13,6 +15,18 @@ class ProcessResponse
      * @var string
      */
     private string $redirectToSuccessPageString;
+    /**
+     * @var \Fortispay\Fortis\Model\Config
+     */
+    private Config $config;
+
+    protected LoggerInterface $logger;
+
+    public function __construct(Config $config, LoggerInterface $logger)
+    {
+        $this->config = $config;
+        $this->logger = $logger;
+    }
 
     /**
      * Process Response
@@ -45,13 +59,13 @@ class ProcessResponse
 
         // Get the transaction
         try {
-            $api          = new FortisApi($this->getConfigData('fortis_environment'));
-            $user_id      = $this->getConfigData('user_id');
-            $user_api_key = $this->getConfigData('user_api_key');
+            $api          = new FortisApi($this->config);
+            $user_id      = $this->config->userId();
+            $user_api_key = $this->config->userApiKey();
             $transaction  = $api->getTransaction($data->id, $user_id, $user_api_key)->data;
 
             if ($transaction->product_transaction_id !== $product_transaction_id_order) {
-                throw new \Magento\Framework\Exception\RuntimeException('Product transaction ids do not match');
+                throw new RuntimeException('Product transaction ids do not match');
             }
             $status = $transaction->reason_code_id;
             switch ($status) {
@@ -103,6 +117,7 @@ class ProcessResponse
                     $invoice->save();
 
                     $order->setState($status)->setStatus($status)->save();
+
                     // Invoice capture code completed
                     return json_encode(
                         ['redirectTo' => $this->redirectToSuccessPageString]
@@ -126,6 +141,7 @@ class ProcessResponse
                         $this->_checkoutSession->restoreQuote();
                         // Save Transaction Response
                         $this->createTransaction($data);
+
                         return $this->redirectToCartPageString;
                     case 0:
                     case 4:
@@ -140,6 +156,7 @@ class ProcessResponse
                         $this->_checkoutSession->restoreQuote();
                         // Save Transaction Response
                         $this->createTransaction($data);
+
                         return $this->redirectToCartPageString;
                     default:
                         // Save Transaction Response
@@ -152,6 +169,7 @@ class ProcessResponse
             $this->createTransaction($data);
             $this->_logger->error($pre . $e->getMessage());
             $this->messageManager->addExceptionMessage($e, __('We can\'t start Fortis Checkout.'));
+
             return $this->redirectToSuccessPageString;
         }
 

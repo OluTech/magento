@@ -39,10 +39,12 @@ class Index extends AbstractFortis implements CsrfAwareActionInterface
         } catch (LocalizedException $e) {
             $this->_logger->error($pre . $e->getMessage());
             $this->messageManager->addExceptionMessage($e, $e->getMessage());
+
             return $this->getRedirectToCartObject();
         } catch (Exception $e) {
             $this->_logger->error($pre . $e->getMessage());
             $this->messageManager->addExceptionMessage($e, __('We can\'t start Fortis Checkout.'));
+
             return $this->getRedirectToCartObject();
         }
 

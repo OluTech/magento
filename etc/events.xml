@@ -31,5 +31,13 @@
         <observer name="fortis_delete_saved_vault"
                   instance="Fortispay\Fortis\Observer\DeleteSavedVault"/>
     </event>
+    <event name="admin_system_config_save">
+        <observer name="fortis_setup_webhook"
+                  instance="Fortispay\Fortis\Observer\SetupWebhook"/>
+    </event>
+    <event name="fortispay_fortis_create_third_level_data_after_success">
+        <observer name="fortis_create_third_level_data"
+                  instance="Fortispay\Fortis\Observer\CreateThirdLevelData"/>
+    </event>
 </config>
 

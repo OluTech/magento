@@ -12,6 +12,8 @@ use Magento\Payment\Model\Method\AbstractMethod;
 use Magento\Store\Model\ScopeInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface;
+use Magento\Framework\Encryption\EncryptorInterface;
+use Magento\Framework\App\Config\Storage\WriterInterface;
 
 /**
  * Config model that is aware of all \Fortispay\Fortis payment methods
@@ -67,6 +69,14 @@ class Config extends AbstractConfig
      * @var ScopeConfigInterface
      */
     protected $scopeConfig;
+    /**
+     * @var \Magento\Framework\Encryption\EncryptorInterface
+     */
+    private EncryptorInterface $encryptor;
+    /**
+     * @var \Magento\Framework\App\Config\Storage\WriterInterface
+     */
+    private WriterInterface $configWriter;
 
     /**
      * Construct
@@ -76,6 +86,8 @@ class Config extends AbstractConfig
      * @param StoreManagerInterface $storeManager
      * @param LoggerInterface $logger
      * @param Repository $assetRepo
+     * @param \Magento\Framework\Encryption\EncryptorInterface $encryptor
+     * @param \Magento\Framework\App\Config\Storage\WriterInterface $configWriter
      *
      * @throws \Magento\Framework\Exception\NoSuchEntityException
      */
@@ -84,7 +96,9 @@ class Config extends AbstractConfig
         Data $directoryHelper,
         StoreManagerInterface $storeManager,
         LoggerInterface $logger,
-        Repository $assetRepo
+        Repository $assetRepo,
+        EncryptorInterface $encryptor,
+        WriterInterface $configWriter
     ) {
         $this->_logger = $logger;
         parent::__construct($scopeConfig);
@@ -96,6 +110,16 @@ class Config extends AbstractConfig
         $this->setMethod($METHOD_CODE);
         $currentStoreId = $this->_storeManager->getStore()->getStoreId();
         $this->setStoreId($currentStoreId);
+        $this->encryptor    = $encryptor;
+        $this->configWriter = $configWriter;
+    }
+
+    /**
+     * @return string
+     */
+    public function environment(): string
+    {
+        return $this->getConfig('fortis_environment');
     }
 
     /**
@@ -172,6 +196,10 @@ class Config extends AbstractConfig
      */
     public function getPaymentMarkImageUrl()
     {
+        if ($this->achIsActive()) {
+            return $this->_assetRepo->getUrl('Fortispay_Fortis::images/logo-ach.png');
+        }
+
         return $this->_assetRepo->getUrl('Fortispay_Fortis::images/logo.png');
     }
 
@@ -256,12 +284,110 @@ class Config extends AbstractConfig
         return $this->scopeConfig->getValue($path, $storeScope);
     }
 
+    public function setConfig(string $key, string $value)
+    {
+        $path = 'payment/' . Config::METHOD_CODE . '/' . $key;
+
+        $this->configWriter->save($path, $value);
+    }
+
     /**
      * Check isVault condition
      **/
     public function isVault()
     {
         return $this->getConfig('fortis_cc_vault_active');
+    }
+
+    /**
+     * @return bool
+     */
+    public function isCheckoutIframe(): bool
+    {
+        return $this->getConfig('fortis_checkout_iframe_enabled') === 'iframe';
+    }
+
+    /**
+     * @return bool
+     */
+    public function isSingleView(): bool
+    {
+        return $this->getConfig('fortis_single_view') === 'single';
+    }
+
+    /**
+     * Returns true if ACH is configured active in store settings
+     *
+     * @return bool
+     */
+    public function achIsActive(): bool
+    {
+        $r = $this->getConfig('fortis_ach_active');
+
+        return $r === '1';
+    }
+
+    /**
+     * ACH product ID (optional)
+     *
+     * @return string
+     */
+    public function achProductId(): string
+    {
+        $t = $this->getConfig('fortis_ach_product_id') ?? '';
+        if ($t !== '') {
+            $t = $this->encryptor->decrypt($t);
+        }
+
+        return $t;
+    }
+
+    public function achLocationId(): string
+    {
+        $t = $this->getConfig('fortis_ach_location_id') ?? '';
+        if ($t !== '') {
+            $t = $this->encryptor->decrypt($t);
+        }
+
+        return $t;
+    }
+
+    /**
+     * @return string
+     */
+    public function achWebhookId(): string
+    {
+        return $this->getConfig('fortis_ach_webhook_id') ?? '';
+    }
+
+    /**
+     * CC product ID (optional)
+     *
+     * @return string
+     */
+    public function ccProductId(): string
+    {
+        if ($this->achIsActive()) {
+            $t = $this->getConfig('fortis_ach_cc_product_id') ?? '';
+        } else {
+            $t = $this->getConfig('product_transaction_id') ?? '';
+        }
+
+        if ($t !== '') {
+            $t = $this->encryptor->decrypt($t);
+        }
+
+        return $t;
+    }
+
+    /**
+     * Return true if vaulting is enabled for store
+     *
+     * @return bool
+     */
+    public function saveAccount(): bool
+    {
+        return (int)$this->getConfig('fortis_cc_vault_active') === 1;
     }
 
     /**
@@ -318,5 +444,63 @@ class Config extends AbstractConfig
     protected function _getSpecificConfigPath($fieldName)
     {
         return $this->_mapFortisFieldset($fieldName);
+    }
+
+    /**
+     * Decrypted user id
+     *
+     * @return string
+     */
+    public function userId(): string
+    {
+        $t = $this->getConfig('user_id') ?? '';
+        if ($t !== '') {
+            $t = $this->encryptor->decrypt($t);
+        }
+
+        return $t;
+    }
+
+    /**
+     * Decrypted user api key
+     *
+     * @return string
+     */
+    public function userApiKey(): string
+    {
+        $t = $this->getConfig('user_api_key') ?? '';
+        if ($t !== '') {
+            $t = $this->encryptor->decrypt($t);
+        }
+
+        return $t;
+    }
+
+    /**
+     * @return string
+     */
+    public function orderAction(): string
+    {
+        return $this->getConfig('order_intention');
+    }
+
+    /**
+     * @return bool
+     */
+    public function orderSuccessfulEmail(): bool
+    {
+        $t = $this->getConfig('order_email');
+
+        return $t !== '0';
+    }
+
+    /**
+     * @return bool
+     */
+    public function emailInvoice(): bool
+    {
+        $t = $this->getConfig('invoice_email');
+
+        return $t !== '0';
     }
 }

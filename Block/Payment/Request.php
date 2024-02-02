@@ -3,8 +3,8 @@
 namespace Fortispay\Fortis\Block\Payment;
 
 use Exception;
+use Fortispay\Fortis\Model\Config;
 use Fortispay\Fortis\Model\Fortis;
-use Fortispay\Fortis\Model\FortisApi;
 use Magento\Checkout\Model\Session;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\Encryption\EncryptorInterface;
@@ -17,11 +17,10 @@ use Magento\Framework\View\Element\Template\Context;
 use Magento\Sales\Model\Order\Address;
 use Magento\Sales\Model\OrderFactory;
 use Magento\Framework\Controller\ResultFactory;
+use Ramsey\Uuid\Uuid;
 
 class Request extends Template
 {
-    public const SECURE = ['_secure' => true];
-
     /**
      * @var MessageManagerInterface
      */
@@ -69,6 +68,8 @@ class Request extends Template
 
     private string $successURL;
 
+    protected Config $fortisConfig;
+
     /**
      * Construct
      *
@@ -93,6 +94,7 @@ class Request extends Template
         EncryptorInterface $encryptor,
         MessageManagerInterface $messageManager,
         ResultFactory $resultFactory,
+        Config $fortisConfig,
         array $data = []
     ) {
         $this->_orderFactory    = $orderFactory;
@@ -104,7 +106,8 @@ class Request extends Template
         $this->_paymentMethod  = $paymentMethod;
         $this->encryptor       = $encryptor;
         $this->messageManager  = $messageManager;
-        $this->resultFactory  = $resultFactory;
+        $this->resultFactory   = $resultFactory;
+        $this->fortisConfig    = $fortisConfig;
     }
 
     public function _prepareLayout()
@@ -119,88 +122,15 @@ class Request extends Template
         $addressAll = $order->getBillingAddress();
         list($address, $country, $city, $postalCode, $regionCode) = $this->getAddresses($addressAll);
 
-        $action = $this->_paymentMethod->getConfigData('order_intention');
-
-        $returnUrl = "";
-        if ($action === 'sale') {
-            $returnUrl = $this->_urlBuilder->getUrl(
-                'fortis/redirect/success',
-                self::SECURE
-            ) . '?gid=' . $order->getRealOrderId();
-        } elseif ($action === 'auth-only') {
-            $returnUrl = $this->_urlBuilder->getUrl(
-                'fortis/redirect/authorise',
-                self::SECURE
-            ) . '?gid=' . $order->getRealOrderId();
-        }
+        $enableVaultForOrder = ((int)($additionalData['fortis-vault-method'] ?? 0)) === 1;
 
         $vaultHash = $additionalData['fortis-vault-method'] ?? '';
-        if (strlen($vaultHash) > 10) {
-            // Have a vaulted card transaction
-            $paymentTokenManagementInterface = $this->_paymentMethod->getPaymentTokenManagement();
-            $cardData                        = $paymentTokenManagementInterface->getByPublicHash(
-                $vaultHash,
-                $order->getCustomerId()
-            );
-            $gatewayToken                    = $cardData->getGatewayToken();
-            // Do the tokenised card transaction
-            try {
-                $api = new FortisApi($this->_paymentMethod->getConfigData('fortis_environment'));
-
-                $user_id              = $this->encryptor->decrypt($this->_paymentMethod->getConfigData('user_id'));
-                $user_api_key         = $this->encryptor->decrypt($this->_paymentMethod->getConfigData('user_api_key'));
-                $productTransactionId = $this->encryptor->decrypt(
-                    $this->_paymentMethod->getConfigData('product_transaction_id')
-                );
-                $intentData           = [
-                    'transaction_amount' => (int)($order->getTotalDue() * 100),
-                    'token_id'           => $gatewayToken,
-                    'description'        => $incrementId,
-                ];
-                if ($productTransactionId
-                    && preg_match(
-                        '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',
-                        $productTransactionId
-                    ) === 1) {
-                    $intentData['product_transaction_id'] = $productTransactionId;
-                }
-
-                if ($action === "auth-only") {
-                    $transactionResult = $api->doAuthTransaction($intentData, $user_id, $user_api_key);
-                } else {
-                    $transactionResult = $api->doTokenisedTransaction($intentData, $user_id, $user_api_key);
-                }
-
-                $transactionResult = json_decode($transactionResult);
-                if (strpos($transactionResult->type ?? '', 'Error') !== false
-                    || isset($transactionResult->errors)
-                ) {
-                    throw new LocalizedException(__('Error: Please use a different saved card or a new card.'));
-                }
-
-                $returnUrl .= '&tid=' . $transactionResult->data->id;
-                $redirect = $this->resultFactory->create(\Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT);
-                $redirect->setUrl($returnUrl);
-
-                $this->successURL = $returnUrl;
-                return $redirect;
-            } catch (LocalizedException $e) {
-                $this->_logger->error($e->getMessage());
-                $this->messageManager->addExceptionMessage($e, $e->getMessage());
-                $this->setMessage($e->getMessage());
-                $this->_checkoutSession->restoreQuote();
-
-                return $e;
-            } catch (Exception $exception) {
-                return $exception;
-            }
-        }
-
-        $enableVaultForOrder = ((int)($additionalData['fortis-vault-method'] ?? 0)) === 1;
 
         if ($vaultHash === 'new-save') {
             $enableVaultForOrder = true;
         }
+
+        $achEnabled = $this->fortisConfig->achIsActive();
 
         try {
             $config = $this->_paymentMethod->getFortisOrderToken($enableVaultForOrder);
@@ -220,6 +150,8 @@ class Request extends Template
         $showValidationAnimation = (int)$main_options['showValidationAnimation'] === 1 ? 'true' : 'false';
         $appearance_options      = $config['options']['appearance_options'];
         $redirectUrl             = $config['redirectUrl'];
+        $guid                    = strtoupper(Uuid::uuid4());
+        $guid                    = str_replace('-', '', $guid);
 
         $submit = <<<SUBMIT
 <script>
@@ -239,6 +171,11 @@ class Request extends Template
             floatingLabels: $floatingLabels,
             showValidationAnimation: $showValidationAnimation,
             showReceipt: false,
+SUBMIT;
+        if (!$achEnabled) {
+            $submit .= "view: 'default',";
+        }
+        $submit .= <<<SUBMIT
             appearance: {
             colorButtonSelectedBackground: `$appearance_options[colorButtonSelectedBackground]`,
             colorButtonSelectedText: `$appearance_options[colorButtonSelectedText]`,
@@ -257,7 +194,7 @@ class Request extends Template
             fields: {
               additional: [
                 {name: 'description', required: true, value: `$incrementId`, hidden: true},
-                // {name: 'order_number', required: true, readOnly: true, value: `$orderId`, hidden: true},
+                {name: 'transaction_api_id', hidden: true, value: `$guid`},
               ],
               billing: [
 SUBMIT;
@@ -329,12 +266,6 @@ SUBMIT;
              ->setSubmitForm($submit);
 
         return parent::_prepareLayout();
-    }
-
-    public function getSuccessURL(): ?string
-    {
-        return (isset($this->successURL) ? ('<script>window.top.location.href="' . $this->successURL . '";</script>') : $this->getSubmitForm());
-
     }
 
     /**

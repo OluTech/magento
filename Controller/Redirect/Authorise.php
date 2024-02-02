@@ -5,6 +5,8 @@ namespace Fortispay\Fortis\Controller\Redirect;
 use Exception;
 use Fortispay\Fortis\Controller\AbstractFortis;
 use Fortispay\Fortis\Model\FortisApi;
+use Magento\Framework\Exception\RuntimeException;
+use Magento\Framework\Phrase;
 use Magento\Sales\Api\Data\TransactionInterface;
 use Magento\Sales\Model\Order\Invoice;
 use Magento\Sales\Model\Order\Payment\Transaction;
@@ -77,7 +79,7 @@ class Authorise extends AbstractFortis
     public function execute()
     {
         $json = $this->request->getContent();
-        $GET = $this->request->getParams();
+        $GET  = $this->request->getParams();
         $data = json_decode($json);
 
         $tokenised = false;
@@ -115,14 +117,14 @@ class Authorise extends AbstractFortis
 
         // Get the transaction
         try {
-            $api                = new FortisApi($this->getConfigData('fortis_environment'));
+            $api                = new FortisApi($this->config);
             $user_id            = $this->getConfigData('user_id');
             $user_api_key       = $this->getConfigData('user_api_key');
             $rawTransaction     = $api->getTransaction($data->id, $user_id, $user_api_key);
             $fortrisTransaction = $rawTransaction->data;
 
             if (!$tokenised && ($fortrisTransaction->product_transaction_id !== $product_transaction_id_order)) {
-                throw new \Magento\Framework\Exception\RuntimeException('Product transaction ids do not match');
+                throw new RuntimeException(new Phrase('Product transaction ids do not match'));
             }
             $status = $fortrisTransaction->reason_code_id;
             switch ($status) {
@@ -155,14 +157,16 @@ class Authorise extends AbstractFortis
 
                     if (!$tokenised) {
                         $resultJson = $this->resultJsonFactory->create();
+
                         return $resultJson->setData([
-                            'redirectTo' => $this->redirectToSuccessPageString,
-                        ]);
+                                                        'redirectTo' => $this->redirectToSuccessPageString,
+                                                    ]);
                     } else {
                         $redirect = $this->resultFactory->create(
                             \Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT
                         );
                         $redirect->setUrl($this->redirectToSuccessPageString);
+
                         return $redirect;
                     }
                     break;
@@ -179,14 +183,16 @@ class Authorise extends AbstractFortis
                     $this->createTransaction($data);
                     if (!$tokenised) {
                         $resultJson = $this->resultJsonFactory->create();
+
                         return $resultJson->setData([
-                            'redirectTo' => $this->redirectToCartPageString,
-                        ]);
+                                                        'redirectTo' => $this->redirectToCartPageString,
+                                                    ]);
                     } else {
                         $redirect = $this->resultFactory->create(
                             \Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT
                         );
                         $redirect->setUrl($this->redirectToCartPageString);
+
                         return $redirect;
                     }
                     break;
@@ -196,6 +202,7 @@ class Authorise extends AbstractFortis
             $this->createTransaction($data);
             $this->_logger->error($pre . $e->getMessage());
             $this->messageManager->addExceptionMessage($e, __('We can\'t start Fortis Checkout.'));
+
             return $this->redirectToSuccessPageString;
         }
 
