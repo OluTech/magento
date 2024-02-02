@@ -39,12 +39,18 @@ use Magento\Sales\Model\Service\InvoiceService;
 use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface;
 use Magento\Framework\Controller\Result\JsonFactory;
+use Magento\Sales\Api\TransactionRepositoryInterface;
+use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\Event\ManagerInterface as EventManager;
+use Magento\Directory\Model\CountryFactory;
+use Magento\Directory\Model\ResourceModel\Country\CollectionFactory as CountryCollectionFactory;
 
 /**
  * Checkout Controller
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
-abstract class AbstractFortis implements HttpGetActionInterface, HttpPostActionInterface, RedirectLoginInterface, CsrfAwareActionInterface
+abstract class AbstractFortis implements HttpGetActionInterface, HttpPostActionInterface, RedirectLoginInterface,
+                                         CsrfAwareActionInterface
 {
     /**
      * @var array|string[]
@@ -195,7 +201,7 @@ abstract class AbstractFortis implements HttpGetActionInterface, HttpPostActionI
     /**
      * @var UrlInterface
      */
-    private $_urlBuilder;
+    protected $_urlBuilder;
     /**
      * @var DateTime
      */
@@ -206,7 +212,7 @@ abstract class AbstractFortis implements HttpGetActionInterface, HttpPostActionI
     /**
      * @var EncryptorInterface
      */
-    private EncryptorInterface $encryptor;
+    protected EncryptorInterface $encryptor;
 
     /**
      * @var RequestInterface
@@ -222,6 +228,26 @@ abstract class AbstractFortis implements HttpGetActionInterface, HttpPostActionI
 
     public const CARTURL = 'checkout/cart';
     protected JsonFactory $resultJsonFactory;
+    /**
+     * @var \Magento\Sales\Api\TransactionRepositoryInterface
+     */
+    protected TransactionRepositoryInterface $transactionRepository;
+    /**
+     * @var \Magento\Framework\App\ResourceConnection
+     */
+    protected ResourceConnection $resourceConnection;
+    /**
+     * @var \Magento\Framework\Event\ManagerInterface
+     */
+    protected EventManager $eventManager;
+    /**
+     * @var \Magento\Directory\Model\CountryFactory
+     */
+    protected CountryFactory $countryFactory;
+    /**
+     * @var \Magento\Directory\Model\ResourceModel\Country\CollectionFactory
+     */
+    protected CountryCollectionFactory $countryCollectionFactory;
 
     /**
      * @param PageFactory $pageFactory
@@ -253,6 +279,12 @@ abstract class AbstractFortis implements HttpGetActionInterface, HttpPostActionI
      * @param RequestInterface $request
      * @param ResultFactory $resultFactory
      * @param ManagerInterface $messageManager
+     * @param \Magento\Framework\Controller\Result\JsonFactory $resultJsonFactory
+     * @param \Magento\Sales\Api\TransactionRepositoryInterface $transactionRepository
+     * @param \Magento\Framework\App\ResourceConnection $resourceConnection
+     * @param \Magento\Framework\Event\ManagerInterface $eventManager
+     * @param \Magento\Directory\Model\CountryFactory $countryFactory
+     * @param \Magento\Directory\Model\ResourceModel\Country\CollectionFactory $countryCollectionFactory
      */
     public function __construct(
         PageFactory $pageFactory,
@@ -284,7 +316,12 @@ abstract class AbstractFortis implements HttpGetActionInterface, HttpPostActionI
         RequestInterface $request,
         ResultFactory $resultFactory,
         ManagerInterface $messageManager,
-        JsonFactory $resultJsonFactory
+        JsonFactory $resultJsonFactory,
+        TransactionRepositoryInterface $transactionRepository,
+        ResourceConnection $resourceConnection,
+        EventManager $eventManager,
+        CountryFactory $countryFactory,
+        CountryCollectionFactory $countryCollectionFactory
     ) {
         $pre = __METHOD__ . " : ";
 
@@ -320,8 +357,13 @@ abstract class AbstractFortis implements HttpGetActionInterface, HttpPostActionI
         $this->messageManager                          = $messageManager;
         $this->resultJsonFactory                       = $resultJsonFactory;
 
-        $this->state         = $state;
-        $this->_fortishelper = $fortishelper;
+        $this->state                    = $state;
+        $this->_fortishelper            = $fortishelper;
+        $this->transactionRepository    = $transactionRepository;
+        $this->resourceConnection       = $resourceConnection;
+        $this->eventManager             = $eventManager;
+        $this->countryFactory           = $countryFactory;
+        $this->countryCollectionFactory = $countryCollectionFactory;
 
         $this->_logger->debug($pre . 'eof');
     }
@@ -488,6 +530,7 @@ abstract class AbstractFortis implements HttpGetActionInterface, HttpPostActionI
     {
         $redirect = $this->resultFactory->create(\Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT);
         $redirect->setUrl(self::CARTURL);
+
         return $redirect;
     }
 }

@@ -144,11 +144,18 @@ class FortisConfigProvider implements ConfigProviderInterface
             foreach ($cardList as $card) {
                 if ($card['is_active'] == 1 && $card['is_visible'] == 1) {
                     $cardDetails = json_decode($card['details']);
-                    $cards[]     = [
+                    if ($cardDetails->type === 'ach') {
+                        $text = "Use ACH account ending " . $cardDetails->maskedCC;
+                    } else {
+                        $text = "Use credit card ending in " . $cardDetails->maskedCC;
+                    }
+                    $cardDetail = [
                         'masked_cc' => $cardDetails->maskedCC,
                         'token'     => $card['public_hash'],
                         'card_type' => $cardDetails->type,
+                        'text'      => $text,
                     ];
+                    $cards[]    = $cardDetail;
                     $cardCount++;
                 }
             }
@@ -167,6 +174,9 @@ class FortisConfigProvider implements ConfigProviderInterface
                     'saved_card_data'           => json_encode($cards),
                     'card_count'                => $cardCount,
                     'redirectUrl'               => $this->urlBuilder->getRedirectUrl('fortis/redirect'),
+                    'achIsEnabled'              => $this->config->achIsActive(),
+                    'isCheckoutIframe'          => $this->config->isCheckoutIframe(),
+                    'isSingleView'              => $this->config->isSingleView(),
                 ],
             ],
         ];

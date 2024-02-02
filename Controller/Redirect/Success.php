@@ -5,6 +5,7 @@ namespace Fortispay\Fortis\Controller\Redirect;
 use Exception;
 use Fortispay\Fortis\Controller\AbstractFortis;
 use Fortispay\Fortis\Model\FortisApi;
+use Magento\Framework\Controller\ResultFactory;
 use Magento\Sales\Model\Order\Invoice;
 use Magento\Sales\Model\Order\Payment\Transaction;
 use stdClass;
@@ -20,12 +21,12 @@ class Success extends AbstractFortis
     /**
      * @var string
      */
-    private $redirectToSuccessPageString;
+    private string $redirectToSuccessPageString;
 
     /**
      * @var string
      */
-    private $redirectToCartPageString;
+    private string $redirectToCartPageString;
 
     /**
      * @var array|string[]
@@ -70,16 +71,26 @@ class Success extends AbstractFortis
         1631 => 'ACCOUNT_CLOSED'
     ];
 
+    public static array $achResponseStatuses = [
+        131 => 'Pending Origination',
+        132 => 'Originating',
+        133 => 'Originated',
+        134 => 'Settled',
+        201 => 'Voided',
+        301 => 'Declined',
+        331 => 'Charged Back',
+    ];
+
     /**
      * Execute on fortis/redirect/success
      *
-     * @return string|void
+     * @return \Magento\Framework\Controller\ResultInterface
      */
     public function execute()
     {
-        $json = $this->request->getContent();
-        $GET = $this->request->getParams();
-        $data = json_decode($json);
+        $json      = $this->request->getContent();
+        $GET       = $this->request->getParams();
+        $data      = json_decode($json);
         $tokenised = false;
         $orderId   = (int)$GET['gid'];
         if (!$data) {
@@ -115,7 +126,7 @@ class Success extends AbstractFortis
 
         // Get the transaction
         try {
-            $api               = new FortisApi($this->getConfigData('fortis_environment'));
+            $api               = new FortisApi($this->config);
             $user_id           = $this->getConfigData('user_id');
             $user_api_key      = $this->getConfigData('user_api_key');
             $fortisTransaction = $api->getTransaction($data->id, $user_id, $user_api_key)->data;
@@ -124,107 +135,163 @@ class Success extends AbstractFortis
                 $data = $fortisTransaction;
             }
 
-            if (!$tokenised && ($fortisTransaction->product_transaction_id !== $product_transaction_id_order)) {
-                throw new \Magento\Framework\Exception\RuntimeException(
-                    __('Product transaction ids do not match')
-                );
-            }
             $status = $fortisTransaction->status_code;
-            switch ($status) {
-                case 101:  // Success
-                case 102:  // Success
-                    // Check for stored card and save if necessary
-                    $model = $this->_paymentMethod;
-                    $model->saveVaultData($order, $data);
+            if ($fortisTransaction->payment_method === 'ach') {
+                // Handle response from ACH
+                switch ($status) {
+                    case 131: // Pending Origination
+                        $message = "ACH Transaction: " . self::$achResponseStatuses[$status];
+                        $this->messageManager->addNoticeMessage($message);
+                        $this->_order->addStatusToHistory(__($message));
+                        $status = \Magento\Sales\Model\Order::STATE_PENDING_PAYMENT;
+                        // Save Transaction Response
+                        $this->createTransaction($data);
+                        $order->setState($status)->setStatus($status)->save();
 
-                    $status = \Magento\Sales\Model\Order::STATE_PROCESSING;
-                    if ($this->getConfigData('Successful_Order_status') != "") {
-                        $status = $this->getConfigData('Successful_Order_status');
-                    }
+                        // Check for stored card and save if necessary
+                        $model = $this->_paymentMethod;
+                        $model->saveVaultData($order, $data);
 
-                    $model                  = $this->_paymentMethod;
-                    $order_successful_email = $model->getConfigData('order_email');
+                        if (!$tokenised) {
+                            $resultJson = $this->resultJsonFactory->create();
 
-                    if ($order_successful_email != '0') {
-                        $this->OrderSender->send($order);
-                        $order->addStatusHistoryComment(
-                            __('Notified customer about order #%1.', $order->getId())
-                        )->setIsCustomerNotified(true)->save();
-                    }
+                            return $resultJson->setData([
+                                                            'redirectTo' => $this->redirectToSuccessPageString,
+                                                        ]);
+                        } else {
+                            $redirect = $this->resultFactory->create(
+                                ResultFactory::TYPE_REDIRECT
+                            );
+                            $redirect->setUrl($this->redirectToSuccessPageString);
 
-                    // Capture invoice when payment is successful
-                    $invoice = $this->_invoiceService->prepareInvoice($order);
-                    $invoice->setRequestedCaptureCase(Invoice::CAPTURE_ONLINE);
-                    $invoice->register();
+                            return $redirect;
+                        }
+                }
+            } else {
+                // Handle response from CC transaction
+                if (!$tokenised && ($fortisTransaction->product_transaction_id !== $product_transaction_id_order)) {
+                    throw new \Magento\Framework\Exception\RuntimeException(
+                        __('Product transaction ids do not match')
+                    );
+                }
+                $accountType = $fortisTransaction->account_type;
+                switch ($status) {
+                    case 101:  // Success
+                    case 102:  // Success
+                        // Check for stored card and save if necessary
+                        $model = $this->_paymentMethod;
+                        $model->saveVaultData($order, $data);
 
-                    // Save the invoice to the order
-                    $fortisTransaction = $this->dbTransaction
-                        ->addObject($invoice)
-                        ->addObject($invoice->getOrder());
+                        $status = \Magento\Sales\Model\Order::STATE_PROCESSING;
+                        if ($this->getConfigData('Successful_Order_status') != "") {
+                            $status = $this->getConfigData('Successful_Order_status');
+                        }
 
-                    $fortisTransaction->save();
+                        $model                  = $this->_paymentMethod;
+                        $order_successful_email = $model->getConfigData('order_email');
 
-                    // Magento\Sales\Model\Order\Email\Sender\InvoiceSender
-                    $send_invoice_email = $model->getConfigData('invoice_email');
-                    if ($send_invoice_email != '0') {
-                        $this->invoiceSender->send($invoice);
-                        $order->addStatusHistoryComment(
-                            __('Notified customer about invoice #%1.', $invoice->getId())
-                        )->setIsCustomerNotified(true)->save();
-                    }
+                        if ($order_successful_email != '0') {
+                            $this->OrderSender->send($order);
+                            $order->addStatusHistoryComment(
+                                __('Notified customer about order #%1.', $order->getId())
+                            )->setIsCustomerNotified(true)->save();
+                        }
 
-                    // Save Transaction Response
-                    $transactionId = $this->createTransaction($data);
+                        // Capture invoice when payment is successful
+                        $invoice = $this->_invoiceService->prepareInvoice($order);
+                        $invoice->setRequestedCaptureCase(Invoice::CAPTURE_ONLINE);
+                        $invoice->register();
 
-                    $invoice->setTransactionId($transactionId);
-                    $invoice->save();
+                        // Save the invoice to the order
+                        $fortisTransactionDB = $this->dbTransaction
+                            ->addObject($invoice)
+                            ->addObject($invoice->getOrder());
 
-                    $order->setState($status)->setStatus($status)->save();
-                    // Invoice capture code completed
-                    if (!$tokenised) {
-                        $resultJson = $this->resultJsonFactory->create();
-                        return $resultJson->setData([
-                            'redirectTo' => $this->redirectToSuccessPageString,
-                        ]);
+                        $fortisTransactionDB->save();
 
-                    } else {
-                        $redirect = $this->resultFactory->create(
-                            \Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT
-                        );
-                        $redirect->setUrl($this->redirectToSuccessPageString);
-                        return $redirect;
-                    }
-                    break;
-                default:
-                    if (isset($this->responseCodes[$status])) {
-                        $message = "Not Authorised: " . $this->responseCodes[$status];
-                    } else {
-                        $message = 'Not Authorised: Reason Unknown';
-                    }
-                    $this->messageManager->addNoticeMessage($message);
-                    $this->_order->addStatusToHistory(__("Failed: $message "));
-                    $this->_order->cancel()->save();
-                    $this->_checkoutSession->restoreQuote();
-                    $this->createTransaction($data);
-                    if (!$tokenised) {
-                        $resultJson = $this->resultJsonFactory->create();
-                        return $resultJson->setData([
-                            'redirectTo' => $this->redirectToCartPageString,
-                        ]);
-                    } else {
-                        $redirect = $this->resultFactory->create(
-                            \Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT
-                        );
-                        $redirect->setUrl($this->redirectToCartPageString);
-                        return $redirect;
-                    }
-                    break;
+                        // Magento\Sales\Model\Order\Email\Sender\InvoiceSender
+                        $send_invoice_email = $model->getConfigData('invoice_email');
+                        if ($send_invoice_email != '0') {
+                            $this->invoiceSender->send($invoice);
+                            $order->addStatusHistoryComment(
+                                __('Notified customer about invoice #%1.', $invoice->getId())
+                            )->setIsCustomerNotified(true)->save();
+                        }
+
+                        // Save Transaction Response
+                        $transactionId = $this->createTransaction($data);
+
+                        $invoice->setTransactionId($transactionId);
+                        $invoice->save();
+
+                        $order->setState($status)->setStatus($status)->save();
+
+                        // Dispatch event to create third level data
+                        try {
+                            $this->eventManager->dispatch(
+                                'fortispay_fortis_create_third_level_data_after_success',
+                                [
+                                    'order'                    => $order,
+                                    'storeManager'             => $this->_storeManager,
+                                    'type'                     => $accountType,
+                                    'countryFactory'           => $this->countryFactory,
+                                    'countryCollectionFactory' => $this->countryCollectionFactory
+                                ]
+                            );
+                        } catch (\Exception $exception) {
+                            $this->_logger->error('Could not create 3rd level data: ' . $exception->getMessage());
+                        }
+
+                        // Invoice capture code completed
+                        if (!$tokenised) {
+                            $resultJson = $this->resultJsonFactory->create();
+
+                            return $resultJson->setData([
+                                                            'redirectTo' => $this->redirectToSuccessPageString,
+                                                        ]);
+                        } else {
+                            $redirect = $this->resultFactory->create(
+                                ResultFactory::TYPE_REDIRECT
+                            );
+                            $redirect->setUrl($this->redirectToSuccessPageString);
+
+                            return $redirect;
+                        }
+                        break;
+                    default:
+                        if (isset($this->responseCodes[$status])) {
+                            $message = "Not Authorised: " . $this->responseCodes[$status];
+                        } else {
+                            $message = 'Not Authorised: Reason Unknown';
+                        }
+                        $this->messageManager->addNoticeMessage($message);
+                        $this->_order->addStatusToHistory(__("Failed: $message "));
+                        $this->_order->cancel()->save();
+                        $this->_checkoutSession->restoreQuote();
+                        $this->createTransaction($data);
+                        if (!$tokenised) {
+                            $resultJson = $this->resultJsonFactory->create();
+
+                            return $resultJson->setData([
+                                                            'redirectTo' => $this->redirectToCartPageString,
+                                                        ]);
+                        } else {
+                            $redirect = $this->resultFactory->create(
+                                ResultFactory::TYPE_REDIRECT
+                            );
+                            $redirect->setUrl($this->redirectToCartPageString);
+
+                            return $redirect;
+                        }
+                        break;
+                }
             }
         } catch (Exception $e) {
             // Save Transaction Response
             $this->createTransaction($data);
             $this->_logger->error($pre . $e->getMessage());
             $this->messageManager->addExceptionMessage($e, __('We can\'t start Fortis Checkout.'));
+
             return $this->redirectToSuccessPageString;
         }
 
@@ -263,7 +330,11 @@ class Success extends AbstractFortis
                                  )
                                  ->setFailSafe(true)
                 // Build method creates the transaction and returns the object
-                                 ->build(Transaction::TYPE_CAPTURE);
+                                 ->build(
+                    $paymentData->payment_method === 'ach'
+                        ? Transaction::TYPE_ORDER
+                        : Transaction::TYPE_CAPTURE
+                );
 
             $payment->addTransactionCommentsToOrder(
                 $transaction,
@@ -333,9 +404,10 @@ class Success extends AbstractFortis
         if (!$this->_order->getId()) {
             // Redirect to Cart if Order not found
             $redirect = $this->resultFactory->create(
-                \Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT
+                ResultFactory::TYPE_REDIRECT
             );
             $redirect->setUrl($this->redirectToSuccessPageString);
+
             return $redirect;
         }
     }

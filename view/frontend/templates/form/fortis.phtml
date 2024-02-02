@@ -1,10 +1,15 @@
-<?php if ($instructions = $block->getMethod()->getInstructions()) { ?>
+<?php
+
+if ($instructions = $block->getMethod()->getInstructions()) { ?>
     <div class="items "<?=
-        /* @noEscape */ $block->getMethodCode()
-    ?> instructions agreement content" id="payment_form_"<?=
-        /* @noEscape */ $block->getMethodCode()
-?>" style="display: none;">
-    "<?= /* @noEscape */ nl2br($block->escapeHtml($instructions)) ?>
+        /* @noEscape */
+        $block->getMethodCode()
+        ?> instructions agreement content" id="payment_form_"<?=
+    /* @noEscape */
+    $block->getMethodCode()
+    ?>" style="display: none;">
+    "<?= /* @noEscape */
+    nl2br($block->escapeHtml($instructions)) ?>
     </div>
     <?php
 } ?>

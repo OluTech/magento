@@ -3,6 +3,7 @@
 namespace Fortispay\Fortis\Observer;
 
 use Exception;
+use Fortispay\Fortis\Model\Config;
 use Fortispay\Fortis\Model\FortisApi;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
@@ -27,20 +28,27 @@ class OrderCancelAfter extends AbstractDataAssignObserver
      * @var EncryptorInterface
      */
     private EncryptorInterface $encryptor;
+    /**
+     * @var \Fortispay\Fortis\Model\Config
+     */
+    private Config $config;
 
     /**
      * @param ScopeConfigInterface $scopeConfig
      * @param Builder $transactionBuilder
      * @param EncryptorInterface $encryptor
+     * @param \Fortispay\Fortis\Model\Config $config
      */
     public function __construct(
         ScopeConfigInterface $scopeConfig,
         Builder $transactionBuilder,
-        EncryptorInterface $encryptor
+        EncryptorInterface $encryptor,
+        Config $config
     ) {
         $this->scopeConfig        = $scopeConfig;
         $this->transactionBuilder = $transactionBuilder;
         $this->encryptor          = $encryptor;
+        $this->config             = $config;
     }
 
     /**
@@ -77,7 +85,7 @@ class OrderCancelAfter extends AbstractDataAssignObserver
         $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_api_key'));
         $type         = $this->scopeConfig->getValue('payment/fortis/order_intention');
 
-        $api = new FortisApi($this->scopeConfig->getValue('payment/fortis/fortis_environment'));
+        $api = new FortisApi($this->config);
         // Do auth transaction
         $intentData = [
             'transaction_amount' => $authAmount,

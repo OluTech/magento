@@ -330,6 +330,7 @@ class Fortis extends AbstractMethod
      * @param OrderRepositoryInterface $orderRepository
      * @param AbstractResource|null $resource
      * @param AbstractDb|null $resourceCollection
+     * @param \Fortispay\Fortis\Model\Config $config
      * @param array $data
      */
     public function __construct(
@@ -356,6 +357,7 @@ class Fortis extends AbstractMethod
         PaymentTokenResourceModel $paymentTokenResourceModel,
         TransactionSearchResultInterfaceFactory $transactions,
         OrderRepositoryInterface $orderRepository,
+        Config $config,
         AbstractResource $resource = null,
         AbstractDb $resourceCollection = null,
         array $data = []
@@ -387,6 +389,7 @@ class Fortis extends AbstractMethod
         $this->transactions              = $transactions;
         $this->_paymentData              = $fortisData;
         $this->orderRepository           = $orderRepository;
+        $this->config                    = $config;
 
         $parameters = ['params' => [$this->_code]];
 
@@ -397,6 +400,7 @@ class Fortis extends AbstractMethod
      * Store setter; also updates store ID in config object
      *
      * @param Store|int $store
+     *
      * @return $this
      */
     public function setStore($store)
@@ -457,8 +461,10 @@ class Fortis extends AbstractMethod
     public function getFortisOrderToken(bool $saveAccount)
     {
         // Variable initialization
-        $saveAccount          = $saveAccount && ((int)$this->getConfigData('fortis_cc_vault_active') === 1);
-        $productTransactionId = $this->encryptor->decrypt($this->getConfigData('product_transaction_id'));
+        $saveAccount          = $saveAccount && $this->_config->saveAccount();
+        $productTransactionId = $this->_config->ccProductId();
+        $achEnabled           = $this->_config->achIsActive();
+        $achProductId         = $this->_config->achProductId();
 
         $order      = $this->_checkoutSession->getLastRealOrder();
         $orderTotal = (int)($order->getTotalDue() * 100);
@@ -476,15 +482,25 @@ class Fortis extends AbstractMethod
         }
         if ($productTransactionId
             && preg_match(
-                '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',
-                $productTransactionId
-            ) === 1) {
+                   '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',
+                   $productTransactionId
+               ) === 1) {
             $intentData['methods']   = [];
             $intentData['methods'][] = ['type' => 'cc', 'product_transaction_id' => $productTransactionId];
         }
+        if ($achEnabled && $achProductId
+            && preg_match(
+                   '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',
+                   $achProductId
+               ) === 1) {
+            if (empty($intentData['methods'])) {
+                $intentData['methods'] = [];
+            }
+            $intentData['methods'][] = ['type' => 'ach', 'product_transaction_id' => $achProductId];
+        }
 
         // Initiate Fortis - transaction intention
-        $api                    = new FortisApi($this->getConfigData('fortis_environment'));
+        $api                    = new FortisApi($this->config);
         $client_token           = $api->getClientToken($intentData, $user_id, $user_api_key);
         $body                   = json_decode($api->getTokenBody($client_token));
         $product_transaction_id = $body->transaction->methods[0]->product_transaction_id;
@@ -565,17 +581,17 @@ class Fortis extends AbstractMethod
         $billing = $order->getBillingAddress();
         $billing->getCountryId();
 
-        $action = $this->getConfigData('order_intention');
+        $action = $this->config->orderAction();
         if ($action === 'sale') {
             $returnUrl = $this->_urlBuilder->getUrl(
-                'fortis/redirect/success',
-                self::SECURE
-            ) . '?gid=' . $order->getRealOrderId();
+                    'fortis/redirect/success',
+                    self::SECURE
+                ) . '?gid=' . $order->getRealOrderId();
         } else {
             $returnUrl = $this->_urlBuilder->getUrl(
-                'fortis/redirect/authorise',
-                self::SECURE
-            ) . '?gid=' . $order->getRealOrderId();
+                    'fortis/redirect/authorise',
+                    self::SECURE
+                ) . '?gid=' . $order->getRealOrderId();
         }
 
         return [$user_id, $user_api_key, $action, $options, $returnUrl];
@@ -707,7 +723,7 @@ class Fortis extends AbstractMethod
 
         $user_id      = $this->getConfigData('user_id');
         $user_api_key = $this->getConfigData('user_api_key');
-        $api          = new FortisApi($this->getConfigData('fortis_environment'));
+        $api          = new FortisApi($this->config);
         try {
             $response = $api->refundTransactionAmount($intentData, $user_id, $user_api_key);
             $data     = json_decode($response)->data;
@@ -828,22 +844,25 @@ class Fortis extends AbstractMethod
         }
 
         $paymentToken->setGatewayToken($data->saved_account->id);
-        $expDate = $data->saved_account->exp_date;
-        $month   = substr($expDate, 0, 2);
-        $year    = substr($expDate, 2, 2);
-        $paymentToken->setTokenDetails(
-            json_encode(
-                [
-                    'type'           => $data->saved_account->payment_method,
-                    'maskedCC'       => $data->saved_account->last_four,
-                    'expirationDate' => "$month/$year",
-                ]
-            )
-        );
-        $paymentToken->setExpiresAt($this->getExpirationDate($month, $year));
+        $expDate      = $data->saved_account->exp_date;
+        $tokenDetails = [
+            'type'     => $data->saved_account->payment_method,
+            'maskedCC' => $data->saved_account->last_four,
+        ];
+        if ($expDate) {
+            $month                          = substr($expDate, 0, 2);
+            $year                           = substr($expDate, 2, 2);
+            $tokenDetails['expirationDate'] = "$month/$year";
+        }
+
+        $paymentToken->setTokenDetails(json_encode($tokenDetails));
+        if ($expDate) {
+            $paymentToken->setExpiresAt($this->getExpirationDate($month, $year));
+        }
         $paymentToken->setIsActive((int)$data->saved_account->active === 1);
         $paymentToken->setIsVisible(true);
         $paymentToken->setPaymentMethodCode('fortis');
+        $paymentToken->setType($data->saved_account->payment_method);
         $paymentToken->setCustomerId($order->getCustomerId());
         $paymentToken->setPublicHash($this->generatePublicHash($paymentToken));
 
@@ -914,7 +933,7 @@ class Fortis extends AbstractMethod
         $paymentToken->getTokenDetails();
 
         $hashKey .= $paymentToken->getPaymentMethodCode() . $paymentToken->getType() . $paymentToken->getGatewayToken(
-        ) . $paymentToken->getTokenDetails();
+            ) . $paymentToken->getTokenDetails();
 
         return $this->encryptor->getHash($hashKey);
     }

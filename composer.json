@@ -2,13 +2,15 @@
   "name": "fortispay/magento-2-payment-gateway",
   "description": "FortisPay Payment Gateway for Magento 2",
   "type": "magento2-module",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minimum-stability": "stable",
   "license": "GPL-3.0",
-  "authors": [{
-    "name": "FortisPay",
-    "email": "sales@fortispayments.com"
-  }],
+  "authors": [
+    {
+      "name": "FortisPay",
+      "email": "sales@fortispayments.com"
+    }
+  ],
   "require": {
     "php": "^8.1"
   },

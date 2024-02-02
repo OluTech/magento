@@ -2,6 +2,7 @@
 
 namespace Fortispay\Fortis\Observer;
 
+use Fortispay\Fortis\Model\Config;
 use Fortispay\Fortis\Model\FortisApi;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
@@ -25,20 +26,27 @@ class CancelOrderAuthorisation implements ObserverInterface
      * @var EncryptorInterface
      */
     private EncryptorInterface $encryptor;
+    /**
+     * @var \Fortispay\Fortis\Model\Config
+     */
+    private Config $config;
 
     /**
      * @param ScopeConfigInterface $scopeConfig
      * @param Builder $transactionBuilder
      * @param EncryptorInterface $encryptor
+     * @param \Fortispay\Fortis\Model\Config $config
      */
     public function __construct(
         ScopeConfigInterface $scopeConfig,
         Builder $transactionBuilder,
-        EncryptorInterface $encryptor
+        EncryptorInterface $encryptor,
+        Config $config
     ) {
         $this->scopeConfig        = $scopeConfig;
         $this->transactionBuilder = $transactionBuilder;
         $this->encryptor          = $encryptor;
+        $this->config             = $config;
     }
 
     /**
@@ -68,7 +76,7 @@ class CancelOrderAuthorisation implements ObserverInterface
             'token_id'           => $d->data->token_id,
             'transactionId'      => $transactionId,
         ];
-        $api        = new FortisApi($this->scopeConfig->getValue('payment/fortis/fortis_environment'));
+        $api        = new FortisApi($this->config);
         if ($type === 'auth-only') {
             $response = $api->refundAuthAmount($intentData, $user_id, $user_api_key);
         } else {
