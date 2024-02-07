@@ -155,6 +155,23 @@ class Authorise extends AbstractFortis
 
                     $order->setState($status)->setStatus($status)->save();
 
+                    // Create third level data - dispatch event for observer
+                    try {
+                        $this->eventManager->dispatch(
+                            'fortispay_fortis_create_third_level_data_after_success',
+                            [
+                                'order'                    => $order,
+                                'storeManager'             => $this->_storeManager,
+                                'type'                     => $fortrisTransaction->account_type,
+                                'countryFactory'           => $this->countryFactory,
+                                'countryCollectionFactory' => $this->countryCollectionFactory,
+                                'transactionId'            => $fortrisTransaction->id,
+                            ]
+                        );
+                    } catch (\Exception $exception) {
+                        $this->_logger->error('Could not create 3rd level data: ' . $exception->getMessage());
+                    }
+
                     if (!$tokenised) {
                         $resultJson = $this->resultJsonFactory->create();
 

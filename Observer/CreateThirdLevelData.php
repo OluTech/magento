@@ -72,11 +72,12 @@ class CreateThirdLevelData implements ObserverInterface
         $accountType    = $d['type'];
         $countryFactory = $d['countryFactory'];
         $api            = new FortisApi($this->config);
+        $transactionId  = $d['transactionId'];
 
         if ($accountType === 'visa') {
-            $api->createVisaLevel3Entry($order, $storeManager, $countryFactory);
+            $api->createVisaLevel3Entry($order, $storeManager, $countryFactory, $transactionId);
         } elseif ($accountType === 'mc') {
-            $api->createMcLevel3Entry($order, $storeManager, $countryFactory);
+            $api->createMcLevel3Entry($order, $storeManager, $countryFactory, $transactionId);
         }
     }
 }

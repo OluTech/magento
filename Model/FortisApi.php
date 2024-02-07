@@ -929,13 +929,12 @@ class FortisApi
     public function createVisaLevel3Entry(
         Order $order,
         StoreManagerInterface $storeManager,
-        CountryFactory $countryFactory
+        CountryFactory $countryFactory,
+        string $transactionId
     ): void {
         $userId      = $this->config->userId();
         $userApiKey  = $this->config->userApiKey();
         $developerId = $this->developerId;
-
-        $transactionId = $order->getPayment()->getTransactionId();
 
         $shippingAddress          = $order->getShippingAddress();
         $countryId                = $shippingAddress->getCountryId();
@@ -1023,13 +1022,12 @@ class FortisApi
     public function createMcLevel3Entry(
         Order $order,
         StoreManagerInterface $storeManager,
-        CountryFactory $countryFactory
+        CountryFactory $countryFactory,
+        string $transactionId
     ): void {
         $userId      = $this->config->userId();
         $userApiKey  = $this->config->userApiKey();
         $developerId = $this->developerId;
-
-        $transactionId = $order->getPayment()->getTransactionId();
 
         $shippingAddress          = $order->getShippingAddress();
         $countryId                = $shippingAddress->getCountryId();

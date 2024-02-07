@@ -235,7 +235,8 @@ class Success extends AbstractFortis
                                     'storeManager'             => $this->_storeManager,
                                     'type'                     => $accountType,
                                     'countryFactory'           => $this->countryFactory,
-                                    'countryCollectionFactory' => $this->countryCollectionFactory
+                                    'countryCollectionFactory' => $this->countryCollectionFactory,
+                                    'transactionId'            => $fortisTransaction->id,
                                 ]
                             );
                         } catch (\Exception $exception) {
