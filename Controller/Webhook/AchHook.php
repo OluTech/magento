@@ -119,10 +119,9 @@ class AchHook implements CsrfAwareActionInterface
         $pre      = __METHOD__ . " : ";
         $response = $this->resultFactory->create();
 
-        if (empty($_POST)) {
-            $data = json_decode($this->request->getContent(), true);
-        } else {
-            $data = $_POST;
+        $data = json_decode($this->request->getContent(), true);
+        if (!$data) {
+            $data = $this->request->getParams();
         }
 
         $this->logger->info('ACH Hook has been reached');
@@ -248,6 +247,9 @@ class AchHook implements CsrfAwareActionInterface
                     $orderState = Order::STATE_PROCESSING;
                     $order->setState($orderState)->setStatus($orderState);
                     $order->save();
+                    break;
+                default:
+                    $this->logger->error("Response code received was $transactionStatus");
                     break;
             }
             $response->setHttpResponseCode(200);

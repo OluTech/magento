@@ -41,6 +41,11 @@ class OrderAuthCaptured implements ObserverInterface
     {
         $order   = $observer->getInvoice()->getOrder();
         $payment = $order->getPayment();
+
+        if ($payment->getMethodInstance()->getCode() !== Config::METHOD_CODE) {
+            return;
+        }
+
         $orderID = $order->getId();
 
         $d = json_decode($payment->getAdditionalInformation()['raw_details_info'] ?? "");
