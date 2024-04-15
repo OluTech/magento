@@ -55,6 +55,12 @@ class Fortis extends AbstractMethod
 {
     public const        SECURE = ['_secure' => true];
     public const        FFFFFF = '#ffffff';
+    public const        AVAILABLE_CC_TYPES = [
+        'visa' => 'VI',
+        'mc' => 'MC',
+        'disc' => 'DI',
+        'amex' => 'AE'
+    ];
     /**
      * @var array|string[]
      */
@@ -848,8 +854,18 @@ class Fortis extends AbstractMethod
 
         $paymentToken->setGatewayToken($data->saved_account->id);
         $expDate      = $data->saved_account->exp_date;
+
+        if ($data->saved_account->payment_method === 'ach') {
+            $paymentTokenType = PaymentTokenFactoryInterface::TOKEN_TYPE_ACCOUNT;
+            $tokenType = $data->saved_account->payment_method;
+        } else {
+            $paymentTokenType = PaymentTokenFactoryInterface::TOKEN_TYPE_CREDIT_CARD;
+            $tokenType = self::AVAILABLE_CC_TYPES[$data->saved_account->account_type]
+                         ?? $data->saved_account->account_type;
+        }
+
         $tokenDetails = [
-            'type'     => $data->saved_account->payment_method,
+            'type'     => $tokenType,
             'maskedCC' => $data->saved_account->last_four,
         ];
 
@@ -860,8 +876,6 @@ class Fortis extends AbstractMethod
         $month                          = substr($expDate, 0, 2);
         $year                           = substr($expDate, 2, 2);
         $tokenDetails['expirationDate'] = "$month/$year";
-
-        $paymentTokenType = PaymentTokenFactoryInterface::TOKEN_TYPE_CREDIT_CARD;
 
         $paymentToken->setTokenDetails(json_encode($tokenDetails));
 

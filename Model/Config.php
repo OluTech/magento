@@ -29,6 +29,11 @@ class Config extends AbstractConfig
      */
     public const METHOD_CODE = 'fortis';
 
+    public const ACH_ICON = [
+      'width' => 50,
+      'height' => 33
+    ];
+
     /**
      * @var Data
      */
@@ -204,6 +209,16 @@ class Config extends AbstractConfig
     }
 
     /**
+     * Get Fortis icon image URL
+     *
+     * @return string
+     */
+    public function getFortisIconImageUrl()
+    {
+        return $this->_assetRepo->getUrl('Fortispay_Fortis::images/fortis_ach.png');
+    }
+
+    /**
      * Get "What Is Fortis" localized URL; Supposed to be used with "mark" as popup window
      *
      * @return string
@@ -358,6 +373,14 @@ class Config extends AbstractConfig
     public function achWebhookId(): string
     {
         return $this->getConfig('fortis_ach_webhook_id') ?? '';
+    }
+
+    /**
+     * @return array
+     */
+    public function getACHIcon(): array
+    {
+        return self::ACH_ICON;
     }
 
     /**
