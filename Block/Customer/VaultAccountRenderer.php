@@ -84,6 +84,7 @@ class VaultAccountRenderer extends AbstractTokenRenderer
      * Can render specified token
      *
      * @param PaymentTokenInterface $token
+     *
      * @return boolean
      */
     public function canRender(PaymentTokenInterface $token): bool

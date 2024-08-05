@@ -49,8 +49,11 @@ use Magento\Directory\Model\ResourceModel\Country\CollectionFactory as CountryCo
  * Checkout Controller
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
-abstract class AbstractFortis implements HttpGetActionInterface, HttpPostActionInterface, RedirectLoginInterface,
-                                         CsrfAwareActionInterface
+abstract class AbstractFortis implements
+    HttpGetActionInterface,
+    HttpPostActionInterface,
+    RedirectLoginInterface,
+    CsrfAwareActionInterface
 {
     /**
      * @var array|string[]

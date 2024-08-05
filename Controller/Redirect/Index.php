@@ -65,14 +65,14 @@ class Index extends AbstractFortis
         $returnUrl = "";
         if ($action === 'sale') {
             $returnUrl = $this->_urlBuilder->getUrl(
-                    'fortis/redirect/success',
-                    self::SECURE
-                ) . '?gid=' . $order->getRealOrderId();
+                'fortis/redirect/success',
+                self::SECURE
+            ) . '?gid=' . $order->getRealOrderId();
         } elseif ($action === 'auth-only') {
             $returnUrl = $this->_urlBuilder->getUrl(
-                    'fortis/redirect/authorise',
-                    self::SECURE
-                ) . '?gid=' . $order->getRealOrderId();
+                'fortis/redirect/authorise',
+                self::SECURE
+            ) . '?gid=' . $order->getRealOrderId();
         }
 
         $vaultHash = $additionalData['fortis-vault-method'] ?? '';
@@ -84,14 +84,14 @@ class Index extends AbstractFortis
                 $order->getCustomerId()
             );
 
-            $tokenType = json_decode($cardData->getTokenDetails())->type;
-            $gatewayToken                    = $cardData->getGatewayToken();
-            $user_id                         = $this->config->userId();
-            $user_api_key                    = $this->config->userApiKey();
-            $api                             = new FortisApi($this->config);
-            $guid                            = strtoupper(Uuid::uuid4());
-            $guid                            = str_replace('-', '', $guid);
-            $intentData                      = [
+            $tokenType    = json_decode($cardData->getTokenDetails())->type;
+            $gatewayToken = $cardData->getGatewayToken();
+            $user_id      = $this->config->userId();
+            $user_api_key = $this->config->userApiKey();
+            $api          = new FortisApi($this->config);
+            $guid         = strtoupper(Uuid::uuid4());
+            $guid         = str_replace('-', '', $guid);
+            $intentData   = [
                 'transaction_amount' => (int)($order->getTotalDue() * 100),
                 'token_id'           => $gatewayToken,
                 'description'        => $incrementId,
@@ -103,9 +103,9 @@ class Index extends AbstractFortis
                     $achProductId = $this->config->achProductId();
                     if ($achProductId
                         && preg_match(
-                               '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',
-                               $achProductId
-                           ) === 1) {
+                            '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',
+                            $achProductId
+                        ) === 1) {
                         $intentData['product_transaction_id'] = $achProductId;
                     }
                     $transactionResult = $api->doAchTokenisedTransaction($intentData);
@@ -142,9 +142,9 @@ class Index extends AbstractFortis
                     $productTransactionId = $this->config->ccProductId();
                     if ($productTransactionId
                         && preg_match(
-                               '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',
-                               $productTransactionId
-                           ) === 1) {
+                            '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',
+                            $productTransactionId
+                        ) === 1) {
                         $intentData['product_transaction_id'] = $productTransactionId;
                     }
 

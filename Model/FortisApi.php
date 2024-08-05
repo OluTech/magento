@@ -1096,6 +1096,5 @@ class FortisApi
         if ($response->type === 'Error') {
             throw new \Exception('Level 3 creation error: ' . $response->detail);
         }
-
     }
 }

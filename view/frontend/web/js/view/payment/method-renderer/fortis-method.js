@@ -27,6 +27,7 @@ define(
     'use strict';
     let fortisPaymentType;
     let fortisSavedCard = undefined;
+    let checkFortisSavedCard = false;
 
     return Component.extend({
       defaults: {
@@ -63,6 +64,13 @@ define(
        */
       isFortisVaultEnabled: function () {
         return window.checkoutConfig.payment.fortis.isVault;
+      },
+
+      /**
+       * @return {Boolean}
+       */
+      useFortisVaultEnabled: function () {
+        return true;
       },
 
       /**
@@ -173,15 +181,15 @@ define(
             _urlBuilder.build(url),
             {}
           ).done(function (result) {
-              if (result.success === false) {
-                  $frame.html('<h1>'+result.reason+'</h1>');
-              } else {
-                  $frame.html(result);
-              }
+            if (result.success === false) {
+              $frame.html('<h1>'+result.reason+'</h1>');
+            } else {
+              $frame.html(result);
+            }
 
-              $frame.trigger('processStop');
-              $frame[0].scrollIntoView();
-              $frame.show();
+            $frame.trigger('processStop');
+            $frame[0].scrollIntoView();
+            $frame.show();
 
           }).fail(function (response) {
             $frame.trigger('processStop');

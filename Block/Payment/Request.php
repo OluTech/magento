@@ -153,6 +153,18 @@ class Request extends Template
         $guid                    = strtoupper(Uuid::uuid4());
         $guid                    = str_replace('-', '', $guid);
 
+        $digitalWallets = [];
+        if ($config['googlepay']) {
+            array_push($digitalWallets, 'GooglePay');
+        }
+        if ($config['applepay']) {
+            array_push($digitalWallets, 'ApplePay');
+        }
+        $digitalWalletsValue = "['" . implode("', '", $digitalWallets) . "']";
+        if ($digitalWalletsValue == "['']") {
+            $digitalWalletsValue = '[]';
+        }
+
         $submit = <<<SUBMIT
 <script>
     const fortisDiv = document.createElement('div');
@@ -171,6 +183,7 @@ class Request extends Template
             floatingLabels: $floatingLabels,
             showValidationAnimation: $showValidationAnimation,
             showReceipt: false,
+            digitalWallets: $digitalWalletsValue,
 SUBMIT;
         if (!$achEnabled) {
             $submit .= "view: 'default',";

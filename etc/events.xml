@@ -19,10 +19,6 @@
         <observer name="fortis_order_cancel_after"
                   instance="Fortispay\Fortis\Observer\OrderCancelAfter"/>
     </event>
-    <event name="sales_order_payment_refund">
-        <observer name="fortis_purchase_refund"
-                  instance="Fortispay\Fortis\Observer\SaleRefund"/>
-    </event>
     <event name="sales_order_invoice_pay">
         <observer name="fortis_capture_auth"
                   instance="Fortispay\Fortis\Observer\OrderAuthCaptured"/>

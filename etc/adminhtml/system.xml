@@ -39,6 +39,20 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>Select Yes to enable ACH support</comment>
                 </field>
+                <field id="fortis_googlepay_active" translate="label" type="select" sortOrder="3" showInDefault="1"
+                       showInWebsite="1"
+                       showInStore="1">
+                    <label>Enable Google Pay</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Select Yes to enable Google Pay support</comment>
+                </field>
+                <field id="fortis_applepay_active" translate="label" type="select" sortOrder="3" showInDefault="1"
+                       showInWebsite="1"
+                       showInStore="1">
+                    <label>Enable Apple Pay</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Select Yes to enable Apple Pay support</comment>
+                </field>
                 <field id="fortis_ach_product_id" translate="label" type="obscure" sortOrder="3" showInDefault="1"
                        showInWebsite="1"
                        showInStore="1">
