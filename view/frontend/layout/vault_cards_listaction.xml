@@ -1,11 +1,17 @@
 <?xml version="1.0"?>
 <page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <update handle="customer_account"/>
     <body>
         <referenceContainer name="content">
+            <block class="Magento\Vault\Block\Customer\CreditCards" name="vault.cards.list" cacheable="false" template="Magento_Vault::cards_list.phtml" />
+            <block class="Magento\Vault\Block\Customer\AccountTokens" name="vault.token.list" cacheable="false" template="Fortispay_Fortis::token_list.phtml" />
             <referenceBlock name="vault.cards.list">
                 <block class="Fortispay\Fortis\Block\Customer\CardRenderer" name="fortis.card.renderer"
                        template="Magento_Vault::customer_account/credit_card.phtml"/>
+            </referenceBlock>
+            <referenceBlock name="vault.token.list">
+                <block class="Fortispay\Fortis\Block\Customer\VaultAccountRenderer" name="fortis.token.renderer" template="Fortispay_Fortis::html/account_token.phtml"/>
             </referenceBlock>
         </referenceContainer>
     </body>

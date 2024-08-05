@@ -83,6 +83,8 @@ class Index extends AbstractFortis
                 $vaultHash,
                 $order->getCustomerId()
             );
+
+            $tokenType = json_decode($cardData->getTokenDetails())->type;
             $gatewayToken                    = $cardData->getGatewayToken();
             $user_id                         = $this->config->userId();
             $user_api_key                    = $this->config->userApiKey();
@@ -95,7 +97,7 @@ class Index extends AbstractFortis
                 'description'        => $incrementId,
                 'transaction_api_id' => $guid,
             ];
-            if ($cardData->getType() === 'ach') {
+            if ($tokenType === 'ach') {
                 // Do the tokenised ach debit
                 try {
                     $achProductId = $this->config->achProductId();
@@ -128,7 +130,6 @@ class Index extends AbstractFortis
                 } catch (LocalizedException $e) {
                     $this->_logger->error($e->getMessage());
                     $this->messageManager->addExceptionMessage($e, $e->getMessage());
-                    $this->setMessage($e->getMessage());
                     $this->_checkoutSession->restoreQuote();
 
                     return $e;

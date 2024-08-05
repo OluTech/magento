@@ -43,7 +43,8 @@ use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Vault\Api\PaymentTokenManagementInterface;
 use Magento\Vault\Api\PaymentTokenRepositoryInterface;
-use Magento\Vault\Model\CreditCardTokenFactory;
+use Magento\Vault\Api\Data\PaymentTokenFactoryInterface;
+use Magento\Vault\Model\PaymentTokenFactory;
 use Magento\Vault\Model\ResourceModel\PaymentToken as PaymentTokenResourceModel;
 
 /**
@@ -54,6 +55,12 @@ class Fortis extends AbstractMethod
 {
     public const        SECURE = ['_secure' => true];
     public const        FFFFFF = '#ffffff';
+    public const        AVAILABLE_CC_TYPES = [
+        'visa' => 'VI',
+        'mc' => 'MC',
+        'disc' => 'DI',
+        'amex' => 'AE'
+    ];
     /**
      * @var array|string[]
      */
@@ -246,11 +253,6 @@ class Fortis extends AbstractMethod
     protected $transactionBuilder;
 
     /**
-     * @var CreditCardTokenFactory
-     */
-    protected $creditCardTokenFactory;
-
-    /**
      * @var PaymentTokenRepositoryInterface
      */
     protected $paymentTokenRepository;
@@ -303,6 +305,11 @@ class Fortis extends AbstractMethod
     protected $orderRepository;
 
     /**
+     * @var PaymentTokenFactory
+     */
+    protected PaymentTokenFactory $paymentTokenFactory;
+
+    /**
      * Construct
      *
      * @param Context $context
@@ -321,16 +328,16 @@ class Fortis extends AbstractMethod
      * @param LocalizedExceptionFactory $exception
      * @param TransactionRepositoryInterface $transactionRepository
      * @param BuilderInterface $transactionBuilder
-     * @param CreditCardTokenFactory $CreditCardTokenFactory
      * @param PaymentTokenRepositoryInterface $PaymentTokenRepositoryInterface
      * @param PaymentTokenManagementInterface $paymentTokenManagement
+     * @param PaymentTokenFactory $paymentTokenFactory
      * @param EncryptorInterface $encryptor
      * @param PaymentTokenResourceModel $paymentTokenResourceModel
      * @param TransactionSearchResultInterfaceFactory $transactions
      * @param OrderRepositoryInterface $orderRepository
+     * @param Config $config
      * @param AbstractResource|null $resource
      * @param AbstractDb|null $resourceCollection
-     * @param \Fortispay\Fortis\Model\Config $config
      * @param array $data
      */
     public function __construct(
@@ -350,9 +357,9 @@ class Fortis extends AbstractMethod
         LocalizedExceptionFactory $exception,
         TransactionRepositoryInterface $transactionRepository,
         BuilderInterface $transactionBuilder,
-        CreditCardTokenFactory $CreditCardTokenFactory,
         PaymentTokenRepositoryInterface $PaymentTokenRepositoryInterface,
         PaymentTokenManagementInterface $paymentTokenManagement,
+        PaymentTokenFactory $paymentTokenFactory,
         EncryptorInterface $encryptor,
         PaymentTokenResourceModel $paymentTokenResourceModel,
         TransactionSearchResultInterfaceFactory $transactions,
@@ -381,7 +388,7 @@ class Fortis extends AbstractMethod
         $this->_exception                = $exception;
         $this->transactionRepository     = $transactionRepository;
         $this->transactionBuilder        = $transactionBuilder;
-        $this->creditCardTokenFactory    = $CreditCardTokenFactory;
+        $this->paymentTokenFactory       = $paymentTokenFactory;
         $this->paymentTokenRepository    = $PaymentTokenRepositoryInterface;
         $this->paymentTokenManagement    = $paymentTokenManagement;
         $this->encryptor                 = $encryptor;
@@ -840,29 +847,43 @@ class Fortis extends AbstractMethod
             $order->getCustomerId()
         );
         if (!$paymentToken) {
-            $paymentToken = $this->creditCardTokenFactory->create();
+            $paymentToken = $this->paymentTokenFactory->create();
         }
+
+        $paymentToken->setPaymentMethodCode(Config::METHOD_CODE);
 
         $paymentToken->setGatewayToken($data->saved_account->id);
         $expDate      = $data->saved_account->exp_date;
-        $tokenDetails = [
-            'type'     => $data->saved_account->payment_method,
-            'maskedCC' => $data->saved_account->last_four,
-        ];
-        if ($expDate) {
-            $month                          = substr($expDate, 0, 2);
-            $year                           = substr($expDate, 2, 2);
-            $tokenDetails['expirationDate'] = "$month/$year";
+
+        if ($data->saved_account->payment_method === 'ach') {
+            $paymentTokenType = PaymentTokenFactoryInterface::TOKEN_TYPE_ACCOUNT;
+            $tokenType = $data->saved_account->payment_method;
+        } else {
+            $paymentTokenType = PaymentTokenFactoryInterface::TOKEN_TYPE_CREDIT_CARD;
+            $tokenType = self::AVAILABLE_CC_TYPES[$data->saved_account->account_type]
+                         ?? $data->saved_account->account_type;
         }
 
-        $paymentToken->setTokenDetails(json_encode($tokenDetails));
-        if ($expDate) {
-            $paymentToken->setExpiresAt($this->getExpirationDate($month, $year));
+        $tokenDetails = [
+            'type'     => $tokenType,
+            'maskedCC' => $data->saved_account->last_four,
+        ];
+
+        if (!$expDate) {
+            $expDate = $this->createExpiryDate();
         }
+
+        $month                          = substr($expDate, 0, 2);
+        $year                           = substr($expDate, 2, 2);
+        $tokenDetails['expirationDate'] = "$month/$year";
+
+        $paymentToken->setTokenDetails(json_encode($tokenDetails));
+
+        $paymentToken->setExpiresAt($this->getExpirationDate($month, $year));
+
         $paymentToken->setIsActive((int)$data->saved_account->active === 1);
         $paymentToken->setIsVisible(true);
-        $paymentToken->setPaymentMethodCode('fortis');
-        $paymentToken->setType($data->saved_account->payment_method);
+        $paymentToken->setType($paymentTokenType);
         $paymentToken->setCustomerId($order->getCustomerId());
         $paymentToken->setPublicHash($this->generatePublicHash($paymentToken));
 
@@ -870,8 +891,15 @@ class Fortis extends AbstractMethod
 
         /* Retrieve Payment Token */
 
-        $this->creditCardTokenFactory->create();
+        $this->paymentTokenFactory->create();
         $this->addLinkToOrderPayment($paymentToken->getEntityId(), $order->getPayment()->getEntityId());
+    }
+
+    public function createExpiryDate(): string
+    {
+        $one_year_from_now_timestamp = strtotime('+1 year');
+
+        return date('my', $one_year_from_now_timestamp);
     }
 
     /**

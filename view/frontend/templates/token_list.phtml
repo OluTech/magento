@@ -1,0 +1,24 @@
+<?php
+
+/** @var \Magento\Vault\Block\Customer\AccountTokens $block */
+$tokens = $block->getPaymentTokens();
+?>
+<?php if (count($tokens) !== 0) : ?>
+    <div class="table-wrapper my-credit-cards">
+        <table class="data table table-credit-cards" id="token-list-table">
+            <thead>
+            <tr>
+                <th scope="col" class="col"><?= $block->escapeHtml(__('Account Number')) ?></th>
+                <th scope="col" class="col expire"><?= $block->escapeHtml(__('Expiration Date')) ?></th>
+                <th scope="col" class="col card-type"><?= $block->escapeHtml(__('Type')) ?></th>
+                <th scope="col" class="col actions">&nbsp;</th>
+            </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($tokens as $token) : ?>
+                <?= /* @noEscape */ $block->renderTokenHtml($token) ?>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+<?php endif; ?>
