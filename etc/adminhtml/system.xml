@@ -175,6 +175,11 @@
                     <label>Button Selected Text</label>
                     <frontend_model>Fortispay\Fortis\Block\ColorPicker</frontend_model>
                 </field>
+                <field id="fortis_place_order_btn" translate="label" type="text" sortOrder="3" showInDefault="1"
+                       showInWebsite="1"
+                       showInStore="1">
+                    <label>Place Order Button Text (optional)</label>
+                </field>
                 <field id="fortis_color_button_action_background" translate="label" type="text" sortOrder="7"
                        showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Button Action Background</label>

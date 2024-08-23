@@ -551,4 +551,14 @@ class Config extends AbstractConfig
 
         return $t !== '0';
     }
+
+    /**
+     * Return Place Order button text
+     *
+     * @return string
+     */
+    public function getPlaceOrderBtnText(): string
+    {
+        return $this->getConfig('fortis_place_order_btn') ?? 'Place order';
+    }
 }
