@@ -93,6 +93,18 @@ class Classic extends AbstractFortis implements HttpPostActionInterface
         $guid                    = strtoupper(Uuid::uuid4());
         $guid                    = str_replace('-', '', $guid);
 
+        $digitalWallets = [];
+        if ($config['googlepay']) {
+            array_push($digitalWallets, 'GooglePay');
+        }
+        if ($config['applepay']) {
+            array_push($digitalWallets, 'ApplePay');
+        }
+        $digitalWalletsValue = "['" . implode("', '", $digitalWallets) . "']";
+        if ($digitalWalletsValue == "['']") {
+            $digitalWalletsValue = '[]';
+        }
+
         $submit = <<<CONTENT
 </script>
     <script>
@@ -109,6 +121,7 @@ class Classic extends AbstractFortis implements HttpPostActionInterface
             hideAgreementCheckbox: false,
             hideTotal: false,
             showReceipt: false,
+            digitalWallets: $digitalWalletsValue,
             fields: {
               additional: [
                 {name: 'description', required: true, value: `$incrementId`, hidden: true},

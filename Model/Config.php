@@ -30,8 +30,8 @@ class Config extends AbstractConfig
     public const METHOD_CODE = 'fortis';
 
     public const ACH_ICON = [
-      'width' => 50,
-      'height' => 33
+        'width'  => 50,
+        'height' => 33
     ];
 
     /**
@@ -341,6 +341,31 @@ class Config extends AbstractConfig
 
         return $r === '1';
     }
+
+    /**
+     * Returns true if Google Pay is configured active in store settings
+     *
+     * @return bool
+     */
+    public function googlePayIsActive(): bool
+    {
+        $r = $this->getConfig('fortis_googlepay_active');
+
+        return $r === '1';
+    }
+
+    /**
+     * Returns true if Apple Pay is configured active in store settings
+     *
+     * @return bool
+     */
+    public function applePayIsActive(): bool
+    {
+        $r = $this->getConfig('fortis_applepay_active');
+
+        return $r === '1';
+    }
+
 
     /**
      * ACH product ID (optional)

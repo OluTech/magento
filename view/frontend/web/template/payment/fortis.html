@@ -18,14 +18,11 @@
     <div class="payment-method-content">
         <!-- ko if: (isFortisVaultEnabled() != 0)-->
         <!-- ko if:(checkFortisSavedCard() <= 0) -->
-        <div name="payment-token" style="margin-bottom:20px;">
-            <input id="fortis-vault-method"
-                   name="fortis-vault-method"
-                   type="checkbox"
-                   value="true"/>
-            <label class="label" data-bind="attr: {'for': getCode() + '_enable_vault'}">
-                <span><!-- ko i18n: 'Remember my payment method details'--><!-- /ko --></span>
-            </label>
+        <div class="fortis-vault-method-block field choice" data-bind="visible: isFortisVaultEnabled()">
+            <input type="checkbox" name="fortis-vault-method"
+                   data-bind="checked: checkFortisSavedCard, click: useFortisVaultEnabled, attr: {id: 'fortis-vault-method'}"/>
+            <label data-bind="attr: {for: 'fortis-vault-method'}"><span
+                    data-bind="i18n: 'Remember my payment method details'"></span></label>
         </div>
         <!-- /ko -->
         <!-- ko if:(checkFortisSavedCard() > 0) -->

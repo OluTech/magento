@@ -332,10 +332,10 @@ class Success extends AbstractFortis
                                  ->setFailSafe(true)
                 // Build method creates the transaction and returns the object
                                  ->build(
-                    $paymentData->payment_method === 'ach'
-                        ? Transaction::TYPE_ORDER
-                        : Transaction::TYPE_CAPTURE
-                );
+                                     $paymentData->payment_method === 'ach'
+                                     ? Transaction::TYPE_ORDER
+                                     : Transaction::TYPE_CAPTURE
+                                 );
 
             $payment->addTransactionCommentsToOrder(
                 $transaction,

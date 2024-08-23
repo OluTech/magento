@@ -47,17 +47,21 @@ use Magento\Vault\Api\Data\PaymentTokenFactoryInterface;
 use Magento\Vault\Model\PaymentTokenFactory;
 use Magento\Vault\Model\ResourceModel\PaymentToken as PaymentTokenResourceModel;
 
+use Magento\Framework\Filesystem\DirectoryList;
+use Magento\Framework\Filesystem;
+use Magento\Framework\Filesystem\Io\File;
+
 /**
  * @SuppressWarnings(PHPMD.TooManyFields)
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
 class Fortis extends AbstractMethod
 {
-    public const        SECURE = ['_secure' => true];
-    public const        FFFFFF = '#ffffff';
+    public const        SECURE             = ['_secure' => true];
+    public const        FFFFFF             = '#ffffff';
     public const        AVAILABLE_CC_TYPES = [
         'visa' => 'VI',
-        'mc' => 'MC',
+        'mc'   => 'MC',
         'disc' => 'DI',
         'amex' => 'AE'
     ];
@@ -308,6 +312,9 @@ class Fortis extends AbstractMethod
      * @var PaymentTokenFactory
      */
     protected PaymentTokenFactory $paymentTokenFactory;
+    protected $directoryList;
+    protected $fileIo;
+    protected $logger;
 
     /**
      * Construct
@@ -349,6 +356,8 @@ class Fortis extends AbstractMethod
         Data $fortisData,
         ScopeConfigInterface $scopeConfig,
         Logger $logger,
+        DirectoryList $directoryList,
+        File $fileIo,
         ConfigFactory $configFactory,
         StoreManagerInterface $storeManager,
         UrlInterface $urlBuilder,
@@ -397,10 +406,40 @@ class Fortis extends AbstractMethod
         $this->_paymentData              = $fortisData;
         $this->orderRepository           = $orderRepository;
         $this->config                    = $config;
+        $this->scopeConfig               = $scopeConfig;
 
         $parameters = ['params' => [$this->_code]];
 
         $this->_config = $configFactory->create($parameters);
+
+        $this->directoryList = $directoryList;
+        $this->fileIo        = $fileIo;
+
+        $this->checkApplePayFile();
+    }
+
+    public function checkApplePayFile()
+    {
+        try {
+            if ($this->_config->applePayIsActive()) {
+                $currentFolder = $this->directoryList->getRoot();
+                $file          = 'apple-developer-merchantid-domain-association';
+                $source        = $currentFolder . '/app/code/Fortispay/Fortis/' . $file;
+                $targetDir     = $currentFolder . '/pub/.well-known/';
+                $target        = $targetDir . $file;
+
+                // Ensure the .well-known directory exists
+                if (!is_dir($targetDir)) {
+                    $this->fileIo->mkdir($targetDir, 0755);
+                }
+
+                if ($this->fileIo->fileExists($source) && !$this->fileIo->fileExists($target)) {
+                    $this->fileIo->cp($source, $target);
+                }
+            }
+        } catch (Exception $e) {
+            $this->_logger->error('Error copying Apple Pay file: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -489,17 +528,17 @@ class Fortis extends AbstractMethod
         }
         if ($productTransactionId
             && preg_match(
-                   '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',
-                   $productTransactionId
-               ) === 1) {
+                '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',
+                $productTransactionId
+            ) === 1) {
             $intentData['methods']   = [];
             $intentData['methods'][] = ['type' => 'cc', 'product_transaction_id' => $productTransactionId];
         }
         if ($achEnabled && $achProductId
             && preg_match(
-                   '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',
-                   $achProductId
-               ) === 1) {
+                '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',
+                $achProductId
+            ) === 1) {
             if (empty($intentData['methods'])) {
                 $intentData['methods'] = [];
             }
@@ -518,6 +557,8 @@ class Fortis extends AbstractMethod
             'token'       => $client_token,
             'options'     => $options,
             'redirectUrl' => $returnUrl,
+            'googlepay'   => $this->_config->googlePayIsActive(),
+            'applepay'    => $this->_config->applePayIsActive(),
         ];
     }
 
@@ -591,14 +632,14 @@ class Fortis extends AbstractMethod
         $action = $this->config->orderAction();
         if ($action === 'sale') {
             $returnUrl = $this->_urlBuilder->getUrl(
-                    'fortis/redirect/success',
-                    self::SECURE
-                ) . '?gid=' . $order->getRealOrderId();
+                'fortis/redirect/success',
+                self::SECURE
+            ) . '?gid=' . $order->getRealOrderId();
         } else {
             $returnUrl = $this->_urlBuilder->getUrl(
-                    'fortis/redirect/authorise',
-                    self::SECURE
-                ) . '?gid=' . $order->getRealOrderId();
+                'fortis/redirect/authorise',
+                self::SECURE
+            ) . '?gid=' . $order->getRealOrderId();
         }
 
         return [$user_id, $user_api_key, $action, $options, $returnUrl];
@@ -714,32 +755,58 @@ class Fortis extends AbstractMethod
      * @param DataObject|InfoInterface $payment
      * @param float $amount
      *
-     * @return $this
+     * @return bool
      * @throws LocalizedException
      * @api
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function refund(InfoInterface $payment, $amount)
     {
-        $order         = $payment->getOrder();
+        $order = $payment->getOrder();
+
+        if ($order->getStatus() !== Order::STATE_PROCESSING) {
+            $order->setState(Order::STATE_PROCESSING);
+        }
+
+        $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_id'));
+        $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_api_key'));
+        $api          = new FortisApi($this->config);
+        $type         = $this->scopeConfig->getValue('payment/fortis/order_intention');
+
         $transactionId = $payment->getLastTransId();
         $intentData    = [
             'transaction_amount' => (int)($amount * 100),
             'transactionId'      => $transactionId,
+            'description'        => $order->getIncrementId()
         ];
 
-        $user_id      = $this->getConfigData('user_id');
-        $user_api_key = $this->getConfigData('user_api_key');
-        $api          = new FortisApi($this->config);
-        try {
-            $response = $api->refundTransactionAmount($intentData, $user_id, $user_api_key);
-            $data     = json_decode($response)->data;
+        $paymentMethod         = 'cc';
+        $additionalInformation = $payment->getAdditionalInformation();
+        $rawDetailsInfo        = null;
+        if (!empty($additionalInformation) && !empty($additionalInformation['raw_details_info'])) {
+            $rawDetailsInfo = json_decode($additionalInformation['raw_details_info']);
+            $paymentMethod  = $rawDetailsInfo->payment_method;
+        }
 
-            $helper = $this->_paymentData;
-            $amount = $helper->convertToOrderCurrency($order, $amount);
+        try {
+            if ($type === 'auth-only') {
+                $response = $api->refundAuthAmount($intentData, $user_id, $user_api_key);
+            } else {
+                if ($paymentMethod !== 'ach') {
+                    $response = $api->refundTransactionAmount($intentData, $user_id, $user_api_key);
+                } else {
+                    $intentData = [
+                        'transaction_amount'      => $intentData['transaction_amount'],
+                        'description'             => $order->getIncrementId(),
+                        'previous_transaction_id' => $rawDetailsInfo?->id,
+                    ];
+                    $response   = $api->achRefundTransactionAmount($intentData);
+                }
+            }
+            $data = json_decode($response)->data ?? null;
 
             /* Set Comment to Order*/
-            if ($data->reason_code_id === 1000) {
+            if ($data?->reason_code_id === 1000) {
                 $order->addStatusHistoryComment(
                     __(
                         "Order Successfully Refunded with Transaction Id - $data->id Auth Code - $data->auth_code"
@@ -853,15 +920,15 @@ class Fortis extends AbstractMethod
         $paymentToken->setPaymentMethodCode(Config::METHOD_CODE);
 
         $paymentToken->setGatewayToken($data->saved_account->id);
-        $expDate      = $data->saved_account->exp_date;
+        $expDate = $data->saved_account->exp_date;
 
         if ($data->saved_account->payment_method === 'ach') {
             $paymentTokenType = PaymentTokenFactoryInterface::TOKEN_TYPE_ACCOUNT;
-            $tokenType = $data->saved_account->payment_method;
+            $tokenType        = $data->saved_account->payment_method;
         } else {
             $paymentTokenType = PaymentTokenFactoryInterface::TOKEN_TYPE_CREDIT_CARD;
-            $tokenType = self::AVAILABLE_CC_TYPES[$data->saved_account->account_type]
-                         ?? $data->saved_account->account_type;
+            $tokenType        = self::AVAILABLE_CC_TYPES[$data->saved_account->account_type]
+                                ?? $data->saved_account->account_type;
         }
 
         $tokenDetails = [
@@ -961,7 +1028,7 @@ class Fortis extends AbstractMethod
         $paymentToken->getTokenDetails();
 
         $hashKey .= $paymentToken->getPaymentMethodCode() . $paymentToken->getType() . $paymentToken->getGatewayToken(
-            ) . $paymentToken->getTokenDetails();
+        ) . $paymentToken->getTokenDetails();
 
         return $this->encryptor->getHash($hashKey);
     }
