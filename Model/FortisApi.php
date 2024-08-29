@@ -1032,8 +1032,11 @@ class FortisApi
         $userApiKey  = $this->config->userApiKey();
         $developerId = $this->developerId;
 
-        $shippingAddress          = $order->getShippingAddress();
-        $countryId                = $shippingAddress->getCountryId();
+        $customerAddress = $order->getShippingAddress();
+        if (!$customerAddress) {
+            $customerAddress = $order->getBillingAddress();
+        }
+        $countryId                = $customerAddress->getCountryId();
         $country                  = $countryFactory->create()->loadByCode($countryId);
         $destination_country_code = '840';
         if ($country->getId()) {
@@ -1047,7 +1050,7 @@ class FortisApi
             'destination_country_code' => $destination_country_code,
             'freight_amount'           => $order->getShippingAmount(),
             'shipfrom_zip_code'        => $storeManager->getStore()->getCode(),
-            'shipto_zip_code'          => $shippingAddress->getPostcode(),
+            'shipto_zip_code'          => $customerAddress->getPostcode(),
             'tax_amount'               => $order->getTaxAmount(),
         ];
 
