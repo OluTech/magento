@@ -765,7 +765,14 @@ class Fortis extends AbstractMethod
         $order = $payment->getOrder();
 
         if ($order->getStatus() !== Order::STATE_PROCESSING) {
-            $order->setState(Order::STATE_PROCESSING);
+            if ($this->isOrderVirtualOnly($order)) {
+                $order->setState(Order::STATE_NEW);
+                $order->setStatus(Order::STATE_NEW);
+                $order->save();
+            } else {
+                $order->setState(Order::STATE_PROCESSING);
+                $order->setStatus(Order::STATE_PROCESSING);
+            }
         }
 
         $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_id'));
@@ -824,6 +831,24 @@ class Fortis extends AbstractMethod
 
             return false;
         }
+    }
+
+    /**
+     * Check if the order contains only virtual products.
+     *
+     * @param \Magento\Sales\Model\Order $order
+     *
+     * @return bool
+     */
+    private function isOrderVirtualOnly(\Magento\Sales\Model\Order $order)
+    {
+        foreach ($order->getAllItems() as $item) {
+            if (!$item->getProduct()->isVirtual()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

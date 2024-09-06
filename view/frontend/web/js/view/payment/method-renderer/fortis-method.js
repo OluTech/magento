@@ -206,6 +206,10 @@ define(
       },
       achIsEnabled: function () {
         return window.checkoutConfig.payment.fortis.achIsEnabled;
+      },
+      /** Return text for place order button **/
+      getPlaceOrderBtn: function () {
+          return window.checkoutConfig.payment.fortis.placeOrderBtnText
       }
     });
   }

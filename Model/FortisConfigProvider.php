@@ -177,6 +177,7 @@ class FortisConfigProvider implements ConfigProviderInterface
                     'achIsEnabled'              => $this->config->achIsActive(),
                     'isCheckoutIframe'          => $this->config->isCheckoutIframe(),
                     'isSingleView'              => $this->config->isSingleView(),
+                    'placeOrderBtnText'         => $this->config->getPlaceOrderBtnText()
                 ],
             ],
         ];

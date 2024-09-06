@@ -232,6 +232,13 @@ SUBMIT;
             }
         });
 
+        elements.on(
+          'ready',
+          function () {
+            jQuery('#fortis-saved_cards').hide();
+          }
+        );
+
         elements.on('paymentFinished', (result) => {
           if(result.status === 'approved') {
             console.log('approved');
