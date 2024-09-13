@@ -30,6 +30,7 @@ class Index extends AbstractFortis
      * @var string
      */
     protected $_configMethod = Config::METHOD_CODE;
+    private string $successURL;
 
     /**
      * Execute
@@ -173,7 +174,6 @@ class Index extends AbstractFortis
                 } catch (LocalizedException $e) {
                     $this->_logger->error($e->getMessage());
                     $this->messageManager->addExceptionMessage($e, $e->getMessage());
-                    $this->setMessage($e->getMessage());
                     $this->_checkoutSession->restoreQuote();
 
                     return $e;
@@ -183,22 +183,9 @@ class Index extends AbstractFortis
             }
         }
 
-        $block = $page_object->getLayout()
-                             ->getBlock('fortis_redirect')
-                             ->setPaymentFormData($order);
-
-        $formData = $block->getSubmitForm();
-        if (!$formData) {
-            $this->_logger->error("We can\'t start Fortis Checkout.");
-
-            return $this->getRedirectToCartObject();
-        }
+        $page_object->getLayout()
+                    ->getBlock('fortis_redirect');
 
         return $page_object;
-    }
-
-    public function getResponse()
-    {
-        return $this->getResponse();
     }
 }

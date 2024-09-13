@@ -12,8 +12,5 @@ use Fortispay\Fortis\Controller\AbstractFortis;
  */
 abstract class Cron extends AbstractFortis
 {
-    public function getResponse()
-    {
-        return $this->getResponse();
-    }
+
 }

@@ -282,9 +282,4 @@ class AchHook implements CsrfAwareActionInterface
     {
         return true;
     }
-
-    public function getResponse()
-    {
-        return $this->getResponse();
-    }
 }

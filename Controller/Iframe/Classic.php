@@ -3,228 +3,184 @@
 namespace Fortispay\Fortis\Controller\Iframe;
 
 use Fortispay\Fortis\Controller\AbstractFortis;
+use Fortispay\Fortis\Helper\Data as FortisHelper;
+use Fortispay\Fortis\Model\Config;
 use Fortispay\Fortis\Model\Fortis;
-use Magento\Checkout\Model\Session;
-use Magento\Framework\App\Action\Context;
-use Magento\Framework\App\Action\HttpPostActionInterface;
-use Magento\Framework\Controller\Result\RawFactory;
-use Magento\Framework\Exception\LocalizedException;
+use Fortispay\Fortis\Model\Payment\IFrameData;
+use Magento\Checkout\Model\Session as CheckoutSession;
+use Magento\Customer\Model\Session as CustomerSession;
+use Magento\Customer\Model\Url;
+use Magento\Directory\Model\CountryFactory;
+use Magento\Directory\Model\ResourceModel\Country\CollectionFactory as CountryCollectionFactory;
+use Magento\Framework\App\RequestInterface;
+use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\App\State;
+use Magento\Framework\Controller\Result\JsonFactory;
+use Magento\Framework\Controller\ResultFactory;
+use Magento\Framework\DB\Transaction as DBTransaction;
+use Magento\Framework\DB\TransactionFactory;
+use Magento\Framework\Encryption\EncryptorInterface;
+use Magento\Framework\Event\ManagerInterface as EventManager;
+use Magento\Framework\Message\ManagerInterface;
+use Magento\Framework\Session\Generic;
+use Magento\Framework\Stdlib\DateTime\DateTime;
+use Magento\Framework\Url\Helper\Data;
+use Magento\Framework\UrlInterface;
 use Magento\Framework\View\Result\PageFactory;
-use Magento\Sales\Model\Order\Address;
+use Magento\Sales\Api\Data\TransactionSearchResultInterfaceFactory;
+use Magento\Sales\Api\OrderRepositoryInterface;
+use Magento\Sales\Api\TransactionRepositoryInterface;
+use Magento\Sales\Model\Order;
+use Magento\Sales\Model\Order\Email\Sender\InvoiceSender;
+use Magento\Sales\Model\Order\Email\Sender\OrderSender;
+use Magento\Sales\Model\Order\Payment\Transaction\Builder;
 use Magento\Sales\Model\OrderFactory;
-use Ramsey\Uuid\Uuid;
+use Magento\Sales\Model\ResourceModel\Order\CollectionFactory;
+use Magento\Sales\Model\Service\InvoiceService;
+use Magento\Store\Model\StoreManagerInterface;
+use Psr\Log\LoggerInterface;
 
-class Classic extends AbstractFortis implements HttpPostActionInterface
+class Classic extends AbstractFortis
 {
-    protected $pageFactory;
-    private RawFactory $resultRawFactory;
     /**
-     * @var \Magento\Sales\Model\OrderFactory
+     * @var ResultFactory
      */
-    private OrderFactory $orderFactory;
-    /**
-     * @var \Magento\Checkout\Model\Session
-     */
-    private Session $checkoutSession;
-    /**
-     * @var \Fortispay\Fortis\Model\Fortis
-     */
-    private Fortis $paymentMethod;
+    protected $resultRawFactory;
 
+    /**
+     * @var IFrameData
+     */
+    protected IFrameData $iFrameData;
+
+    /**
+     * @param PageFactory $pageFactory
+     * @param CustomerSession $customerSession
+     * @param CheckoutSession $checkoutSession
+     * @param OrderFactory $orderFactory
+     * @param Generic $fortisSession
+     * @param Data $urlHelper
+     * @param Url $customerUrl
+     * @param LoggerInterface $logger
+     * @param TransactionFactory $transactionFactory
+     * @param InvoiceService $invoiceService
+     * @param InvoiceSender $invoiceSender
+     * @param Fortis $paymentMethod
+     * @param UrlInterface $urlBuilder
+     * @param OrderRepositoryInterface $orderRepository
+     * @param StoreManagerInterface $storeManager
+     * @param OrderSender $OrderSender
+     * @param DateTime $date
+     * @param CollectionFactory $orderCollectionFactory
+     * @param Builder $_transactionBuilder
+     * @param DBTransaction $dbTransaction
+     * @param Order $order
+     * @param Config $config
+     * @param State $state
+     * @param FortisHelper $fortishelper
+     * @param TransactionSearchResultInterfaceFactory $transactionSearchResultInterfaceFactory
+     * @param EncryptorInterface $encryptor
+     * @param RequestInterface $request
+     * @param ResultFactory $resultFactory
+     * @param ManagerInterface $messageManager
+     * @param JsonFactory $resultJsonFactory
+     * @param TransactionRepositoryInterface $transactionRepository
+     * @param ResourceConnection $resourceConnection
+     * @param EventManager $eventManager
+     * @param CountryFactory $countryFactory
+     * @param CountryCollectionFactory $countryCollectionFactory
+     * @param IFrameData $iFrame
+     */
     public function __construct(
-        Context $context,
         PageFactory $pageFactory,
-        RawFactory $resultRawFactory,
+        CustomerSession $customerSession,
+        CheckoutSession $checkoutSession,
         OrderFactory $orderFactory,
-        Session $session,
-        Fortis $paymentMethod
+        Generic $fortisSession,
+        Data $urlHelper,
+        Url $customerUrl,
+        LoggerInterface $logger,
+        TransactionFactory $transactionFactory,
+        InvoiceService $invoiceService,
+        InvoiceSender $invoiceSender,
+        Fortis $paymentMethod,
+        UrlInterface $urlBuilder,
+        OrderRepositoryInterface $orderRepository,
+        StoreManagerInterface $storeManager,
+        OrderSender $OrderSender,
+        DateTime $date,
+        CollectionFactory $orderCollectionFactory,
+        Builder $_transactionBuilder,
+        DBTransaction $dbTransaction,
+        Order $order,
+        Config $config,
+        State $state,
+        FortisHelper $fortishelper,
+        TransactionSearchResultInterfaceFactory $transactionSearchResultInterfaceFactory,
+        EncryptorInterface $encryptor,
+        RequestInterface $request,
+        ResultFactory $resultFactory,
+        ManagerInterface $messageManager,
+        JsonFactory $resultJsonFactory,
+        TransactionRepositoryInterface $transactionRepository,
+        ResourceConnection $resourceConnection,
+        EventManager $eventManager,
+        CountryFactory $countryFactory,
+        CountryCollectionFactory $countryCollectionFactory,
+        IFrameData $iFrameData
     ) {
-        $this->pageFactory      = $pageFactory;
-        $this->resultRawFactory = $resultRawFactory;
-        $this->orderFactory     = $orderFactory;
-        $this->checkoutSession  = $session;
-        $this->paymentMethod    = $paymentMethod;
+        $this->resultRawFactory = $resultFactory;
+        $this->iFrameData       = $iFrameData;
+        parent::__construct(
+            $pageFactory,
+            $customerSession,
+            $checkoutSession,
+            $orderFactory,
+            $fortisSession,
+            $urlHelper,
+            $customerUrl,
+            $logger,
+            $transactionFactory,
+            $invoiceService,
+            $invoiceSender,
+            $paymentMethod,
+            $urlBuilder,
+            $orderRepository,
+            $storeManager,
+            $OrderSender,
+            $date,
+            $orderCollectionFactory,
+            $_transactionBuilder,
+            $dbTransaction,
+            $order,
+            $config,
+            $state,
+            $fortishelper,
+            $transactionSearchResultInterfaceFactory,
+            $encryptor,
+            $request,
+            $resultFactory,
+            $messageManager,
+            $resultJsonFactory,
+            $transactionRepository,
+            $resourceConnection,
+            $eventManager,
+            $countryFactory,
+            $countryCollectionFactory,
+            $iFrameData
+        );
     }
 
-    /**
-     * @inheritDoc
-     */
     public function execute()
     {
-        $result = $this->resultRawFactory->create();
+        $pageObject = $this->pageFactory->create();
 
-        $order          = $this->checkoutSession->getLastRealOrder();
-        $orderData      = $order->getPayment()->getData();
-        $additionalData = $orderData['additional_information'];
+        $blockContent = $pageObject->getLayout()
+                                   ->getBlock('fortis_redirect')
+                                   ->toHtml();
 
-        $incrementId = $order->getIncrementId();
-        $orderId     = $order->getId();
+        $resultRaw = $this->resultRawFactory->create(ResultFactory::TYPE_RAW);
+        $resultRaw->setContents($blockContent);
 
-        $addressAll = $order->getBillingAddress();
-        list($address, $country, $city, $postalCode, $regionCode) = $this->getAddresses($addressAll);
-
-        $enableVaultForOrder = ((int)($additionalData['fortis-vault-method'] ?? 0)) === 1;
-
-        $vaultHash = $additionalData['fortis-vault-method'] ?? '';
-
-        if ($vaultHash === 'new-save') {
-            $enableVaultForOrder = true;
-        }
-
-        try {
-            $config = $this->paymentMethod->getFortisOrderToken($enableVaultForOrder);
-        } catch (LocalizedException $e) {
-            $this->_logger->error($e->getMessage());
-            $this->messageManager->addExceptionMessage($e, $e->getMessage());
-            $this->setMessage($e->getMessage());
-            $this->checkoutSession->restoreQuote();
-
-            return parent::_prepareLayout();
-        } catch (\Exception $exception) {
-            $this->_logger->error($exception->getMessage());
-        }
-
-        $client_token            = $config['token'];
-        $main_options            = $config['options']['main_options'];
-        $floatingLabels          = (int)$main_options['floatingLabels'] === 1 ? 'true' : 'false';
-        $showValidationAnimation = (int)$main_options['showValidationAnimation'] === 1 ? 'true' : 'false';
-        $appearance_options      = $config['options']['appearance_options'];
-        $redirectUrl             = $config['redirectUrl'];
-        $guid                    = strtoupper(Uuid::uuid4());
-        $guid                    = str_replace('-', '', $guid);
-
-        $digitalWallets = [];
-        if ($config['googlepay']) {
-            array_push($digitalWallets, 'GooglePay');
-        }
-        if ($config['applepay']) {
-            array_push($digitalWallets, 'ApplePay');
-        }
-        $digitalWalletsValue = "['" . implode("', '", $digitalWallets) . "']";
-        if ($digitalWalletsValue == "['']") {
-            $digitalWalletsValue = '[]';
-        }
-
-        $submit = <<<CONTENT
-</script>
-    <script>
-    require(['fortis-commerce'], function(Commerce) {
-      setTimeout(() => {
-         const elements = new Commerce.elements('$client_token');
-         console.log(elements);
-        elements.create({
-            container: '#fortis-framed-2567',
-            theme: '$main_options[theme]',
-            environment: '$main_options[environment]',
-            view: 'default',
-            floatingLabels: $floatingLabels,
-            hideAgreementCheckbox: false,
-            hideTotal: false,
-            showReceipt: false,
-            digitalWallets: $digitalWalletsValue,
-            fields: {
-              additional: [
-                {name: 'description', required: true, value: `$incrementId`, hidden: true},
-                {name: 'transaction_api_id', hidden: true, value: `$guid`},
-              ],
-              billing: [
-CONTENT;
-
-        if ($address !== '') {
-            $submit .= "{name: 'address', required: false, value: `$address`},";
-        }
-        if ($country !== '') {
-            $submit .= "{name: 'country', required: false, value: `$country`},";
-        }
-        if ($city !== '') {
-            $submit .= "{name: 'city', required: false, value: `$city`},";
-        }
-        if ($postalCode !== '') {
-            $submit .= "{name: 'postal_code', required: false, value: `$postalCode`},";
-        }
-        if ($regionCode !== '') {
-            $submit .= "{name: 'state', required: false, value: `$regionCode`},";
-        }
-
-        $submit .= <<<CONTENT
-                ]
-            }
-        });
-
-        elements.on(
-          'ready',
-          function () {
-            jQuery('#fortis-saved_cards').hide();
-          }
-        );
-
-        elements.on('paymentFinished', (result) => {
-          if(result.status === 'approved') {
-            console.log('approved');
-          } else {
-            console.log('failed');
-          }
-          console.log(result);
-        });
-
-        elements.on('done', async (result) => {
-          console.log(result);
-          // POST result to redirect endpoint
-          const response = await fetch('$redirectUrl', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(result.data)
-          });
-          if (response.status === 200) {
-            const redirect = await response.json();
-            setTimeout(() => {
-                window.location.href = redirect.redirectTo;
-            }, 2000);
-          } else {
-
-          }
-        });
-
-        elements.on('error', (error) => {
-          console.log(error);
-        });
-    });
-      }, 1000);
-
-    </script>
-</body>
-CONTENT;
-
-        $result->setContents($submit);
-
-        return $result;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function getResponse()
-    {
-        // TODO: Implement getResponse() method.
-    }
-
-    /**
-     * Get Addresses
-     *
-     * @param Address $addressAll
-     *
-     * @return array
-     */
-    private function getAddresses(Address $addressAll): array
-    {
-        $address    = implode(', ', $addressAll->getStreet());
-        $country    = $addressAll->getCountryId() ?? '';
-        $city       = $addressAll->getCity() ?? '';
-        $postalCode = $addressAll->getPostcode() ?? '';
-        $regionCode = $addressAll->getRegionCode() ?? '';
-
-        return [$address, $country, $city, $postalCode, $regionCode];
+        return $resultRaw;
     }
 }

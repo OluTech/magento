@@ -100,6 +100,7 @@ class Fortis extends AbstractMethod
         'fortis_font_size',
         'fortis_margin_spacing',
         'fortis_border_radius',
+        'fortis_cancel_order_btn_text'
     ];
 
     /**
@@ -623,6 +624,7 @@ class Fortis extends AbstractMethod
                 'fontSize'                      => ($cred['fortis_font_size'] ?? '16') . 'px',
                 'marginSpacing'                 => ($cred['fortis_margin_spacing'] ?? '0.5') . 'rem',
                 'borderRadius'                  => ($cred['fortis_border_radius'] ?? 4) . 'px',
+                'cancelButtonText'              => $cred['fortis_cancel_order_btn_text'] ?? 'Cancel'
             ],
         ];
 

@@ -66,7 +66,7 @@ class Success extends AbstractFortis
         1627 => 'SYSTEM_ERROR',
         1628 => 'BAD_MERCH_ID',
         1629 => 'DUPLICATE_BATCH',
-        1630 => 'REJECTED_BATCH (First attempt at batch close will fail with a transaction in the batch for $6.30. 
+        1630 => 'REJECTED_BATCH (First attempt at batch close will fail with a transaction in the batch for $6.30.
         The second batch close attempt will succeed.)',
         1631 => 'ACCOUNT_CLOSED'
     ];
@@ -411,10 +411,5 @@ class Success extends AbstractFortis
 
             return $redirect;
         }
-    }
-
-    public function getResponse()
-    {
-        return $this->getResponse();
     }
 }

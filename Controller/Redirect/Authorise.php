@@ -334,9 +334,4 @@ class Authorise extends AbstractFortis
             return $this->redirectToSuccessPageString;
         }
     }
-
-    public function getResponse()
-    {
-        return $this->getResponse();
-    }
 }
