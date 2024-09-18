@@ -83,6 +83,7 @@ class Fortis extends AbstractMethod
         'invoice_email',
         'sort_order',
         'SuccessFul_Order_status',
+        'fortis_single_view',
         'fortis_theme',
         'fortis_environment',
         'fortis_floating_labels',
@@ -601,12 +602,13 @@ class Fortis extends AbstractMethod
 
         $user_id      = $cred['user_id'];
         $user_api_key = $cred['user_api_key'];
-        $action       = $cred['order_intention'] ?? 'sale';
+        $view         = ($cred['fortis_single_view'] === 'single') ? 'card-single-field' : 'default';
 
         $options = [
             'main_options'       => [
                 'theme'                   => $cred['fortis_theme'] ?? 'default',
                 'environment'             => $cred['fortis_environment'] ?? 'production',
+                'view'                    => $view,
                 'floatingLabels'          => $cred['fortis_floating_labels'] ?? 0,
                 'showValidationAnimation' => $cred['fortis_validation_animation'] ?? 0,
             ],

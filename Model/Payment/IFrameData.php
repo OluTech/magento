@@ -9,6 +9,7 @@ use Magento\Checkout\Model\Session;
 use Magento\Framework\Message\ManagerInterface;
 use Magento\Sales\Model\Order\Address;
 use Ramsey\Uuid\Uuid;
+use Psr\Log\LoggerInterface;
 
 class IFrameData
 {
@@ -16,17 +17,20 @@ class IFrameData
     protected Fortis $paymentMethod;
     protected Config $fortisConfig;
     protected ManagerInterface $messageManager;
+    protected LoggerInterface $logger;
 
     public function __construct(
         Session $checkoutSession,
         Fortis $paymentMethod,
         Config $fortisConfig,
         ManagerInterface $messageManager,
+        LoggerInterface $logger
     ) {
         $this->checkoutSession = $checkoutSession;
         $this->fortisConfig    = $fortisConfig;
         $this->paymentMethod   = $paymentMethod;
         $this->messageManager  = $messageManager;
+        $this->logger          = $logger;
     }
 
     /**
@@ -56,6 +60,7 @@ class IFrameData
         } catch (Exception $e) {
             $this->messageManager->addExceptionMessage($e, $e->getMessage());
             $this->checkoutSession->restoreQuote();
+            $this->logger->error('Something went wrong while fetching the Fortis order token: ' . $e->getMessage());
 
             return null;
         }
@@ -88,25 +93,30 @@ class IFrameData
             'guid'                    => $guid,
             'digitalWallets'          => $digitalWallets,
             'billingFields'           => array_filter([
-                                                          $address ? ['name'     => 'address',
-                                                                      'required' => false,
-                                                                      'value'    => $address
+                                                          $address ? [
+                                                              'name'     => 'address',
+                                                              'required' => false,
+                                                              'value'    => $address
                                                           ] : null,
-                                                          $country ? ['name'     => 'country',
-                                                                      'required' => false,
-                                                                      'value'    => $country
+                                                          $country ? [
+                                                              'name'     => 'country',
+                                                              'required' => false,
+                                                              'value'    => $country
                                                           ] : null,
-                                                          $city ? ['name'     => 'city',
-                                                                   'required' => false,
-                                                                   'value'    => $city
+                                                          $city ? [
+                                                              'name'     => 'city',
+                                                              'required' => false,
+                                                              'value'    => $city
                                                           ] : null,
-                                                          $postalCode ? ['name'     => 'postal_code',
-                                                                         'required' => false,
-                                                                         'value'    => $postalCode
+                                                          $postalCode ? [
+                                                              'name'     => 'postal_code',
+                                                              'required' => false,
+                                                              'value'    => $postalCode
                                                           ] : null,
-                                                          $regionCode ? ['name'     => 'state',
-                                                                         'required' => false,
-                                                                         'value'    => $regionCode
+                                                          $regionCode ? [
+                                                              'name'     => 'state',
+                                                              'required' => false,
+                                                              'value'    => $regionCode
                                                           ] : null
                                                       ])
         ];

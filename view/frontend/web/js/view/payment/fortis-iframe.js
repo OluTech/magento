@@ -34,7 +34,7 @@ require(['fortis-commerce', 'mage/url',], function(Commerce, _urlBuilder) {
                 showValidationAnimation: config.showValidationAnimation,
                 showReceipt: false,
                 digitalWallets: config.digitalWallets,
-                view: config.view,
+                view: config.main_options.view,
                 appearance: {
                     colorButtonSelectedBackground: config.appearance_options.colorButtonSelectedBackground,
                     colorButtonSelectedText: config.appearance_options.colorButtonSelectedText,
