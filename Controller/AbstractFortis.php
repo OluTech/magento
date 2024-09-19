@@ -5,20 +5,25 @@ namespace Fortispay\Fortis\Controller;
 use Fortispay\Fortis\Helper\Data as FortisHelper;
 use Fortispay\Fortis\Model\Config;
 use Fortispay\Fortis\Model\Fortis;
-use Magento\Checkout\Controller\Express\RedirectLoginInterface;
+use Fortispay\Fortis\Model\Payment\IFrameData;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Customer\Model\Session as CustomerSession;
 use Magento\Customer\Model\Url;
+use Magento\Directory\Model\CountryFactory;
+use Magento\Directory\Model\ResourceModel\Country\CollectionFactory as CountryCollectionFactory;
 use Magento\Framework\App\Action\HttpGetActionInterface;
 use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\App\CsrfAwareActionInterface;
 use Magento\Framework\App\Request\InvalidRequestException;
 use Magento\Framework\App\RequestInterface;
+use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\App\State;
+use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Controller\ResultFactory;
 use Magento\Framework\DB\Transaction as DBTransaction;
 use Magento\Framework\DB\TransactionFactory;
 use Magento\Framework\Encryption\EncryptorInterface;
+use Magento\Framework\Event\ManagerInterface as EventManager;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Message\ManagerInterface;
 use Magento\Framework\Session\Generic;
@@ -29,6 +34,7 @@ use Magento\Framework\View\Result\PageFactory;
 use Magento\Quote\Model\Quote;
 use Magento\Sales\Api\Data\TransactionSearchResultInterfaceFactory;
 use Magento\Sales\Api\OrderRepositoryInterface;
+use Magento\Sales\Api\TransactionRepositoryInterface;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\Order\Email\Sender\InvoiceSender;
 use Magento\Sales\Model\Order\Email\Sender\OrderSender;
@@ -38,12 +44,6 @@ use Magento\Sales\Model\ResourceModel\Order\CollectionFactory;
 use Magento\Sales\Model\Service\InvoiceService;
 use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface;
-use Magento\Framework\Controller\Result\JsonFactory;
-use Magento\Sales\Api\TransactionRepositoryInterface;
-use Magento\Framework\App\ResourceConnection;
-use Magento\Framework\Event\ManagerInterface as EventManager;
-use Magento\Directory\Model\CountryFactory;
-use Magento\Directory\Model\ResourceModel\Country\CollectionFactory as CountryCollectionFactory;
 
 /**
  * Checkout Controller
@@ -52,7 +52,6 @@ use Magento\Directory\Model\ResourceModel\Country\CollectionFactory as CountryCo
 abstract class AbstractFortis implements
     HttpGetActionInterface,
     HttpPostActionInterface,
-    RedirectLoginInterface,
     CsrfAwareActionInterface
 {
     /**
@@ -225,7 +224,7 @@ abstract class AbstractFortis implements
     /**
      * @var ResultFactory
      */
-    protected $resultFactory;
+    protected ResultFactory $resultFactory;
 
     protected ManagerInterface $messageManager;
 
@@ -251,6 +250,7 @@ abstract class AbstractFortis implements
      * @var \Magento\Directory\Model\ResourceModel\Country\CollectionFactory
      */
     protected CountryCollectionFactory $countryCollectionFactory;
+    protected IFrameData $iFrameData;
 
     /**
      * @param PageFactory $pageFactory
@@ -324,7 +324,8 @@ abstract class AbstractFortis implements
         ResourceConnection $resourceConnection,
         EventManager $eventManager,
         CountryFactory $countryFactory,
-        CountryCollectionFactory $countryCollectionFactory
+        CountryCollectionFactory $countryCollectionFactory,
+        IFrameData $iFrame
     ) {
         $pre = __METHOD__ . " : ";
 
@@ -367,6 +368,7 @@ abstract class AbstractFortis implements
         $this->eventManager             = $eventManager;
         $this->countryFactory           = $countryFactory;
         $this->countryCollectionFactory = $countryCollectionFactory;
+        $this->iFrameData               = $iFrame;
 
         $this->_logger->debug($pre . 'eof');
     }
@@ -458,7 +460,6 @@ abstract class AbstractFortis implements
         $this->_order = $this->_checkoutSession->getLastRealOrder();
 
         if (!$this->_order->getId()) {
-            $this->getResponse()->setStatusHeader(404, '1.1', 'Not found');
             throw new LocalizedException(__('We could not find "Order" for processing'));
         }
 

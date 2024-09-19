@@ -66,9 +66,4 @@ class Index extends AbstractFortis implements CsrfAwareActionInterface
     {
         return true;
     }
-
-    public function getResponse()
-    {
-        return $this->getResponse();
-    }
 }

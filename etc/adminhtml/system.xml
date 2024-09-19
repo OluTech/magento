@@ -180,6 +180,11 @@
                        showInStore="1">
                     <label>Place Order Button Text (optional)</label>
                 </field>
+                <field id="fortis_cancel_order_btn_text" translate="label" type="text" sortOrder="3.5" showInDefault="1"
+                       showInWebsite="1"
+                       showInStore="1">
+                    <label>Cancel Order Button Text (optional)</label>
+                </field>
                 <field id="fortis_color_button_action_background" translate="label" type="text" sortOrder="7"
                        showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Button Action Background</label>

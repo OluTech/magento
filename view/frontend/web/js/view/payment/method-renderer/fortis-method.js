@@ -173,9 +173,6 @@ define(
           window.location.replace(_urlBuilder.build(window.checkoutConfig.payment.fortis.redirectUrl));
         } else {
           let url = 'fortis/iframe/classic';
-          if (this.frameSingleView()) {
-            url = 'fortis/iframe/simple';
-          }
           $frame.trigger('processStart');
           $.post(
             _urlBuilder.build(url),

@@ -1,4 +1,4 @@
-# FortisPay Magento 2
+# FortisPay for Magento 2.4.4 and higher
 
 ## Composer Requirement
 
@@ -23,10 +23,6 @@ root: ```composer require ramsey/uuid```
 
 You will then be able to configure the plugin via the admin portal at ``Stores/Configuration/Sales/Payment Methods.``
 
-## PHP Code Standards
-
-- ``vendor/bin/phpcs --standard=Magento2 --extensions=php,phtml --error-severity=10 --ignore-annotations app/code/Fortispay/Fortis/``
-
 ## Level 3 Data
 
 If your Fortis account has Level 3 Data enabled additional custom attributes have to be configured on products for Level
@@ -42,3 +38,6 @@ If your Fortis account has Level 3 Data enabled additional custom attributes hav
   trade."* Further information on this may be found
   at https://docs.fortispay.com/developers/api/endpoints/level3data#codesforunitsofmeasurement.
 
+## PHP Code Standards
+
+- ``vendor/bin/phpcs --standard=Magento2 --extensions=php,phtml --error-severity=10 --ignore-annotations Fortispay/Fortis/``
