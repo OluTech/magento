@@ -42,7 +42,7 @@ class IFrameData
         $orderData      = $order->getPayment()->getData();
         $additionalData = $orderData['additional_information'];
 
-        $orderId = $order->getIncrementId();
+        $orderId = $order->getId();
 
         $addressAll = $order->getBillingAddress();
         list($address, $country, $city, $postalCode, $regionCode) = $this->getAddresses($addressAll);
@@ -90,6 +90,7 @@ class IFrameData
             'appearance_options'      => $appearance_options,
             'redirectUrl'             => $redirectUrl,
             'orderId'                 => $orderId,
+            'incrementId'             => $order->getIncrementId(),
             'guid'                    => $guid,
             'digitalWallets'          => $digitalWallets,
             'billingFields'           => array_filter([

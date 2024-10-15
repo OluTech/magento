@@ -5,7 +5,8 @@ require(['fortis-commerce', 'mage/url',], function(Commerce, _urlBuilder) {
     }
 
     function generateIFrame() {
-        const config = window.fortisData;
+        const fortisDataElement = document.getElementById('fortis-data');
+        const config = JSON.parse(fortisDataElement.getAttribute('data-config'));
 
         const fortisDiv = document.createElement('div');
         fortisDiv.id = 'fortis_payment327';
@@ -52,7 +53,7 @@ require(['fortis-commerce', 'mage/url',], function(Commerce, _urlBuilder) {
                 },
                 fields: {
                     additional: [
-                        {name: 'description', required: true, value: config.orderId, hidden: true},
+                        {name: 'description', required: true, value: config.incrementId, hidden: true},
                         {name: 'transaction_api_id', hidden: true, value: config.guid},
                     ],
                     billing: config.billingFields

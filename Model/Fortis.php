@@ -796,7 +796,10 @@ class Fortis extends AbstractMethod
         $rawDetailsInfo        = null;
         if (!empty($additionalInformation) && !empty($additionalInformation['raw_details_info'])) {
             $rawDetailsInfo = json_decode($additionalInformation['raw_details_info']);
-            $paymentMethod  = $rawDetailsInfo->payment_method;
+            $paymentMethod  = property_exists(
+                $rawDetailsInfo,
+                'payment_method'
+            ) ? $rawDetailsInfo->payment_method : $paymentMethod;
         }
 
         try {

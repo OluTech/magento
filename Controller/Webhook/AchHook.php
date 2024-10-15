@@ -137,11 +137,11 @@ class AchHook implements CsrfAwareActionInterface
 
         try {
             if (is_string($data['data'])) {
-                $transactionData = json_decode($data['data']);
+                $transactionData = json_decode($data['data'], true);
             } else {
                 $transactionData = $data['data'];
             }
-            if ($transactionData->payment_method !== 'ach') {
+            if ($transactionData['payment_method'] !== 'ach') {
                 $this->logger->error('Webhook type is not ACH');
                 $response->setHttpResponseCode(422);
                 $response->setContents('Webhook type is not ACH');
@@ -149,12 +149,18 @@ class AchHook implements CsrfAwareActionInterface
                 return $response;
             }
 
-            $transactionStatus = $transactionData->status_id;
+            $transactionStatus = 0;
+            if (isset($transactionData['status_code'])) {
+                $transactionStatus = $transactionData['status_code'];
+            } elseif (isset($transactionData['status_id'])) {
+                $transactionStatus = $transactionData['status_id'];
+            }
+            $transactionId = $transactionData['id'] ?? '';
 
             // Query sales_payment_transaction to find transaction
             $connection = $this->resourceConnection->getConnection();
             $tableName  = $this->resourceConnection->getTableName('sales_payment_transaction');
-            $query      = "select * from $tableName where txn_id='$transactionData->id'";
+            $query      = "select * from $tableName where txn_id='$transactionId'";
             $result     = $connection->fetchRow($query);
 
             $transaction           = $this->transactionRepository->get($result['transaction_id']);

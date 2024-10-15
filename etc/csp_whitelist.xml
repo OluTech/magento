@@ -10,6 +10,7 @@
                 <value id="fortis" type="host">https://js.fortis.tech</value>
                 <value id="fortis-elements-sandbox" type="host">https://elements.sandbox.fortis.tech</value>
                 <value id="fortis-elements" type="host">https://elements.fortis.tech</value>
+                <value id="fortis-iframe-script-hash" type="hash" algorithm="sha256">6VXBrbkiLRNNMNFuhJ+xbEtxEzQDf0gwlWrdqJaCuhA=</value>
             </values>
         </policy>
         <policy id="connect-src">
@@ -17,6 +18,12 @@
                 <value id="devdocs" type="host">https://developer.adobe.com</value>
                 <value id="fortis-elements-sandbox1" type="host">https://elements.sandbox.fortis.tech</value>
                 <value id="fortis-elements1" type="host">https://elements.fortis.tech</value>
+            </values>
+        </policy>
+        <policy id="frame-src">
+            <values>
+                <value id="fortis-elements-sandbox-frame" type="host">https://elements.sandbox.fortis.tech</value>
+                <value id="fortis-elements-frame" type="host">https://elements.fortis.tech</value>
             </values>
         </policy>
     </policies>
