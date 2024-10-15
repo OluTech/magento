@@ -6,11 +6,13 @@ use Fortispay\Fortis\Model\Payment\IFrameData;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\Element\Template\Context;
+use Magento\Csp\Helper\CspNonceProvider;
 
 class Request extends Template
 {
     private IFrameData $iFrame;
     private ?array $jsConfig;
+    private $cspNonceProvider;
 
     /**
      * Construct
@@ -22,10 +24,12 @@ class Request extends Template
     public function __construct(
         Context $context,
         IFrameData $iFrame,
+        CspNonceProvider $cspNonceProvider,
         array $data = []
     ) {
         parent::__construct($context, $data);
-        $this->iFrame = $iFrame;
+        $this->iFrame           = $iFrame;
+        $this->cspNonceProvider = $cspNonceProvider;
     }
 
     /**
@@ -52,5 +56,15 @@ class Request extends Template
     public function getJSConfig(): ?array
     {
         return $this->jsConfig;
+    }
+
+    /**
+     * Get CSP Nonce
+     *
+     * @return String
+     */
+    public function getNonce(): string
+    {
+        return $this->cspNonceProvider->generateNonce();
     }
 }

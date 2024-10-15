@@ -49,11 +49,11 @@ class OrderAuthCaptured implements ObserverInterface
         $orderID = $order->getId();
 
         $d = json_decode($payment->getAdditionalInformation()['raw_details_info'] ?? "");
-        if (!isset($d->data->auth_amount)) {
+        if (!isset($d->auth_amount)) {
             return;
         }
-        $authAmount    = $d->data->auth_amount;
-        $transactionId = $d->data->id;
+        $authAmount    = $d->auth_amount;
+        $transactionId = $d->id;
 
         $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_id'));
         $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_api_key'));

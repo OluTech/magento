@@ -1,4 +1,12 @@
-<script type="text/javascript">
-    window.fortisData = <?= json_encode($block->getJSConfig()); ?>;
-</script>
-<script type="text/javascript" src="<?= $block->getViewFileUrl('Fortispay_Fortis::js/view/payment/fortis-iframe.js') ?>"></script>
+<div id="fortis-data" data-config='<?= json_encode($block->getJSConfig()) ?>'></div>
+<?= $secureRenderer->renderTag(
+    'script',
+    [
+        'type' => 'text/javascript',
+        'src' => $block->getViewFileUrl('Fortispay_Fortis::js/view/payment/fortis-iframe.js'),
+        'nonce' => $block->getNonce()
+    ],
+    '',
+    false
+); ?>
+

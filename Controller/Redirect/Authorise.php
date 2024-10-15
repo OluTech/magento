@@ -245,7 +245,7 @@ class Authorise extends AbstractFortis
                     ->setTransactionId($paymentData->id)
                     ->setIsTransactionClosed(false)
                     ->setAdditionalInformation(
-                        [Transaction::RAW_DETAILS => json_encode($rawData)]
+                        [Transaction::RAW_DETAILS => json_encode($paymentData)]
                     );
             $formattedPrice = $this->_order->getBaseCurrency()->formatTxt(
                 $this->_order->getGrandTotal()
@@ -258,7 +258,7 @@ class Authorise extends AbstractFortis
                                  ->setOrder($this->_order)
                                  ->setTransactionId($paymentData->id)
                                  ->setAdditionalInformation(
-                                     [Transaction::RAW_DETAILS => json_encode($rawData)]
+                                     [Transaction::RAW_DETAILS => json_encode($paymentData)]
                                  )
                                  ->setFailSafe(true)
                 // Build method creates the transaction and returns the object

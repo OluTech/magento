@@ -80,7 +80,7 @@ class OrderCancelAfter extends AbstractDataAssignObserver
                 JSON_THROW_ON_ERROR
             );
 
-            $authAmount = $paymentInfo->data->auth_amount;
+            $authAmount = $paymentInfo->auth_amount;
         } catch (Exception $exception) {
             return;
         }
@@ -93,7 +93,7 @@ class OrderCancelAfter extends AbstractDataAssignObserver
         // Do auth transaction
         $intentData = [
             'transaction_amount' => $authAmount,
-            'token_id'           => $paymentInfo->data->token_id,
+            'token_id'           => $paymentInfo->token_id,
             'transactionId'      => $transactionId,
         ];
         if ($type === 'auth-only') {

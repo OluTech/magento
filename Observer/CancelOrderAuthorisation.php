@@ -64,7 +64,7 @@ class CancelOrderAuthorisation implements ObserverInterface
         $order         = $payment->getOrder();
 
         $d          = json_decode($payment->getAdditionalInformation()['raw_details_info']);
-        $authAmount = $d->data->auth_amount;
+        $authAmount = $d->auth_amount;
 
         $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_id'));
         $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_api_key'));
@@ -73,7 +73,7 @@ class CancelOrderAuthorisation implements ObserverInterface
         // Do auth transaction
         $intentData = [
             'transaction_amount' => $authAmount,
-            'token_id'           => $d->data->token_id,
+            'token_id'           => $d->token_id,
             'transactionId'      => $transactionId,
         ];
         $api        = new FortisApi($this->config);
