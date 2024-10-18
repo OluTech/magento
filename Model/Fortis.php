@@ -782,14 +782,6 @@ class Fortis extends AbstractMethod
         $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_id'));
         $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_api_key'));
         $api          = new FortisApi($this->config);
-        $type         = $this->scopeConfig->getValue('payment/fortis/order_intention');
-
-        $transactionId = $payment->getLastTransId();
-        $intentData    = [
-            'transaction_amount' => (int)($amount * 100),
-            'transactionId'      => $transactionId,
-            'description'        => $order->getIncrementId()
-        ];
 
         $paymentMethod         = 'cc';
         $additionalInformation = $payment->getAdditionalInformation();
@@ -802,20 +794,24 @@ class Fortis extends AbstractMethod
             ) ? $rawDetailsInfo->payment_method : $paymentMethod;
         }
 
+        $transactionId = $rawDetailsInfo?->id;
+
+        $intentData    = [
+            'transaction_amount' => (int)($amount * 100),
+            'transactionId'      => $transactionId,
+            'description'        => $order->getIncrementId()
+        ];
+
         try {
-            if ($type === 'auth-only') {
-                $response = $api->refundAuthAmount($intentData, $user_id, $user_api_key);
+            if ($paymentMethod !== 'ach') {
+                $response = $api->refundTransactionAmount($intentData, $user_id, $user_api_key);
             } else {
-                if ($paymentMethod !== 'ach') {
-                    $response = $api->refundTransactionAmount($intentData, $user_id, $user_api_key);
-                } else {
-                    $intentData = [
-                        'transaction_amount'      => $intentData['transaction_amount'],
-                        'description'             => $order->getIncrementId(),
-                        'previous_transaction_id' => $rawDetailsInfo?->id,
-                    ];
-                    $response   = $api->achRefundTransactionAmount($intentData);
-                }
+                $intentData = [
+                    'transaction_amount'      => $intentData['transaction_amount'],
+                    'description'             => $order->getIncrementId(),
+                    'previous_transaction_id' => $transactionId,
+                ];
+                $response   = $api->achRefundTransactionAmount($intentData);
             }
             $data = json_decode($response)->data ?? null;
 

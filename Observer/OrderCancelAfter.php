@@ -67,7 +67,6 @@ class OrderCancelAfter extends AbstractDataAssignObserver
         $data          = $observer->getData();
         $order         = $data['order'];
         $payment       = $order->getPayment();
-        $transactionId = $payment->getLastTransId();
 
         if (!isset($payment->getAdditionalInformation()['raw_details_info'])) {
             return;
@@ -87,20 +86,18 @@ class OrderCancelAfter extends AbstractDataAssignObserver
 
         $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_id'));
         $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_api_key'));
-        $type         = $this->scopeConfig->getValue('payment/fortis/order_intention');
 
         $api = new FortisApi($this->config);
+
+        $transactionId = $paymentInfo?->id;
+
         // Do auth transaction
         $intentData = [
             'transaction_amount' => $authAmount,
             'token_id'           => $paymentInfo->token_id,
             'transactionId'      => $transactionId,
         ];
-        if ($type === 'auth-only') {
-            $response = $api->refundAuthAmount($intentData, $user_id, $user_api_key);
-        } else {
-            $response = $api->refundTransactionAmount($intentData, $user_id, $user_api_key);
-        }
+        $response = $api->refundAuthAmount($intentData, $user_id, $user_api_key);
 
         $trans = $this->transactionBuilder;
 
