@@ -107,7 +107,7 @@ class Config
         EncryptorInterface $encryptor,
         WriterInterface $configWriter,
     ) {
-        $this->logger = $logger;
+        $this->logger          = $logger;
         $this->directoryHelper = $directoryHelper;
         $this->storeManager    = $storeManager;
         $this->assetRepo       = $assetRepo;

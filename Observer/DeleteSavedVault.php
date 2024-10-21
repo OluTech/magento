@@ -30,7 +30,7 @@ class DeleteSavedVault implements ObserverInterface
     ) {
         $this->scopeConfig = $scopeConfig;
         $this->encryptor   = $encryptor;
-        $this->fortisApi = $fortisApi;
+        $this->fortisApi   = $fortisApi;
     }
 
     public function execute(Observer $observer)

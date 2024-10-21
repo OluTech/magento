@@ -133,21 +133,21 @@ class FortisMethodService
         FileDriver $driver,
         FortisApi $fortisApi
     ) {
-        $this->config = $config;
-        $this->logger = $logger;
-        $this->fileIo = $fileIo;
-        $this->directoryList = $directoryList;
-        $this->checkoutSession = $checkoutSession;
-        $this->urlBuilder = $urlBuilder;
-        $this->encryptor = $encryptor;
-        $this->scopeConfig = $scopeConfig;
-        $this->paymentTokenRepository = $paymentTokenRepository;
-        $this->paymentTokenManagement = $paymentTokenManagement;
-        $this->paymentTokenFactory = $paymentTokenFactory;
+        $this->config                    = $config;
+        $this->logger                    = $logger;
+        $this->fileIo                    = $fileIo;
+        $this->directoryList             = $directoryList;
+        $this->checkoutSession           = $checkoutSession;
+        $this->urlBuilder                = $urlBuilder;
+        $this->encryptor                 = $encryptor;
+        $this->scopeConfig               = $scopeConfig;
+        $this->paymentTokenRepository    = $paymentTokenRepository;
+        $this->paymentTokenManagement    = $paymentTokenManagement;
+        $this->paymentTokenFactory       = $paymentTokenFactory;
         $this->paymentTokenResourceModel = $paymentTokenResourceModel;
-        $this->orderRepository = $orderRepository;
-        $this->driver = $driver;
-        $this->fortisApi = $fortisApi;
+        $this->orderRepository           = $orderRepository;
+        $this->driver                    = $driver;
+        $this->fortisApi                 = $fortisApi;
 
         $this->checkApplePayFile();
     }
@@ -164,7 +164,6 @@ class FortisMethodService
 
                 if (!$this->driver->isDirectory($targetDir)) {
                     $this->fileIo->mkdir($targetDir, 0755);
-
                 }
 
                 if ($this->fileIo->fileExists($source) && !$this->fileIo->fileExists($target)) {
@@ -227,17 +226,17 @@ class FortisMethodService
         }
         if ($productTransactionId
             && preg_match(
-                   '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',
-                   $productTransactionId
-               ) === 1) {
+                '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',
+                $productTransactionId
+            ) === 1) {
             $intentData['methods']   = [];
             $intentData['methods'][] = ['type' => 'cc', 'product_transaction_id' => $productTransactionId];
         }
         if ($achEnabled && $achProductId
             && preg_match(
-                   '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',
-                   $achProductId
-               ) === 1) {
+                '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',
+                $achProductId
+            ) === 1) {
             if (empty($intentData['methods'])) {
                 $intentData['methods'] = [];
             }
@@ -314,14 +313,14 @@ class FortisMethodService
         $action = $this->config->orderAction();
         if ($action === 'sale') {
             $returnUrl = $this->urlBuilder->getUrl(
-                    'fortis/redirect/success',
-                    self::SECURE
-                ) . '?gid=' . $order->getId();
+                'fortis/redirect/success',
+                self::SECURE
+            ) . '?gid=' . $order->getId();
         } else {
             $returnUrl = $this->urlBuilder->getUrl(
-                    'fortis/redirect/authorise',
-                    self::SECURE
-                ) . '?gid=' . $order->getId();
+                'fortis/redirect/authorise',
+                self::SECURE
+            ) . '?gid=' . $order->getId();
         }
 
         return [$user_id, $user_api_key, $action, $options, $returnUrl];
@@ -361,7 +360,10 @@ class FortisMethodService
         $rawDetailsInfo        = null;
         if (!empty($additionalInformation) && !empty($additionalInformation['raw_details_info'])) {
             $rawDetailsInfo = json_decode($additionalInformation['raw_details_info']);
-            $paymentMethod  = property_exists($rawDetailsInfo, 'payment_method') ? $rawDetailsInfo->payment_method : $paymentMethod;
+            $paymentMethod  = property_exists(
+                $rawDetailsInfo,
+                'payment_method'
+            ) ? $rawDetailsInfo->payment_method : $paymentMethod;
         }
 
         $transactionId = $rawDetailsInfo?->id;
@@ -372,7 +374,6 @@ class FortisMethodService
         ];
 
         try {
-
             if ($paymentMethod !== 'ach') {
                 $response = $api->refundTransactionAmount($intentData, $user_id, $user_api_key);
             } else {
@@ -535,7 +536,7 @@ class FortisMethodService
         $paymentToken->getTokenDetails();
 
         $hashKey .= $paymentToken->getPaymentMethodCode() . $paymentToken->getType() . $paymentToken->getGatewayToken(
-            ) . $paymentToken->getTokenDetails();
+        ) . $paymentToken->getTokenDetails();
 
         return $this->encryptor->getHash($hashKey);
     }

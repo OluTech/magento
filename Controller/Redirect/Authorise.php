@@ -212,24 +212,24 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
 
         $this->logger->debug($pre . 'bof');
 
-        $this->order                                    = $order;
-        $this->checkoutSession                          = $checkoutSession;
-        $this->pageFactory                              = $pageFactory;
-        $this->orderSender                              = $OrderSender;
-        $this->paymentMethod                            = $paymentMethod;
-        $this->orderRepository                          = $orderRepository;
-        $this->storeManager                             = $storeManager;
-        $this->transactionBuilder                       = $transactionBuilder;
-        $this->request                                  = $request;
-        $this->resultFactory                            = $resultFactory;
-        $this->messageManager                           = $messageManager;
-        $this->resultJsonFactory                        = $resultJsonFactory;
-        $this->eventManager                             = $eventManager;
-        $this->countryFactory                           = $countryFactory;
-        $this->countryCollectionFactory                 = $countryCollectionFactory;
-        $this->fortisMethodService                      = $fortisMethodService;
-        $this->fortisApi                                = $fortisApi;
-        $this->checkoutProcessor = $checkoutProcessor;
+        $this->order                    = $order;
+        $this->checkoutSession          = $checkoutSession;
+        $this->pageFactory              = $pageFactory;
+        $this->orderSender              = $OrderSender;
+        $this->paymentMethod            = $paymentMethod;
+        $this->orderRepository          = $orderRepository;
+        $this->storeManager             = $storeManager;
+        $this->transactionBuilder       = $transactionBuilder;
+        $this->request                  = $request;
+        $this->resultFactory            = $resultFactory;
+        $this->messageManager           = $messageManager;
+        $this->resultJsonFactory        = $resultJsonFactory;
+        $this->eventManager             = $eventManager;
+        $this->countryFactory           = $countryFactory;
+        $this->countryCollectionFactory = $countryCollectionFactory;
+        $this->fortisMethodService      = $fortisMethodService;
+        $this->fortisApi                = $fortisApi;
+        $this->checkoutProcessor        = $checkoutProcessor;
 
         $this->logger->debug($pre . 'eof');
     }
@@ -260,21 +260,20 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
         }
         $this->order = $order;
 
-        $baseurl = $this->storeManager->getStore()->getBaseUrl();
-        $redirect = $this->resultFactory->create(
+        $baseurl                     = $this->storeManager->getStore()->getBaseUrl();
+        $redirect                    = $this->resultFactory->create(
             ResultFactory::TYPE_REDIRECT
         );
         $redirectToSuccessPageString = $baseurl . 'checkout/onepage/success';
         $redirectToCartPageString    = $baseurl . 'checkout/cart';
 
         if ((int)$order->getId() !== $orderId) {
-
             $redirect->setUrl($redirectToSuccessPageString);
 
             return $redirect;
         }
 
-        $orderHistories = $order->getAllStatusHistory();
+        $orderHistories               = $order->getAllStatusHistory();
         $product_transaction_id_order = '';
         foreach ($orderHistories as $history) {
             if ($comment = $history->getComment()) {
@@ -288,10 +287,10 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
 
         // Get the transaction
         try {
-            $api                = $this->fortisApi;
-            $user_id            = $this->checkoutProcessor->getConfigData('user_id');
-            $user_api_key       = $this->checkoutProcessor->getConfigData('user_api_key');
-            $rawTransaction     = $api->getTransaction($data->id, $user_id, $user_api_key);
+            $api               = $this->fortisApi;
+            $user_id           = $this->checkoutProcessor->getConfigData('user_id');
+            $user_api_key      = $this->checkoutProcessor->getConfigData('user_api_key');
+            $rawTransaction    = $api->getTransaction($data->id, $user_id, $user_api_key);
             $fortisTransaction = $rawTransaction->data;
 
             if (!$tokenised && ($fortisTransaction->product_transaction_id !== $product_transaction_id_order)) {
@@ -453,11 +452,12 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
     public function setlastOrderDetails()
     {
         $orderId = $this->request->getParam('gid');
-        $order = $this->orderRepository->get($orderId);
+        $order   = $this->orderRepository->get($orderId);
         $this->checkoutSession->setData('last_order_id', $order->getId());
         $this->checkoutSession->setData('last_success_quote_id', $order->getQuoteId());
         $this->checkoutSession->setData('last_quote_id', $order->getQuoteId());
         $this->checkoutSession->setData('last_real_order_id', $orderId);
+
         return $order;
     }
 

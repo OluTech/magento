@@ -29,7 +29,7 @@ class Request extends Template
         array $data = []
     ) {
         parent::__construct($context, $data);
-        $this->jsConfig = null;
+        $this->jsConfig         = null;
         $this->iFrame           = $iFrame;
         $this->cspNonceProvider = $cspNonceProvider;
     }

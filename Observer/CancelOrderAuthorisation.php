@@ -51,7 +51,7 @@ class CancelOrderAuthorisation implements ObserverInterface
         $this->transactionBuilder = $transactionBuilder;
         $this->encryptor          = $encryptor;
         $this->orderRepository    = $orderRepository;
-        $this->fortisApi = $fortisApi;
+        $this->fortisApi          = $fortisApi;
     }
 
     /**

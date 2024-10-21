@@ -203,31 +203,32 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
 
         $this->logger->debug($pre . 'bof');
 
-        $this->dbTransaction                            = $dbTransaction;
-        $this->order                                    = $order;
-        $this->checkoutSession                          = $checkoutSession;
-        $this->pageFactory                              = $pageFactory;
-        $this->invoiceService                           = $invoiceService;
-        $this->invoiceSender                            = $invoiceSender;
-        $this->orderSender                              = $OrderSender;
-        $this->paymentMethod                            = $paymentMethod;
-        $this->orderRepository                          = $orderRepository;
-        $this->storeManager                             = $storeManager;
-        $this->transactionBuilder                       = $transactionBuilder;
-        $this->request                                  = $request;
-        $this->resultFactory                            = $resultFactory;
-        $this->messageManager                           = $messageManager;
-        $this->resultJsonFactory                        = $resultJsonFactory;
-        $this->eventManager                             = $eventManager;
-        $this->countryFactory                           = $countryFactory;
-        $this->countryCollectionFactory                 = $countryCollectionFactory;
-        $this->fortisMethodService                      = $fortisMethodService;
-        $this->invoiceRepository                        = $invoiceRepository;
-        $this->fortisApi                                = $fortisApi;
-        $this->checkoutProcessor = $checkoutProcessor;
+        $this->dbTransaction            = $dbTransaction;
+        $this->order                    = $order;
+        $this->checkoutSession          = $checkoutSession;
+        $this->pageFactory              = $pageFactory;
+        $this->invoiceService           = $invoiceService;
+        $this->invoiceSender            = $invoiceSender;
+        $this->orderSender              = $OrderSender;
+        $this->paymentMethod            = $paymentMethod;
+        $this->orderRepository          = $orderRepository;
+        $this->storeManager             = $storeManager;
+        $this->transactionBuilder       = $transactionBuilder;
+        $this->request                  = $request;
+        $this->resultFactory            = $resultFactory;
+        $this->messageManager           = $messageManager;
+        $this->resultJsonFactory        = $resultJsonFactory;
+        $this->eventManager             = $eventManager;
+        $this->countryFactory           = $countryFactory;
+        $this->countryCollectionFactory = $countryCollectionFactory;
+        $this->fortisMethodService      = $fortisMethodService;
+        $this->invoiceRepository        = $invoiceRepository;
+        $this->fortisApi                = $fortisApi;
+        $this->checkoutProcessor        = $checkoutProcessor;
 
         $this->logger->debug($pre . 'eof');
     }
+
     /**
      * @var array|string[]
      */
@@ -308,7 +309,7 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         }
         $this->order = $order;
 
-        $baseurl = $this->storeManager->getStore()->getBaseUrl();
+        $baseurl  = $this->storeManager->getStore()->getBaseUrl();
         $redirect = $this->resultFactory->create(
             ResultFactory::TYPE_REDIRECT
         );
@@ -317,13 +318,12 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         $redirectToCartPageString    = $baseurl . 'checkout/cart';
 
         if ((int)$order->getId() !== $orderId) {
-
             $redirect->setUrl($redirectToSuccessPageString);
 
             return $redirect;
         }
 
-        $orderHistories = $order->getAllStatusHistory();
+        $orderHistories               = $order->getAllStatusHistory();
         $product_transaction_id_order = '';
         foreach ($orderHistories as $history) {
             if ($comment = $history->getComment()) {
@@ -555,11 +555,12 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
     public function setlastOrderDetails()
     {
         $orderId = $this->request->getParam('gid');
-        $order = $this->orderRepository->get($orderId);
+        $order   = $this->orderRepository->get($orderId);
         $this->checkoutSession->setData('last_order_id', $order->getId());
         $this->checkoutSession->setData('last_success_quote_id', $order->getQuoteId());
         $this->checkoutSession->setData('last_quote_id', $order->getQuoteId());
         $this->checkoutSession->setData('last_real_order_id', $orderId);
+
         return $order;
     }
 

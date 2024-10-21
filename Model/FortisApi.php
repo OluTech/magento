@@ -40,8 +40,8 @@ class FortisApi
         ClientInterface $httpClient,
         UrlInterface $urlBuilder
     ) {
-        $this->config = $config;
-        $this->decoder = $decoder;
+        $this->config     = $config;
+        $this->decoder    = $decoder;
         $this->httpClient = $httpClient;
         $this->urlBuilder = $urlBuilder;
 
@@ -52,10 +52,10 @@ class FortisApi
     {
         if ($this->config->environment() === 'production') {
             $this->developerId = self::DEVELOPER_ID;
-            $this->fortisApi = self::FORTIS_API;
+            $this->fortisApi   = self::FORTIS_API;
         } else {
             $this->developerId = self::DEVELOPER_ID_SANDBOX;
-            $this->fortisApi = self::FORTIS_API_SANDBOX;
+            $this->fortisApi   = self::FORTIS_API_SANDBOX;
         }
     }
 
@@ -67,11 +67,17 @@ class FortisApi
      * @param string $user_api_key
      * @param array $data
      * @param string $method
+     *
      * @return string|null
      * @throws LocalizedException
      */
-    private function makeApiRequest(string $endpoint, string $user_id, string $user_api_key, array $data = [], string $method = 'POST'): ?string
-    {
+    private function makeApiRequest(
+        string $endpoint,
+        string $user_id,
+        string $user_api_key,
+        array $data = [],
+        string $method = 'POST'
+    ): ?string {
         $url = $this->fortisApi . $endpoint;
         $this->httpClient->setTimeout(30);
         $this->httpClient->setHeaders($this->createHeaders($user_id, $user_api_key));
@@ -131,13 +137,14 @@ class FortisApi
      *
      * @param string $user_id
      * @param string $user_api_key
+     *
      * @return array
      */
     private function createHeaders(string $user_id, string $user_api_key): array
     {
         return [
             "Content-Type" => "application/json",
-            "user-id" => $user_id,
+            "user-id"      => $user_id,
             "user-api-key" => $user_api_key,
             "developer-id" => $this->developerId,
         ];
@@ -145,7 +152,12 @@ class FortisApi
 
     public function getClientToken(array $intentData, string $user_id, string $user_api_key): string
     {
-        $response = $this->makeApiRequest('/v1/elements/transaction/intention', $user_id, $user_api_key, $intentData);
+        $response        = $this->makeApiRequest(
+            '/v1/elements/transaction/intention',
+            $user_id,
+            $user_api_key,
+            $intentData
+        );
         $decodedResponse = json_decode($response);
 
         if (isset($decodedResponse->data->client_token)) {
@@ -158,6 +170,7 @@ class FortisApi
     public function getTransaction(string $transactionId, string $user_id, string $user_api_key): stdClass
     {
         $response = $this->makeApiRequest("/v1/transactions/{$transactionId}", $user_id, $user_api_key, [], 'GET');
+
         return json_decode($response);
     }
 
@@ -168,20 +181,28 @@ class FortisApi
 
     public function doAchTokenisedTransaction(array $intentData): string
     {
-        $user_id = $this->config->userId();
+        $user_id      = $this->config->userId();
         $user_api_key = $this->config->userApiKey();
+
         return $this->makeApiRequest('/v1/transactions/ach/debit/token', $user_id, $user_api_key, $intentData);
     }
 
     public function refundTransactionAmount(array $intentData, string $user_id, string $user_api_key): bool|string|null
     {
-        return $this->makeApiRequest("/v1/transactions/{$intentData['transactionId']}/refund", $user_id, $user_api_key, $intentData, 'PATCH');
+        return $this->makeApiRequest(
+            "/v1/transactions/{$intentData['transactionId']}/refund",
+            $user_id,
+            $user_api_key,
+            $intentData,
+            'PATCH'
+        );
     }
 
     public function achRefundTransactionAmount(array $intentData): bool|string|null
     {
-        $user_id = $this->config->userId();
+        $user_id      = $this->config->userId();
         $user_api_key = $this->config->userApiKey();
+
         return $this->makeApiRequest('/v1/transactions/ach/refund/prev-trxn', $user_id, $user_api_key, $intentData);
     }
 
@@ -196,7 +217,13 @@ class FortisApi
      */
     public function voidAuthAmount(array $intentData, string $user_id, string $user_api_key): bool|string|null
     {
-        return $this->makeApiRequest("/v1/transactions/{$intentData['transactionId']}/void", $user_id, $user_api_key, $intentData, 'PUT');
+        return $this->makeApiRequest(
+            "/v1/transactions/{$intentData['transactionId']}/void",
+            $user_id,
+            $user_api_key,
+            $intentData,
+            'PUT'
+        );
     }
 
     /**
@@ -227,14 +254,29 @@ class FortisApi
      * @return bool|string|null
      * @throws LocalizedException
      */
-    public function doCompleteAuthTransaction(array $intentData, string $user_id, string $user_api_key): bool|string|null
-    {
-        return $this->makeApiRequest("/v1/transactions/{$intentData['transactionId']}/auth-complete", $user_id, $user_api_key, $intentData, 'PATCH');
+    public function doCompleteAuthTransaction(
+        array $intentData,
+        string $user_id,
+        string $user_api_key
+    ): bool|string|null {
+        return $this->makeApiRequest(
+            "/v1/transactions/{$intentData['transactionId']}/auth-complete",
+            $user_id,
+            $user_api_key,
+            $intentData,
+            'PATCH'
+        );
     }
 
     public function doTokenCCDelete(array $intentData, string $user_id, string $user_api_key): string
     {
-        return $this->makeApiRequest("/v1/tokens/{$intentData['tokenId']}", $user_id, $user_api_key, $intentData, 'DELETE');
+        return $this->makeApiRequest(
+            "/v1/tokens/{$intentData['tokenId']}",
+            $user_id,
+            $user_api_key,
+            $intentData,
+            'DELETE'
+        );
     }
 
     public function createTransactionWebhook(): string|null
@@ -249,7 +291,7 @@ class FortisApi
             return null;
         }
 
-        $url = '/v1/webhooks/transaction';
+        $url        = '/v1/webhooks/transaction';
         $webhookUrl = $this->urlBuilder->getBaseUrl() . 'fortis/webhook/achhook';
         $intentData = [
             'is_active'              => true,
@@ -262,7 +304,7 @@ class FortisApi
             'url'                    => $webhookUrl,
         ];
 
-        $response = $this->makeApiRequest($url, $userId, $userApiKey, $intentData, 'POST');
+        $response        = $this->makeApiRequest($url, $userId, $userApiKey, $intentData, 'POST');
         $decodedResponse = json_decode($response);
 
         if ($decodedResponse->type === 'Error') {
@@ -278,10 +320,10 @@ class FortisApi
 
     public function deleteTransactionWebhook(string $achWebhookId): void
     {
-        $userId      = $this->config->userId();
-        $userApiKey  = $this->config->userApiKey();
+        $userId     = $this->config->userId();
+        $userApiKey = $this->config->userApiKey();
 
-        $url = "/v1/webhooks/$achWebhookId";
+        $url      = "/v1/webhooks/$achWebhookId";
         $response = $this->makeApiRequest($url, $userId, $userApiKey, [], 'DELETE');
 
         if ($response && json_decode($response)->type === 'Error') {
@@ -305,8 +347,8 @@ class FortisApi
         CountryFactory $countryFactory,
         string $transactionId
     ): void {
-        $userId      = $this->config->userId();
-        $userApiKey  = $this->config->userApiKey();
+        $userId     = $this->config->userId();
+        $userApiKey = $this->config->userApiKey();
 
         $customerAddress = $order->getShippingAddress();
         if (!$customerAddress) {
@@ -319,8 +361,8 @@ class FortisApi
         $orderDate = $order->getCreatedAt();
         $orderDate = str_replace('-', '', substr($orderDate, 2, 8));
 
-        $endpoint    = "/v1/transactions/$transactionId/level3/visa";
-        $level3Data  = [
+        $endpoint   = "/v1/transactions/$transactionId/level3/visa";
+        $level3Data = [
             'destination_country_code' => $destination_country_code,
             'freight_amount'           => $order->getShippingAmount(),
             'shipfrom_zip_code'        => $storeManager->getStore()->getCode(),
@@ -346,9 +388,9 @@ class FortisApi
             $lineItems[] = $lineItem;
         }
         $level3Data['line_items'] = $lineItems;
-        $data = ['level3_data' => $level3Data];
+        $data                     = ['level3_data' => $level3Data];
 
-        $response = $this->makeApiRequest($endpoint, $userId, $userApiKey, $data);
+        $response        = $this->makeApiRequest($endpoint, $userId, $userApiKey, $data);
         $responseDecoded = json_decode($response);
 
         if (isset($responseDecoded->type) && $responseDecoded->type === 'Error') {
@@ -372,8 +414,8 @@ class FortisApi
         CountryFactory $countryFactory,
         string $transactionId
     ): void {
-        $userId      = $this->config->userId();
-        $userApiKey  = $this->config->userApiKey();
+        $userId     = $this->config->userId();
+        $userApiKey = $this->config->userApiKey();
 
         $customerAddress = $order->getShippingAddress();
         if (!$customerAddress) {
@@ -408,9 +450,9 @@ class FortisApi
             $lineItems[] = $lineItem;
         }
         $level3Data['line_items'] = $lineItems;
-        $data = ['level3_data' => $level3Data];
+        $data                     = ['level3_data' => $level3Data];
 
-        $response = $this->makeApiRequest($endpoint, $userId, $userApiKey, $data);
+        $response        = $this->makeApiRequest($endpoint, $userId, $userApiKey, $data);
         $responseDecoded = json_decode($response);
 
         if (isset($responseDecoded->type) && $responseDecoded->type === 'Error') {
@@ -431,5 +473,4 @@ class FortisApi
 
         return $this->decoder->decode($parts[1] ?? []);
     }
-
 }

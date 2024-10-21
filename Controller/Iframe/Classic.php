@@ -20,7 +20,7 @@ class Classic implements HttpPostActionInterface, HttpGetActionInterface
         PageFactory $pageFactory,
         ResultFactory $resultFactory,
     ) {
-        $this->pageFactory = $pageFactory;
+        $this->pageFactory   = $pageFactory;
         $this->resultFactory = $resultFactory;
     }
 

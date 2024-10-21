@@ -29,9 +29,9 @@ class IFrameData
         LoggerInterface $logger,
         FortisMethodService $fortisMethodService
     ) {
-        $this->checkoutSession = $checkoutSession;
-        $this->messageManager  = $messageManager;
-        $this->logger          = $logger;
+        $this->checkoutSession     = $checkoutSession;
+        $this->messageManager      = $messageManager;
+        $this->logger              = $logger;
         $this->fortisMethodService = $fortisMethodService;
     }
 

@@ -56,15 +56,15 @@ class CheckoutProcessor
         Fortis $paymentMethod,
         EncryptorInterface $encryptor
     ) {
-        $this->logger = $logger;
-        $this->order = $order;
+        $this->logger          = $logger;
+        $this->order           = $order;
         $this->orderRepository = $orderRepository;
         $this->checkoutSession = $checkoutSession;
         $this->quoteRepository = $quoteRepository;
-        $this->resultFactory = $resultFactory;
-        $this->customerUrl = $customerUrl;
-        $this->paymentMethod = $paymentMethod;
-        $this->encryptor = $encryptor;
+        $this->resultFactory   = $resultFactory;
+        $this->customerUrl     = $customerUrl;
+        $this->paymentMethod   = $paymentMethod;
+        $this->encryptor       = $encryptor;
     }
 
     /**

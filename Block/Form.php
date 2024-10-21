@@ -28,7 +28,7 @@ class Form extends \Magento\Payment\Block\Form
         LoggerInterface $logger,
         array $data = []
     ) {
-        $pre           = __METHOD__ . " : ";
+        $pre          = __METHOD__ . " : ";
         $this->logger = $logger;
         $this->logger->debug($pre . 'bof');
         parent::__construct($context, $data);

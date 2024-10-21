@@ -51,8 +51,8 @@ class OrderCancelAfter extends AbstractDataAssignObserver
         $this->scopeConfig        = $scopeConfig;
         $this->transactionBuilder = $transactionBuilder;
         $this->encryptor          = $encryptor;
-        $this->orderRepository = $orderRepository;
-        $this->fortisApi = $fortisApi;
+        $this->orderRepository    = $orderRepository;
+        $this->fortisApi          = $fortisApi;
     }
 
     /**
@@ -68,8 +68,8 @@ class OrderCancelAfter extends AbstractDataAssignObserver
         if ($type === 'sale') {
             return;
         }
-        $order = $observer->getEvent()->getOrder();
-        $payment       = $order->getPayment();
+        $order   = $observer->getEvent()->getOrder();
+        $payment = $order->getPayment();
 
         if (!isset($payment->getAdditionalInformation()['raw_details_info'])) {
             return;

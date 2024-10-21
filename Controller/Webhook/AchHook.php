@@ -129,7 +129,7 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         $this->invoiceSender         = $invoiceSender;
         $this->creditMemoFactory     = $creditMemoFactory;
         $this->creditMemoService     = $creditMemoService;
-        $this->orderRepository = $orderRepository;
+        $this->orderRepository       = $orderRepository;
     }
 
     /**
@@ -188,8 +188,8 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
             $result = $connection->fetchRow($query, $binds);
 
             $transaction           = $this->transactionRepository->get($result['transaction_id']);
-            $orderId = $transaction->getOrderId();
-            $order = $this->orderRepository->get($orderId);
+            $orderId               = $transaction->getOrderId();
+            $order                 = $this->orderRepository->get($orderId);
             $additionalInformation = $transaction->getAdditionalInformation();
             if (empty($additionalInformation['webhook_update_info'])) {
                 $webhookUpdateInformation = [];

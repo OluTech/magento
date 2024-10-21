@@ -3,6 +3,7 @@
 namespace Fortispay\Fortis\Model;
 
 use Magento\Framework\Data\OptionSourceInterface;
+
 /**
  * @api
  * @since 100.0.2

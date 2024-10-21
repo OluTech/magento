@@ -98,15 +98,15 @@ class Fortis implements MethodInterface
         DirectoryHelper $directoryHelper,
         FortisApi $fortisApi
     ) {
-        $this->eventManager = $eventManager;
-        $this->storeManager = $storeManager;
-        $this->urlBuilder  = $urlBuilder;
-        $this->encryptor                 = $encryptor;
-        $this->orderRepository           = $orderRepository;
-        $this->scopeConfig               = $scopeConfig;
-        $this->fortisMethodService       = $fortisMethodService;
-        $this->directoryHelper           = $directoryHelper;
-        $this->fortisApi = $fortisApi;
+        $this->eventManager        = $eventManager;
+        $this->storeManager        = $storeManager;
+        $this->urlBuilder          = $urlBuilder;
+        $this->encryptor           = $encryptor;
+        $this->orderRepository     = $orderRepository;
+        $this->scopeConfig         = $scopeConfig;
+        $this->fortisMethodService = $fortisMethodService;
+        $this->directoryHelper     = $directoryHelper;
+        $this->fortisApi           = $fortisApi;
 
         $parameters = ['params' => [Config::METHOD_CODE]];
 
@@ -356,6 +356,7 @@ class Fortis implements MethodInterface
                 return false;
             }
         }
+
         return true;
     }
 
@@ -418,6 +419,7 @@ class Fortis implements MethodInterface
         if (!$this->canOrder()) {
             throw new LocalizedException(__('The order action is not available.'));
         }
+
         return $this;
     }
 
@@ -433,6 +435,7 @@ class Fortis implements MethodInterface
         if (!$this->canAuthorize()) {
             throw new LocalizedException(__('The authorize action is not available.'));
         }
+
         return $this;
     }
 
@@ -499,6 +502,7 @@ class Fortis implements MethodInterface
         if (!$this->canVoid()) {
             throw new LocalizedException(__('The void action is not available.'));
         }
+
         return $this;
     }
 
@@ -521,6 +525,7 @@ class Fortis implements MethodInterface
         if (!$this->canReviewPayment()) {
             throw new LocalizedException(__('The payment review action is unavailable.'));
         }
+
         return false;
     }
 
@@ -535,6 +540,7 @@ class Fortis implements MethodInterface
         if (!$this->canReviewPayment()) {
             throw new LocalizedException(__('The payment review action is unavailable.'));
         }
+
         return false;
     }
 
@@ -553,6 +559,7 @@ class Fortis implements MethodInterface
             $storeId = $this->getStore();
         }
         $path = 'payment/' . $this->getCode() . '/' . $field;
+
         return $this->scopeConfig->getValue($path, ScopeInterface::SCOPE_STORE, $storeId);
     }
 
@@ -570,8 +577,8 @@ class Fortis implements MethodInterface
             'payment_method_assign_data_' . $this->getCode(),
             [
                 AbstractDataAssignObserver::METHOD_CODE => $this,
-                AbstractDataAssignObserver::MODEL_CODE => $this->getInfoInstance(),
-                AbstractDataAssignObserver::DATA_CODE => $data
+                AbstractDataAssignObserver::MODEL_CODE  => $this->getInfoInstance(),
+                AbstractDataAssignObserver::DATA_CODE   => $data
             ]
         );
 
@@ -579,8 +586,8 @@ class Fortis implements MethodInterface
             'payment_method_assign_data',
             [
                 AbstractDataAssignObserver::METHOD_CODE => $this,
-                AbstractDataAssignObserver::MODEL_CODE => $this->getInfoInstance(),
-                AbstractDataAssignObserver::DATA_CODE => $data
+                AbstractDataAssignObserver::MODEL_CODE  => $this->getInfoInstance(),
+                AbstractDataAssignObserver::DATA_CODE   => $data
             ]
         );
 

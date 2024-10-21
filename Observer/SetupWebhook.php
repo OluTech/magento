@@ -56,7 +56,7 @@ class SetupWebhook implements ObserverInterface
         $this->config         = $config;
         $this->urlBuilder     = $urlBuilder;
         $this->messageManager = $messageManager;
-        $this->fortisApi = $fortisApi;
+        $this->fortisApi      = $fortisApi;
     }
 
     /**

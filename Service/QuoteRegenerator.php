@@ -35,7 +35,7 @@ class QuoteRegenerator
     ) {
         $this->orderRepository = $orderRepository;
         $this->quoteFactory    = $quoteFactory;
-        $this->logger = $logger;
+        $this->logger          = $logger;
         $this->checkoutSession = $checkoutSession;
         $this->quoteRepository = $quoteRepository;
     }

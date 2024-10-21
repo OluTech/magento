@@ -79,7 +79,7 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
         ManagerInterface $messageManager,
         PaymentTokenManagementInterface $paymentTokenManagement,
         FortisApi $fortisApi,
-        CheckoutProcessor  $checkoutProcessor,
+        CheckoutProcessor $checkoutProcessor,
     ) {
         $pre = __METHOD__ . " : ";
 
@@ -87,18 +87,19 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
 
         $this->logger->debug($pre . 'bof');
 
-        $this->checkoutSession                          = $checkoutSession;
-        $this->pageFactory                              = $pageFactory;
-        $this->resultFactory                            = $resultFactory;
-        $this->messageManager                           = $messageManager;
-        $this->fortisApi                                = $fortisApi;
-        $this->config = $config;
-        $this->checkoutProcessor = $checkoutProcessor;
-        $this->urlBuilder = $urlBuilder;
+        $this->checkoutSession        = $checkoutSession;
+        $this->pageFactory            = $pageFactory;
+        $this->resultFactory          = $resultFactory;
+        $this->messageManager         = $messageManager;
+        $this->fortisApi              = $fortisApi;
+        $this->config                 = $config;
+        $this->checkoutProcessor      = $checkoutProcessor;
+        $this->urlBuilder             = $urlBuilder;
         $this->paymentTokenManagement = $paymentTokenManagement;
 
         $this->logger->debug($pre . 'eof');
     }
+
     /**
      * Execute
      */
