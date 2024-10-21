@@ -8,6 +8,7 @@ use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
+use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\Order\Payment\Transaction;
 use Magento\Sales\Model\Order\Payment\Transaction\Builder;
@@ -17,7 +18,7 @@ class CancelOrderAuthorisation implements ObserverInterface
     /**
      * @var ScopeConfigInterface
      */
-    protected ScopeConfigInterface $scopeConfig;
+    private ScopeConfigInterface $scopeConfig;
     /**
      * @var Builder
      */
@@ -27,26 +28,30 @@ class CancelOrderAuthorisation implements ObserverInterface
      */
     private EncryptorInterface $encryptor;
     /**
-     * @var \Fortispay\Fortis\Model\Config
+     * @var Config
      */
-    private Config $config;
+    private OrderRepositoryInterface $orderRepository;
+    private FortisApi $fortisApi;
 
     /**
      * @param ScopeConfigInterface $scopeConfig
      * @param Builder $transactionBuilder
      * @param EncryptorInterface $encryptor
-     * @param \Fortispay\Fortis\Model\Config $config
+     * @param OrderRepositoryInterface $orderRepository
+     * @param FortisApi $fortisApi
      */
     public function __construct(
         ScopeConfigInterface $scopeConfig,
         Builder $transactionBuilder,
         EncryptorInterface $encryptor,
-        Config $config
+        OrderRepositoryInterface $orderRepository,
+        FortisApi $fortisApi
     ) {
         $this->scopeConfig        = $scopeConfig;
         $this->transactionBuilder = $transactionBuilder;
         $this->encryptor          = $encryptor;
-        $this->config             = $config;
+        $this->orderRepository    = $orderRepository;
+        $this->fortisApi = $fortisApi;
     }
 
     /**
@@ -76,9 +81,9 @@ class CancelOrderAuthorisation implements ObserverInterface
             'token_id'           => $d->token_id,
             'transactionId'      => $transactionId,
         ];
-        $api        = new FortisApi($this->config);
+        $api        = $this->fortisApi;
         if ($type === 'auth-only') {
-            $response = $api->refundAuthAmount($intentData, $user_id, $user_api_key);
+            $response = $api->voidAuthAmount($intentData, $user_id, $user_api_key);
         } else {
             $response = $api->refundTransactionAmount($intentData, $user_id, $user_api_key);
         }
@@ -105,11 +110,10 @@ class CancelOrderAuthorisation implements ObserverInterface
             $message = __('The authorised amount has been voided');
             $payment->addTransactionCommentsToOrder($transaction, $message);
             $payment->setParentTransactionId($transactionId);
-            $payment->save();
             $order->setShouldCloseParentTransaction(true);
             $order->setStatus(Order::STATE_CLOSED);
             $order->setState(Order::STATE_CLOSED);
-            $order->save();
+            $this->orderRepository->save($order);
         }
     }
 }

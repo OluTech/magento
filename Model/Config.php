@@ -1,14 +1,12 @@
 <?php
 
-// @codingStandardsIgnoreFile
-
 namespace Fortispay\Fortis\Model;
 
 use Magento\Directory\Helper\Data;
 use Magento\Framework\App\Config\ScopeConfigInterface;
-use Magento\Framework\UrlInterface;
+use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\View\Asset\Repository;
-use Magento\Payment\Model\Method\AbstractMethod;
+use Magento\Payment\Model\MethodInterface;
 use Magento\Store\Model\ScopeInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -21,13 +19,15 @@ use Magento\Framework\App\Config\Storage\WriterInterface;
  * @SuppressWarnings(PHPMD.ExcesivePublicCount)
  * @SuppressWarnings(PHPMD.ExcessiveClassComplexity)
  */
-class Config extends AbstractConfig
+class Config
 {
-
-    /**
-     * @var Fortis this is a model which we will use.
-     */
     public const METHOD_CODE = 'fortis';
+
+    public const PAYMENT_ACTION_SALE = 'Sale';
+
+    public const PAYMENT_ACTION_AUTH = 'Authorization';
+
+    public const PAYMENT_ACTION_ORDER = 'Order';
 
     public const ACH_ICON = [
         'width'  => 50,
@@ -37,51 +37,53 @@ class Config extends AbstractConfig
     /**
      * @var Data
      */
-    protected $directoryHelper;
+    private Data $directoryHelper;
 
     /**
      * @var StoreManagerInterface
      */
-    protected $_storeManager;
-
-    /**
-     * @var string[]
-     */
-    protected $_supportedBuyerCountryCodes = ['ZA'];
+    private StoreManagerInterface $storeManager;
 
     /**
      * Currency codes supported by Fortis methods
      * @var string[]
      */
-    protected $_supportedCurrencyCodes = ['USD', 'EUR', 'GPD', 'ZAR'];
+    private array $supportedCurrencyCodes = ['USD', 'EUR', 'GPD', 'ZAR'];
 
     /**
      * @var LoggerInterface
      */
-    protected $_logger;
-
-    /**
-     * @var UrlInterface
-     */
-    protected $_urlBuilder;
+    private LoggerInterface $logger;
 
     /**
      * @var Repository
      */
-    protected $_assetRepo;
+    private Repository $assetRepo;
 
     /**
      * @var ScopeConfigInterface
      */
-    protected $scopeConfig;
+    private ScopeConfigInterface $scopeConfig;
     /**
-     * @var \Magento\Framework\Encryption\EncryptorInterface
+     * @var EncryptorInterface
      */
     private EncryptorInterface $encryptor;
     /**
-     * @var \Magento\Framework\App\Config\Storage\WriterInterface
+     * @var WriterInterface
      */
     private WriterInterface $configWriter;
+    /**
+     * Current payment method code
+     *
+     * @var string
+     */
+    private string $methodCode;
+    /**
+     * Current store id
+     *
+     * @var int
+     */
+    private int $storeId;
 
     /**
      * Construct
@@ -91,10 +93,10 @@ class Config extends AbstractConfig
      * @param StoreManagerInterface $storeManager
      * @param LoggerInterface $logger
      * @param Repository $assetRepo
-     * @param \Magento\Framework\Encryption\EncryptorInterface $encryptor
-     * @param \Magento\Framework\App\Config\Storage\WriterInterface $configWriter
+     * @param EncryptorInterface $encryptor
+     * @param WriterInterface $configWriter
      *
-     * @throws \Magento\Framework\Exception\NoSuchEntityException
+     * @throws NoSuchEntityException
      */
     public function __construct(
         ScopeConfigInterface $scopeConfig,
@@ -103,17 +105,15 @@ class Config extends AbstractConfig
         LoggerInterface $logger,
         Repository $assetRepo,
         EncryptorInterface $encryptor,
-        WriterInterface $configWriter
+        WriterInterface $configWriter,
     ) {
-        $this->_logger = $logger;
-        parent::__construct($scopeConfig);
+        $this->logger = $logger;
         $this->directoryHelper = $directoryHelper;
-        $this->_storeManager   = $storeManager;
-        $this->_assetRepo      = $assetRepo;
+        $this->storeManager    = $storeManager;
+        $this->assetRepo       = $assetRepo;
         $this->scopeConfig     = $scopeConfig;
-        $METHOD_CODE           = self::METHOD_CODE;
-        $this->setMethod($METHOD_CODE);
-        $currentStoreId = $this->_storeManager->getStore()->getStoreId();
+        $this->setMethod(self::METHOD_CODE);
+        $currentStoreId = $this->storeManager->getStore()->getStoreId();
         $this->setStoreId($currentStoreId);
         $this->encryptor    = $encryptor;
         $this->configWriter = $configWriter;
@@ -128,30 +128,20 @@ class Config extends AbstractConfig
     }
 
     /**
-     * Return buyer country codes supported by Fortis
-     *
-     * @return string[]
-     */
-    public function getSupportedBuyerCountryCodes()
-    {
-        return $this->_supportedBuyerCountryCodes;
-    }
-
-    /**
      * Return merchant country code, use default country if it not specified in General settings
      *
      * @return string
      */
     public function getMerchantCountry()
     {
-        return $this->directoryHelper->getDefaultCountry($this->_storeId);
+        return $this->directoryHelper->getDefaultCountry($this->storeId);
     }
 
     /**
      * Is Method Supported For Country
      *
      * Check whether method supported for specified country or not
-     * Use $_methodCode and merchant country by default
+     * Use $methodCode and merchant country by default
      *
      * @param string|null $method
      * @param string|null $countryCode
@@ -202,10 +192,10 @@ class Config extends AbstractConfig
     public function getPaymentMarkImageUrl()
     {
         if ($this->achIsActive()) {
-            return $this->_assetRepo->getUrl('Fortispay_Fortis::images/logo-ach.png');
+            return $this->assetRepo->getUrl('Fortispay_Fortis::images/logo-ach.png');
         }
 
-        return $this->_assetRepo->getUrl('Fortispay_Fortis::images/logo.png');
+        return $this->assetRepo->getUrl('Fortispay_Fortis::images/logo.png');
     }
 
     /**
@@ -215,7 +205,7 @@ class Config extends AbstractConfig
      */
     public function getFortisIconImageUrl()
     {
-        return $this->_assetRepo->getUrl('Fortispay_Fortis::images/fortis_ach.png');
+        return $this->assetRepo->getUrl('Fortispay_Fortis::images/fortis_ach.png');
     }
 
     /**
@@ -235,28 +225,27 @@ class Config extends AbstractConfig
      */
     public function getPaymentAction()
     {
-        // TODO: Update for Fortis
         $paymentAction = null;
         $pre           = __METHOD__ . ' : ';
-        $this->_logger->debug($pre . 'bof');
+        $this->logger->debug($pre . 'bof');
 
-        $action = $this->getValue('paymentAction');
+        $action = $this->getConfig('paymentAction');
 
         switch ($action) {
             case self::PAYMENT_ACTION_AUTH:
-                $paymentAction = AbstractMethod::ACTION_AUTHORIZE;
+                $paymentAction = MethodInterface::ACTION_AUTHORIZE;
                 break;
             case self::PAYMENT_ACTION_SALE:
-                $paymentAction = AbstractMethod::ACTION_AUTHORIZE_CAPTURE;
+                $paymentAction = MethodInterface::ACTION_AUTHORIZE_CAPTURE;
                 break;
             case self::PAYMENT_ACTION_ORDER:
-                $paymentAction = AbstractMethod::ACTION_ORDER;
+                $paymentAction = MethodInterface::ACTION_ORDER;
                 break;
             default:
-                $this->_logger->debug($pre . $action . " could not be classified.");
+                $this->logger->debug($pre . $action . " could not be classified.");
         }
 
-        $this->_logger->debug($pre . 'eof : paymentAction is ' . $paymentAction);
+        $this->logger->debug($pre . 'eof : paymentAction is ' . $paymentAction);
 
         return $paymentAction;
     }
@@ -273,13 +262,13 @@ class Config extends AbstractConfig
         $supported = false;
         $pre       = __METHOD__ . ' : ';
 
-        $this->_logger->debug($pre . "bof and code: {$code}");
+        $this->logger->debug($pre . "bof and code: {$code}");
 
-        if (in_array($code, $this->_supportedCurrencyCodes)) {
+        if (in_array($code, $this->supportedCurrencyCodes)) {
             $supported = true;
         }
 
-        $this->_logger->debug($pre . "eof and supported : {$supported}");
+        $this->logger->debug($pre . "eof and supported : {$supported}");
 
         return $supported;
     }
@@ -439,62 +428,6 @@ class Config extends AbstractConfig
     }
 
     /**
-     * Get Api Credential for Fortis Payment
-     **/
-    public function getApiCredentials(): array
-    {
-        // TODO: Update for Fortis
-        $data                 = [];
-        $data['user_api_key'] = $this->getConfig('user_api_key');
-        $data['user_id']      = $this->getConfig('user_id');
-
-        return $data;
-    }
-
-    /**
-     * Check whether specified locale code is supported. Fallback to en_US
-     *
-     * @param string|null $localeCode
-     *
-     * @return string
-     */
-    protected function _getSupportedLocaleCode($localeCode = null)
-    {
-        if (!$localeCode || !in_array($localeCode, $this->_supportedImageLocales)) {
-            return 'en_US';
-        }
-
-        return $localeCode;
-    }
-
-    /**
-     * Map config fields
-     *
-     * @param string $fieldName
-     *
-     * @return string|null
-     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
-     */
-    protected function _mapFortisFieldset($fieldName)
-    {
-        return "payment/{$this->_methodCode}/{$fieldName}";
-    }
-
-    /**
-     * Map any supported payment method into a config path by specified field name
-     *
-     * @param string $fieldName
-     *
-     * @return string|null
-     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
-     * @SuppressWarnings(PHPMD.NPathComplexity)
-     */
-    protected function _getSpecificConfigPath($fieldName)
-    {
-        return $this->_mapFortisFieldset($fieldName);
-    }
-
-    /**
      * Decrypted user id
      *
      * @return string
@@ -570,5 +503,91 @@ class Config extends AbstractConfig
     public function getCancelOrderBtnText(): string
     {
         return $this->getConfig('fortis_cancel_order_btn') ?? 'Place order';
+    }
+
+    /**
+     * Method code setter
+     *
+     * @param string|MethodInterface $method
+     *
+     * @return $this
+     */
+    public function setMethod($method)
+    {
+        if ($method instanceof MethodInterface) {
+            $this->methodCode = $method->getCode();
+        } elseif (is_string($method)) {
+            $this->methodCode = $method;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Payment method instance code getter
+     *
+     * @return string
+     */
+    public function getMethodCode()
+    {
+        return $this->methodCode;
+    }
+
+    /**
+     * Store ID setter
+     *
+     * @param int $storeId
+     *
+     * @return $this
+     */
+    public function setStoreId($storeId)
+    {
+        $this->storeId = (int)$storeId;
+
+        return $this;
+    }
+
+    /**
+     * Store ID Getter
+     *
+     * @return int
+     */
+    public function getStoreId()
+    {
+        return $this->storeId;
+    }
+
+    /**
+     * Check whether method available for checkout or not
+     *
+     * @param string|null $methodCode
+     *
+     * @return bool
+     */
+    public function isMethodAvailable($methodCode = null)
+    {
+        $methodCode = $methodCode ?: $this->methodCode;
+
+        return $this->isMethodActive($methodCode);
+    }
+
+    /**
+     * Check whether method active in configuration and supported for merchant country or not
+     *
+     * @param string $method Method code
+     *
+     * @return bool
+     *
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     */
+    public function isMethodActive(string $method): bool
+    {
+        $isEnabled = $this->scopeConfig->isSetFlag(
+            "payment/{$method}/active",
+            ScopeInterface::SCOPE_STORE,
+            $this->storeId
+        );
+
+        return $this->isMethodSupportedForCountry($method) && $isEnabled;
     }
 }

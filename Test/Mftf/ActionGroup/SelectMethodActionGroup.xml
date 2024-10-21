@@ -1,0 +1,14 @@
+<actionGroups xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:noNamespaceSchemaLocation="urn:magento:mftf:Test/etc/actionGroupSchema.xsd">
+    <actionGroup name="SelectMethodActionGroup">
+        <annotations>
+            <description>Select payment method on the storefront.</description>
+        </annotations>
+        <arguments>
+            <argument name="selector" type="string" defaultValue="{{CheckoutPaymentSection.MagentoPaymentServicesHostedFieldsRadio}}"/>
+        </arguments>
+        <!-- Select payment method -->
+        <waitForElement selector="{{CheckoutPaymentSection.paymentSectionTitle}}" stepKey="waitForPlaceOrderButton"/>
+        <click selector="{{selector}}" stepKey="selectPaymentMethod"/>
+    </actionGroup>
+</actionGroups>

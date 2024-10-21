@@ -6,30 +6,17 @@
             <argument name="namespace" xsi:type="string">fortis</argument>
         </arguments>
     </virtualType>
+
     <virtualType name="Fortispay\Fortis\Model\Session" type="Magento\Framework\Session\Generic">
         <arguments>
             <argument name="storage" xsi:type="object">Fortispay\Fortis\Model\Session\Storage</argument>
         </arguments>
     </virtualType>
 
-    <type name="Fortispay\Fortis\Controller\AbstractFortis">
-        <arguments>
-            <argument name="fortisSession" xsi:type="object">Fortispay\Fortis\Model\Session</argument>
-        </arguments>
-    </type>
-
     <type name="Magento\Framework\Url\SecurityInfo">
         <arguments>
             <argument name="secureUrlList" xsi:type="array">
                 <item name="fortis" xsi:type="string">/fortis/</item>
-            </argument>
-        </arguments>
-    </type>
-
-    <type name="Fortispay\Fortis\Block\Payment\Info">
-        <arguments>
-            <argument name="data" xsi:type="array">
-                <item xsi:type="string" name="is_secure_mode">1</item>
             </argument>
         </arguments>
     </type>

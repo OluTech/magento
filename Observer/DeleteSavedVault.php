@@ -2,8 +2,8 @@
 
 namespace Fortispay\Fortis\Observer;
 
-use Fortispay\Fortis\Model\Config;
 use Fortispay\Fortis\Model\FortisApi;
+use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
@@ -14,30 +14,26 @@ class DeleteSavedVault implements ObserverInterface
     /**
      * @var ScopeConfigInterface
      */
-    protected ScopeConfigInterface $scopeConfig;
-
+    private ScopeConfigInterface $scopeConfig;
     private EncryptorInterface $encryptor;
-    /**
-     * @var \Fortispay\Fortis\Model\Config
-     */
-    private Config $config;
+    private FortisApi $fortisApi;
 
     /**
      * @param ScopeConfigInterface $scopeConfig
      * @param EncryptorInterface $encryptor
-     * @param \Fortispay\Fortis\Model\Config $config
+     * @param FortisApi $fortisApi
      */
     public function __construct(
         ScopeConfigInterface $scopeConfig,
         EncryptorInterface $encryptor,
-        Config $config
+        FortisApi $fortisApi
     ) {
         $this->scopeConfig = $scopeConfig;
         $this->encryptor   = $encryptor;
-        $this->config      = $config;
+        $this->fortisApi = $fortisApi;
     }
 
-    public function execute(\Magento\Framework\Event\Observer $observer)
+    public function execute(Observer $observer)
     {
         $dataObject = $observer->getEvent()->getData()["object"];
         $cardData   = $dataObject->getData();
@@ -55,7 +51,7 @@ class DeleteSavedVault implements ObserverInterface
         $intentData = [
             'tokenId' => $tokenID,
         ];
-        $api        = new FortisApi($this->config);
+        $api        = $this->fortisApi;
 
         $api->doTokenCCDelete($intentData, $user_id, $user_api_key);
     }

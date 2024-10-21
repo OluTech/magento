@@ -3,34 +3,36 @@
 namespace Fortispay\Fortis\Model\Payment;
 
 use Exception;
-use Fortispay\Fortis\Model\Config;
-use Fortispay\Fortis\Model\Fortis;
 use Magento\Checkout\Model\Session;
 use Magento\Framework\Message\ManagerInterface;
 use Magento\Sales\Model\Order\Address;
 use Ramsey\Uuid\Uuid;
 use Psr\Log\LoggerInterface;
+use Fortispay\Fortis\Service\FortisMethodService;
 
 class IFrameData
 {
-    protected Session $checkoutSession;
-    protected Fortis $paymentMethod;
-    protected Config $fortisConfig;
-    protected ManagerInterface $messageManager;
-    protected LoggerInterface $logger;
+    private Session $checkoutSession;
+    private ManagerInterface $messageManager;
+    private LoggerInterface $logger;
+    private FortisMethodService $fortisMethodService;
 
+    /**
+     * @param Session $checkoutSession
+     * @param ManagerInterface $messageManager
+     * @param LoggerInterface $logger
+     * @param FortisMethodService $fortisMethodService
+     */
     public function __construct(
         Session $checkoutSession,
-        Fortis $paymentMethod,
-        Config $fortisConfig,
         ManagerInterface $messageManager,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        FortisMethodService $fortisMethodService
     ) {
         $this->checkoutSession = $checkoutSession;
-        $this->fortisConfig    = $fortisConfig;
-        $this->paymentMethod   = $paymentMethod;
         $this->messageManager  = $messageManager;
         $this->logger          = $logger;
+        $this->fortisMethodService = $fortisMethodService;
     }
 
     /**
@@ -56,7 +58,7 @@ class IFrameData
         }
 
         try {
-            $config = $this->paymentMethod->getFortisOrderToken($enableVaultForOrder);
+            $config = $this->fortisMethodService->getFortisOrderToken($enableVaultForOrder);
         } catch (Exception $e) {
             $this->messageManager->addExceptionMessage($e, $e->getMessage());
             $this->checkoutSession->restoreQuote();

@@ -106,6 +106,7 @@ require(['fortis-commerce', 'mage/url',], function(Commerce, _urlBuilder) {
             url = 'fortis/' + url;
         }
         cancelBtn.href = _urlBuilder.build(url);
+        cancelBtn.id = 'fortis-continue-shopping-btn';
         cancelBtn.textContent = config.appearance_options.cancelButtonText;
         cancelBtn.style.padding = '10px 20px';
         cancelBtn.style.backgroundColor = config.appearance_options.colorButtonBackground;

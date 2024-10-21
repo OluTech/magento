@@ -3,12 +3,20 @@
 namespace Fortispay\Fortis\Controller\Redirect;
 
 use Exception;
-use Fortispay\Fortis\Controller\AbstractFortis;
 use Fortispay\Fortis\Model\Config;
 use Fortispay\Fortis\Model\FortisApi;
+use Magento\Checkout\Model\Session as CheckoutSession;
+use Magento\Framework\App\Action\HttpGetActionInterface;
+use Magento\Framework\App\Action\HttpPostActionInterface;
+use Magento\Framework\Controller\ResultFactory;
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Message\ManagerInterface;
+use Magento\Framework\UrlInterface;
 use Magento\Framework\View\Result\PageFactory;
+use Magento\Vault\Api\PaymentTokenManagementInterface;
+use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
+use Fortispay\Fortis\Service\CheckoutProcessor;
 
 /**
  * Responsible for loading page content.
@@ -16,22 +24,81 @@ use Ramsey\Uuid\Uuid;
  * This is a basic controller that only loads the corresponding layout file. It may duplicate other such
  * controllers, and thus it is considered tech debt. This code duplication will be resolved in future releases.
  */
-class Index extends AbstractFortis
+class Index implements HttpPostActionInterface, HttpGetActionInterface
 {
     public const SECURE = ['_secure' => true];
     /**
-     * @var PageFactory
+     * @var CheckoutSession $checkoutSession
      */
-    protected $resultPageFactory;
+    private CheckoutSession $checkoutSession;
 
     /**
-     * Config method type
-     *
-     * @var string
+     * @var LoggerInterface
      */
-    protected $_configMethod = Config::METHOD_CODE;
-    private string $successURL;
+    private LoggerInterface $logger;
 
+    /**
+     * @var PageFactory
+     */
+    private PageFactory $pageFactory;
+
+    /**
+     * @var ResultFactory
+     */
+    private ResultFactory $resultFactory;
+
+    private ManagerInterface $messageManager;
+    /**
+     * @var FortisApi
+     */
+    private FortisApi $fortisApi;
+    private Config $config;
+    private CheckoutProcessor $checkoutProcessor;
+    private UrlInterface $urlBuilder;
+    private PaymentTokenManagementInterface $paymentTokenManagement;
+
+    /**
+     * @param PageFactory $pageFactory
+     * @param CheckoutSession $checkoutSession
+     * @param LoggerInterface $logger
+     * @param UrlInterface $urlBuilder
+     * @param Config $config
+     * @param ResultFactory $resultFactory
+     * @param ManagerInterface $messageManager
+     * @param PaymentTokenManagementInterface $paymentTokenManagement
+     * @param FortisApi $fortisApi
+     * @param CheckoutProcessor $checkoutProcessor
+     */
+    public function __construct(
+        PageFactory $pageFactory,
+        CheckoutSession $checkoutSession,
+        LoggerInterface $logger,
+        UrlInterface $urlBuilder,
+        Config $config,
+        ResultFactory $resultFactory,
+        ManagerInterface $messageManager,
+        PaymentTokenManagementInterface $paymentTokenManagement,
+        FortisApi $fortisApi,
+        CheckoutProcessor  $checkoutProcessor,
+    ) {
+        $pre = __METHOD__ . " : ";
+
+        $this->logger = $logger;
+
+        $this->logger->debug($pre . 'bof');
+
+        $this->checkoutSession                          = $checkoutSession;
+        $this->pageFactory                              = $pageFactory;
+        $this->resultFactory                            = $resultFactory;
+        $this->messageManager                           = $messageManager;
+        $this->fortisApi                                = $fortisApi;
+        $this->config = $config;
+        $this->checkoutProcessor = $checkoutProcessor;
+        $this->urlBuilder = $urlBuilder;
+        $this->paymentTokenManagement = $paymentTokenManagement;
+
+        $this->logger->debug($pre . 'eof');
+    }
     /**
      * Execute
      */
@@ -42,20 +109,20 @@ class Index extends AbstractFortis
         $page_object = $this->pageFactory->create();
 
         try {
-            $this->_initCheckout();
+            $this->checkoutProcessor->initCheckout();
         } catch (LocalizedException $e) {
-            $this->_logger->error($pre . $e->getMessage());
+            $this->logger->error($pre . $e->getMessage());
             $this->messageManager->addExceptionMessage($e, $e->getMessage());
 
-            return $this->getRedirectToCartObject();
+            return $this->checkoutProcessor->getRedirectToCartObject();
         } catch (Exception $e) {
-            $this->_logger->error($pre . $e->getMessage());
+            $this->logger->error($pre . $e->getMessage());
             $this->messageManager->addExceptionMessage($e, __('We can\'t start Fortis Checkout.'));
 
-            return $this->getRedirectToCartObject();
+            return $this->checkoutProcessor->getRedirectToCartObject();
         }
 
-        $order          = $this->_checkoutSession->getLastRealOrder();
+        $order          = $this->checkoutSession->getLastRealOrder();
         $orderData      = $order->getPayment()->getData();
         $additionalData = $orderData['additional_information'];
 
@@ -65,22 +132,21 @@ class Index extends AbstractFortis
 
         $returnUrl = "";
         if ($action === 'sale') {
-            $returnUrl = $this->_urlBuilder->getUrl(
+            $returnUrl = $this->urlBuilder->getUrl(
                 'fortis/redirect/success',
                 self::SECURE
-            ) . '?gid=' . $order->getRealOrderId();
+            ) . '?gid=' . $order->getId();
         } elseif ($action === 'auth-only') {
-            $returnUrl = $this->_urlBuilder->getUrl(
+            $returnUrl = $this->urlBuilder->getUrl(
                 'fortis/redirect/authorise',
                 self::SECURE
-            ) . '?gid=' . $order->getRealOrderId();
+            ) . '?gid=' . $order->getId();
         }
 
         $vaultHash = $additionalData['fortis-vault-method'] ?? '';
         if (strlen($vaultHash) > 10) {
             // Have a vaulted card transaction
-            $paymentTokenManagementInterface = $this->_paymentMethod->getPaymentTokenManagement();
-            $cardData                        = $paymentTokenManagementInterface->getByPublicHash(
+            $cardData = $this->paymentTokenManagement->getByPublicHash(
                 $vaultHash,
                 $order->getCustomerId()
             );
@@ -89,7 +155,7 @@ class Index extends AbstractFortis
             $gatewayToken = $cardData->getGatewayToken();
             $user_id      = $this->config->userId();
             $user_api_key = $this->config->userApiKey();
-            $api          = new FortisApi($this->config);
+            $api          = $this->fortisApi;
             $guid         = strtoupper(Uuid::uuid4());
             $guid         = str_replace('-', '', $guid);
             $intentData   = [
@@ -121,17 +187,15 @@ class Index extends AbstractFortis
 
                     $returnUrl .= '&tid=' . $transactionResult->data->id;
                     $redirect  = $this->resultFactory->create(
-                        \Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT
+                        ResultFactory::TYPE_REDIRECT
                     );
                     $redirect->setUrl($returnUrl);
 
-                    $this->successURL = $returnUrl;
-
                     return $redirect;
                 } catch (LocalizedException $e) {
-                    $this->_logger->error($e->getMessage());
+                    $this->logger->error($e->getMessage());
                     $this->messageManager->addExceptionMessage($e, $e->getMessage());
-                    $this->_checkoutSession->restoreQuote();
+                    $this->checkoutSession->restoreQuote();
 
                     return $e;
                 } catch (Exception $exception) {
@@ -164,17 +228,15 @@ class Index extends AbstractFortis
 
                     $returnUrl .= '&tid=' . $transactionResult->data->id;
                     $redirect  = $this->resultFactory->create(
-                        \Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT
+                        ResultFactory::TYPE_REDIRECT
                     );
                     $redirect->setUrl($returnUrl);
 
-                    $this->successURL = $returnUrl;
-
                     return $redirect;
                 } catch (LocalizedException $e) {
-                    $this->_logger->error($e->getMessage());
+                    $this->logger->error($e->getMessage());
                     $this->messageManager->addExceptionMessage($e, $e->getMessage());
-                    $this->_checkoutSession->restoreQuote();
+                    $this->checkoutSession->restoreQuote();
 
                     return $e;
                 } catch (Exception $exception) {

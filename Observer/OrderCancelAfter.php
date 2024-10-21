@@ -3,12 +3,12 @@
 namespace Fortispay\Fortis\Observer;
 
 use Exception;
-use Fortispay\Fortis\Model\Config;
 use Fortispay\Fortis\Model\FortisApi;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Event\Observer;
 use Magento\Payment\Observer\AbstractDataAssignObserver;
+use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\Order\Payment\Transaction;
 use Magento\Sales\Model\Order\Payment\Transaction\Builder;
@@ -31,24 +31,28 @@ class OrderCancelAfter extends AbstractDataAssignObserver
     /**
      * @var \Fortispay\Fortis\Model\Config
      */
-    private Config $config;
+    private OrderRepositoryInterface $orderRepository;
+    private FortisApi $fortisApi;
 
     /**
      * @param ScopeConfigInterface $scopeConfig
      * @param Builder $transactionBuilder
      * @param EncryptorInterface $encryptor
-     * @param \Fortispay\Fortis\Model\Config $config
+     * @param OrderRepositoryInterface $orderRepository
+     * @param FortisApi $fortisApi
      */
     public function __construct(
         ScopeConfigInterface $scopeConfig,
         Builder $transactionBuilder,
         EncryptorInterface $encryptor,
-        Config $config
+        OrderRepositoryInterface $orderRepository,
+        FortisApi $fortisApi
     ) {
         $this->scopeConfig        = $scopeConfig;
         $this->transactionBuilder = $transactionBuilder;
         $this->encryptor          = $encryptor;
-        $this->config             = $config;
+        $this->orderRepository = $orderRepository;
+        $this->fortisApi = $fortisApi;
     }
 
     /**
@@ -64,8 +68,7 @@ class OrderCancelAfter extends AbstractDataAssignObserver
         if ($type === 'sale') {
             return;
         }
-        $data          = $observer->getData();
-        $order         = $data['order'];
+        $order = $observer->getEvent()->getOrder();
         $payment       = $order->getPayment();
 
         if (!isset($payment->getAdditionalInformation()['raw_details_info'])) {
@@ -84,20 +87,20 @@ class OrderCancelAfter extends AbstractDataAssignObserver
             return;
         }
 
+        $transactionId = $paymentInfo?->id;
+
         $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_id'));
         $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_api_key'));
 
-        $api = new FortisApi($this->config);
-
-        $transactionId = $paymentInfo?->id;
-
+        $api = $this->fortisApi;
         // Do auth transaction
         $intentData = [
             'transaction_amount' => $authAmount,
             'token_id'           => $paymentInfo->token_id,
             'transactionId'      => $transactionId,
         ];
-        $response = $api->refundAuthAmount($intentData, $user_id, $user_api_key);
+
+        $response = $api->voidAuthAmount($intentData, $user_id, $user_api_key);
 
         $trans = $this->transactionBuilder;
 
@@ -125,11 +128,10 @@ class OrderCancelAfter extends AbstractDataAssignObserver
             $message = __('The authorised amount has been voided');
             $payment->addTransactionCommentsToOrder($transaction, $message);
             $payment->setParentTransactionId($transactionId);
-            $payment->save();
             $order->setShouldCloseParentTransaction(true);
             $order->setStatus(Order::STATE_CLOSED);
             $order->setState(Order::STATE_CLOSED);
-            $order->save();
+            $this->orderRepository->save($order);
         }
     }
 }

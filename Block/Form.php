@@ -2,13 +2,8 @@
 
 namespace Fortispay\Fortis\Block;
 
-use Fortispay\Fortis\Helper\Data;
 use Fortispay\Fortis\Model\Config;
-use Fortispay\Fortis\Model\ConfigFactory;
-use Fortispay\Fortis\Model\Fortis\Checkout;
 use Psr\Log\LoggerInterface;
-use Magento\Customer\Helper\Session\CurrentCustomer;
-use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\View\Element\Template\Context;
 
 class Form extends \Magento\Payment\Block\Form
@@ -16,66 +11,28 @@ class Form extends \Magento\Payment\Block\Form
     /**
      * @var string Payment method code
      */
-    protected $_methodCode = Config::METHOD_CODE;
-
-    /**
-     * @var Data
-     */
-    protected $_fortisData;
-
-    /**
-     * @var ConfigFactory
-     */
-    protected ConfigFactory $fortisConfigFactory;
-
-    /**
-     * @var ResolverInterface
-     */
-    protected $_localeResolver;
+    private string $methodCode = Config::METHOD_CODE;
 
     /**
      * @var Config
      */
-    protected $_config;
-
-    /**
-     * @var bool
-     */
-    protected $_isScopePrivate;
-
-    /**
-     * @var CurrentCustomer
-     */
-    protected $currentCustomer;
+    private LoggerInterface $logger;
 
     /**
      * @param Context $context
-     * @param ConfigFactory $fortisConfigFactory
-     * @param ResolverInterface $localeResolver
-     * @param Data $fortisData
-     * @param CurrentCustomer $currentCustomer
+     * @param LoggerInterface $logger
      * @param array $data
      */
     public function __construct(
         Context $context,
-        ConfigFactory $fortisConfigFactory,
-        ResolverInterface $localeResolver,
-        Data $fortisData,
-        CurrentCustomer $currentCustomer,
         LoggerInterface $logger,
         array $data = []
     ) {
         $pre           = __METHOD__ . " : ";
-        $this->_logger = $logger;
-        $this->_logger->debug($pre . 'bof');
-        $this->_fortisData         = $fortisData;
-        $this->fortisConfigFactory = $fortisConfigFactory;
-        $this->_localeResolver     = $localeResolver;
-        $this->_config             = null;
-        $this->_isScopePrivate     = true;
-        $this->currentCustomer     = $currentCustomer;
+        $this->logger = $logger;
+        $this->logger->debug($pre . 'bof');
         parent::__construct($context, $data);
-        $this->_logger->debug($pre . "eof");
+        $this->logger->debug($pre . "eof");
     }
 
     /**
@@ -83,24 +40,23 @@ class Form extends \Magento\Payment\Block\Form
      *
      * @return string
      */
-    public function getMethodCode()
+    public function getMethodCode(): string
     {
         $pre = __METHOD__ . " : ";
         $this->_logger->debug($pre . 'bof');
 
-        return $this->_methodCode;
+        return $this->methodCode;
     }
 
     /**
      * Set template and redirect message
      *
-     * @return null
+     * @return void
      */
     protected function _construct()
     {
         $pre = __METHOD__ . " : ";
-        $this->_logger->debug($pre . 'bof');
-        $this->_config = $this->fortisConfigFactory->create()->setMethod($this->getMethodCode());
+        $this->logger->debug($pre . 'bof');
         parent::_construct();
     }
 }

@@ -21,13 +21,10 @@ define(
     checkoutData,
     additionalValidators,
     _urlBuilder,
-    CCForm,
-    VaultEnabler
   ) {
     'use strict';
     let fortisPaymentType;
     let fortisSavedCard = undefined;
-    let checkFortisSavedCard = false;
 
     return Component.extend({
       defaults: {

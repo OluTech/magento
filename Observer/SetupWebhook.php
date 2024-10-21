@@ -33,25 +33,30 @@ class SetupWebhook implements ObserverInterface
      * @var \Magento\Framework\Message\ManagerInterface
      */
     private ManagerInterface $messageManager;
+    private FortisApi $fortisApi;
 
     /**
      * @param LoggerInterface $logger
      * @param EncryptorInterface $encryptor
-     * @param \Fortispay\Fortis\Model\Config $config
-     * @param \Magento\Framework\UrlInterface $urlBuilder
+     * @param Config $config
+     * @param UrlInterface $urlBuilder
+     * @param ManagerInterface $messageManager
+     * @param FortisApi $fortisApi
      */
     public function __construct(
         LoggerInterface $logger,
         EncryptorInterface $encryptor,
         Config $config,
         UrlInterface $urlBuilder,
-        ManagerInterface $messageManager
+        ManagerInterface $messageManager,
+        FortisApi $fortisApi
     ) {
         $this->logger         = $logger;
         $this->encryptor      = $encryptor;
         $this->config         = $config;
         $this->urlBuilder     = $urlBuilder;
         $this->messageManager = $messageManager;
+        $this->fortisApi = $fortisApi;
     }
 
     /**
@@ -71,7 +76,7 @@ class SetupWebhook implements ObserverInterface
             $achIsActive  = $this->config->achIsActive();
             if ($achIsActive) {
                 // Create or update the ACH webhook
-                $api = new FortisApi($this->config, $url);
+                $api = $this->fortisApi;
 
                 if ($achWebhookId !== '') {
                     $api->deleteTransactionWebhook($achWebhookId);
