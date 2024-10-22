@@ -7,6 +7,7 @@ use Fortispay\Fortis\Model\FortisApi;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\UrlInterface;
 use Psr\Log\LoggerInterface;
 use Magento\Framework\Message\ManagerInterface;
@@ -79,7 +80,15 @@ class SetupWebhook implements ObserverInterface
                 $api = $this->fortisApi;
 
                 if ($achWebhookId !== '') {
-                    $api->deleteTransactionWebhook($achWebhookId);
+                    try {
+                        $api->deleteTransactionWebhook($achWebhookId);
+                    } catch (LocalizedException $exception) {
+                        $this->messageManager->addExceptionMessage(
+                            $exception,
+                            __('Deleting old webhook failed: ') . $exception->getMessage()
+                        );
+                    }
+
                     $webhookId = $api->createTransactionWebhook();
                     $this->config->setConfig('fortis_ach_webhook_id', $webhookId);
                     $this->messageManager->addSuccessMessage("You have updated webhook $url");

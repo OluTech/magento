@@ -123,9 +123,19 @@ class FortisApi
         $response = json_decode($response);
         if ($response?->type === 'Error') {
             $errorStr = '';
-            foreach ($response->meta->errors as $key => $error) {
-                $errorStr .= "$error[0]\n";
+
+            if (isset($response->meta->errors)) {
+                foreach ($response->meta->errors as $key => $error) {
+                    $errorStr .= "$error[0]\n";
+                }
+            } elseif (isset($response->meta->details)) {
+                foreach ($response->meta->details as $key => $error) {
+                    $errorStr .= "$error->message\n";
+                }
+            } elseif (isset($response->meta)) {
+                $errorStr = $response->meta->message;
             }
+
             throw new LocalizedException(new Phrase($errorStr));
         }
 
