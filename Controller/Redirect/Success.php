@@ -370,6 +370,8 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                         return $resultJson->setData([
                                                         'redirectTo' => $redirectToSuccessPageString,
                                                     ]);
+                    } else {
+                        $redirect->setUrl($redirectToSuccessPageString);
                     }
                 }
             } else {
