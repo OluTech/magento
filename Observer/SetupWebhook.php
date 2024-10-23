@@ -85,8 +85,9 @@ class SetupWebhook implements ObserverInterface
                     } catch (LocalizedException $exception) {
                         $this->messageManager->addExceptionMessage(
                             $exception,
-                            __('Deleting old webhook failed: ') . $exception->getMessage()
+                            __('Deleting old webhook failed, please try again: ') . $exception->getMessage()
                         );
+                        $this->config->setConfig('fortis_ach_webhook_id', '');
                     }
 
                     $webhookId = $api->createTransactionWebhook();
