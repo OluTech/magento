@@ -37,7 +37,3 @@ If your Fortis account has Level 3 Data enabled additional custom attributes hav
 - The ``unit_code`` value is a string 3 characters long that describes *"Units of measurement as used in international
   trade."* Further information on this may be found
   at https://docs.fortispay.com/developers/api/endpoints/level3data#codesforunitsofmeasurement.
-
-## PHP Code Standards
-
-- ``vendor/bin/phpcs --standard=Magento2 --extensions=php,phtml --error-severity=10 --ignore-annotations Fortispay/Fortis/``

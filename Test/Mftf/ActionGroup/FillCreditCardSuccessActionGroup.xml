@@ -1,0 +1,23 @@
+<actionGroups xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:noNamespaceSchemaLocation="urn:magento:mftf:Test/etc/actionGroupSchema.xsd">
+    <actionGroup name="FillCreditCardSuccessActionGroup">
+        <annotations>
+            <description>Fill approved credit card form on checkout payments page</description>
+        </annotations>
+
+        <waitForElementVisible selector="{{FortisSection.FortisPayIFrame}}" stepKey="waitForPaymentIFrame"/>
+        <switchToIFrame selector="{{FortisSection.FortisPayIFrame}}" stepKey="switchToFortisIFrame"/>
+
+        <!-- Fill credit card number -->
+        <waitForElement selector="{{FortisSection.FortisCreditCardNumberField}}" stepKey="waitForCardNumberInput"/>
+        <fillField userInput="4111111111111111" selector="{{FortisSection.FortisCreditCardNumberField}}" stepKey="appendCardNumber"/>
+
+        <!-- Fill credit card expiration date -->
+        <waitForElement selector="{{FortisSection.FortisCreditCardExpField}}" stepKey="waitForCardExpInput"/>
+        <fillField userInput="1225" selector="{{FortisSection.FortisCreditCardExpField}}" stepKey="appendExpirationDate"/>
+
+        <!-- Fill credit card cvv code -->
+        <waitForElement selector="{{FortisSection.FortisCreditCardCVVField}}" stepKey="waitForCardCVVInput"/>
+        <fillField userInput="999" selector="{{FortisSection.FortisCreditCardCVVField}}" stepKey="appendCVV"/>
+    </actionGroup>
+</actionGroups>

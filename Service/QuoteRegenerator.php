@@ -7,38 +7,37 @@ use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\QuoteFactory;
 use Magento\Sales\Api\OrderRepositoryInterface;
-use Magento\Checkout\Model\Cart;
-use Magento\Customer\Model\Session as CustomerSession;
-use Magento\Sales\Api\OrderManagementInterface;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Psr\Log\LoggerInterface;
+use Magento\Quote\Model\QuoteRepository;
 
 class QuoteRegenerator
 {
-    protected OrderRepositoryInterface $orderRepository;
-    protected QuoteFactory $quoteFactory;
-    protected Cart $cart;
-    protected CustomerSession $customerSession;
-    protected OrderManagementInterface $orderManagement;
-    protected LoggerInterface $logger;
-    protected CheckoutSession $checkoutSession;
+    private OrderRepositoryInterface $orderRepository;
+    private QuoteFactory $quoteFactory;
+    private LoggerInterface $logger;
+    private CheckoutSession $checkoutSession;
+    private QuoteRepository $quoteRepository;
 
+    /**
+     * @param OrderRepositoryInterface $orderRepository
+     * @param QuoteFactory $quoteFactory
+     * @param LoggerInterface $logger
+     * @param CheckoutSession $checkoutSession
+     * @param QuoteRepository $quoteRepository
+     */
     public function __construct(
         OrderRepositoryInterface $orderRepository,
         QuoteFactory $quoteFactory,
-        Cart $cart,
-        CustomerSession $customerSession,
-        OrderManagementInterface $orderManagement,
         LoggerInterface $logger,
-        CheckoutSession $checkoutSession
+        CheckoutSession $checkoutSession,
+        QuoteRepository $quoteRepository,
     ) {
         $this->orderRepository = $orderRepository;
         $this->quoteFactory    = $quoteFactory;
-        $this->cart            = $cart;
-        $this->customerSession = $customerSession;
-        $this->orderManagement = $orderManagement;
         $this->logger          = $logger;
         $this->checkoutSession = $checkoutSession;
+        $this->quoteRepository = $quoteRepository;
     }
 
     /**
@@ -81,10 +80,7 @@ class QuoteRegenerator
         }
 
         $quote->collectTotals();
-        $quote->save();
-
-        $this->cart->setQuote($quote);
-        $this->cart->save();
+        $this->quoteRepository->save($quote);
 
         if ($order->canCancel()) {
             $order->cancel();

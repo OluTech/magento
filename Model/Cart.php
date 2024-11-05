@@ -9,7 +9,7 @@ class Cart extends \Magento\Payment\Model\Cart
     /**
      * @var bool
      */
-    protected $_areAmountsValid = false;
+    private $_areAmountsValid = false;
 
     /**
      * Get shipping, tax, subtotal and discount amounts all together
@@ -71,7 +71,7 @@ class Cart extends \Magento\Payment\Model\Cart
      *
      * @return void
      */
-    protected function _validate()
+    private function _validate()
     {
         $areItemsValid          = false;
         $this->_areAmountsValid = false;
@@ -180,7 +180,7 @@ class Cart extends \Magento\Payment\Model\Cart
      *
      * @return void
      */
-    protected function _applyDiscountTaxCompensationWorkaround(
+    private function _applyDiscountTaxCompensationWorkaround(
         SalesModelInterface $salesEntity
     ) {
         $dataContainer = $salesEntity->getTaxContainer();

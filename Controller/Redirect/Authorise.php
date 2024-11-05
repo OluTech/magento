@@ -3,13 +3,35 @@
 namespace Fortispay\Fortis\Controller\Redirect;
 
 use Exception;
-use Fortispay\Fortis\Controller\AbstractFortis;
+use Fortispay\Fortis\Model\Fortis;
 use Fortispay\Fortis\Model\FortisApi;
+use Fortispay\Fortis\Service\CheckoutProcessor;
+use Fortispay\Fortis\Service\FortisMethodService;
+use Magento\Checkout\Model\Session as CheckoutSession;
+use Magento\Directory\Model\CountryFactory;
+use Magento\Directory\Model\ResourceModel\Country\CollectionFactory as CountryCollectionFactory;
+use Magento\Framework\App\Action\HttpGetActionInterface;
+use Magento\Framework\App\Action\HttpPostActionInterface;
+use Magento\Framework\App\CsrfAwareActionInterface;
+use Magento\Framework\App\Request\InvalidRequestException;
+use Magento\Framework\App\RequestInterface;
+use Magento\Framework\Controller\Result\JsonFactory;
+use Magento\Framework\Controller\ResultFactory;
+use Magento\Framework\Event\ManagerInterface as EventManager;
+use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\Exception\RuntimeException;
+use Magento\Framework\Message\ManagerInterface;
 use Magento\Framework\Phrase;
+use Magento\Framework\View\Result\PageFactory;
+use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Api\Data\TransactionInterface;
-use Magento\Sales\Model\Order\Invoice;
+use Magento\Sales\Api\OrderRepositoryInterface;
+use Magento\Sales\Model\Order;
+use Magento\Sales\Model\Order\Email\Sender\OrderSender;
 use Magento\Sales\Model\Order\Payment\Transaction;
+use Magento\Sales\Model\Order\Payment\Transaction\Builder;
+use Magento\Store\Model\StoreManagerInterface;
+use Psr\Log\LoggerInterface;
 use stdClass;
 
 /**
@@ -18,18 +40,8 @@ use stdClass;
  * This is a basic controller that only loads the corresponding layout file. It may duplicate other such
  * controllers, and thus it is considered tech debt. This code duplication will be resolved in future releases.
  */
-class Authorise extends AbstractFortis
+class Authorise implements HttpPostActionInterface, HttpGetActionInterface, CsrfAwareActionInterface
 {
-    /**
-     * @var string
-     */
-    private $redirectToSuccessPageString;
-
-    /**
-     * @var string
-     */
-    private $redirectToCartPageString;
-
     /**
      * @var array|string[]
      */
@@ -74,7 +86,157 @@ class Authorise extends AbstractFortis
     ];
 
     /**
+     * @var CheckoutSession $checkoutSession
+     */
+    private CheckoutSession $checkoutSession;
+
+    /**
+     * @var LoggerInterface
+     */
+    private LoggerInterface $logger;
+
+    /**
+     * @var  Order $order
+     */
+    private Order $order;
+
+    /**
+     * @var PageFactory
+     */
+    private PageFactory $pageFactory;
+
+    /**
+     * @var  StoreManagerInterface $storeManager
+     */
+    private StoreManagerInterface $storeManager;
+
+    /**
+     * @var Fortis $paymentMethod
+     */
+    private Fortis $paymentMethod;
+
+    /**
+     * @var OrderRepositoryInterface $orderRepository
+     */
+    private OrderRepositoryInterface $orderRepository;
+
+    /**
+     * @var Builder
+     */
+    private Builder $transactionBuilder;
+    /**
+     * @var OrderSender
+     */
+    private OrderSender $orderSender;
+
+    /**
+     * @var RequestInterface
+     */
+    private RequestInterface $request;
+
+    /**
+     * @var ResultFactory
+     */
+    private ResultFactory $resultFactory;
+
+    private ManagerInterface $messageManager;
+
+    private JsonFactory $resultJsonFactory;
+    /**
+     * @var EventManager
+     */
+    private EventManager $eventManager;
+    /**
+     * @var CountryFactory
+     */
+    private CountryFactory $countryFactory;
+    /**
+     * @var CountryCollectionFactory
+     */
+    private CountryCollectionFactory $countryCollectionFactory;
+    /**
+     * @var FortisMethodService
+     */
+    private FortisMethodService $fortisMethodService;
+    /**
+     * @var FortisApi
+     */
+    private FortisApi $fortisApi;
+    private CheckoutProcessor $checkoutProcessor;
+
+    /**
+     * @param PageFactory $pageFactory
+     * @param CheckoutSession $checkoutSession
+     * @param LoggerInterface $logger
+     * @param Fortis $paymentMethod
+     * @param OrderRepositoryInterface $orderRepository
+     * @param StoreManagerInterface $storeManager
+     * @param OrderSender $OrderSender
+     * @param Builder $transactionBuilder
+     * @param Order $order
+     * @param RequestInterface $request
+     * @param ResultFactory $resultFactory
+     * @param ManagerInterface $messageManager
+     * @param JsonFactory $resultJsonFactory
+     * @param EventManager $eventManager
+     * @param CountryFactory $countryFactory
+     * @param CountryCollectionFactory $countryCollectionFactory
+     * @param FortisMethodService $fortisMethodService
+     * @param FortisApi $fortisApi
+     * @param CheckoutProcessor $checkoutProcessor
+     */
+    public function __construct(
+        PageFactory $pageFactory,
+        CheckoutSession $checkoutSession,
+        LoggerInterface $logger,
+        Fortis $paymentMethod,
+        OrderRepositoryInterface $orderRepository,
+        StoreManagerInterface $storeManager,
+        OrderSender $OrderSender,
+        Builder $transactionBuilder,
+        Order $order,
+        RequestInterface $request,
+        ResultFactory $resultFactory,
+        ManagerInterface $messageManager,
+        JsonFactory $resultJsonFactory,
+        EventManager $eventManager,
+        CountryFactory $countryFactory,
+        CountryCollectionFactory $countryCollectionFactory,
+        FortisMethodService $fortisMethodService,
+        FortisApi $fortisApi,
+        CheckoutProcessor $checkoutProcessor
+    ) {
+        $pre = __METHOD__ . " : ";
+
+        $this->logger = $logger;
+
+        $this->logger->debug($pre . 'bof');
+
+        $this->order                    = $order;
+        $this->checkoutSession          = $checkoutSession;
+        $this->pageFactory              = $pageFactory;
+        $this->orderSender              = $OrderSender;
+        $this->paymentMethod            = $paymentMethod;
+        $this->orderRepository          = $orderRepository;
+        $this->storeManager             = $storeManager;
+        $this->transactionBuilder       = $transactionBuilder;
+        $this->request                  = $request;
+        $this->resultFactory            = $resultFactory;
+        $this->messageManager           = $messageManager;
+        $this->resultJsonFactory        = $resultJsonFactory;
+        $this->eventManager             = $eventManager;
+        $this->countryFactory           = $countryFactory;
+        $this->countryCollectionFactory = $countryCollectionFactory;
+        $this->fortisMethodService      = $fortisMethodService;
+        $this->fortisApi                = $fortisApi;
+        $this->checkoutProcessor        = $checkoutProcessor;
+
+        $this->logger->debug($pre . 'eof');
+    }
+
+    /**
      * Execute on fortis/redirect/success
+     * @throws NoSuchEntityException
      */
     public function execute()
     {
@@ -91,15 +253,28 @@ class Authorise extends AbstractFortis
         }
 
         $pre = __METHOD__ . " : ";
-        $this->_logger->debug($pre . 'bof');
-        $this->_order = $this->_checkoutSession->getLastRealOrder();
-        $order        = $this->getOrder();
+        $this->logger->debug($pre . 'bof');
+        $order = $this->checkoutSession->getLastRealOrder();
+        if (!$order->getId()) {
+            $order = $this->setlastOrderDetails();
+        }
+        $this->order = $order;
 
-        if ((int)$order->getRealOrderId() !== $orderId) {
-            $this->redirectIfOrderNotFound();
+        $baseurl                     = $this->storeManager->getStore()->getBaseUrl();
+        $redirect                    = $this->resultFactory->create(
+            ResultFactory::TYPE_REDIRECT
+        );
+        $redirectToSuccessPageString = $baseurl . 'checkout/onepage/success';
+        $redirectToCartPageString    = $baseurl . 'checkout/cart';
+
+        if ((int)$order->getId() !== $orderId) {
+            $redirect->setUrl($redirectToSuccessPageString);
+
+            return $redirect;
         }
 
-        $orderHistories = $order->getAllStatusHistory();
+        $orderHistories               = $order->getAllStatusHistory();
+        $product_transaction_id_order = '';
         foreach ($orderHistories as $history) {
             if ($comment = $history->getComment()) {
                 if (str_starts_with($comment, 'product_transaction_id')) {
@@ -109,51 +284,49 @@ class Authorise extends AbstractFortis
             }
         }
         $this->pageFactory->create();
-        $baseurl                           = $this->_storeManager->getStore()->getBaseUrl();
-        $this->redirectToSuccessPageString = $baseurl . 'checkout/onepage/success';
-        $this->redirectToCartPageString    = $baseurl . 'checkout/cart';
-
-        $this->redirectIfOrderNotFound();
 
         // Get the transaction
         try {
-            $api                = new FortisApi($this->config);
-            $user_id            = $this->getConfigData('user_id');
-            $user_api_key       = $this->getConfigData('user_api_key');
-            $rawTransaction     = $api->getTransaction($data->id, $user_id, $user_api_key);
-            $fortrisTransaction = $rawTransaction->data;
+            $api               = $this->fortisApi;
+            $user_id           = $this->checkoutProcessor->getConfigData('user_id');
+            $user_api_key      = $this->checkoutProcessor->getConfigData('user_api_key');
+            $rawTransaction    = $api->getTransaction($data->id, $user_id, $user_api_key);
+            $fortisTransaction = $rawTransaction->data;
 
-            if (!$tokenised && ($fortrisTransaction->product_transaction_id !== $product_transaction_id_order)) {
+            if (!$tokenised && ($fortisTransaction->product_transaction_id !== $product_transaction_id_order)) {
                 throw new RuntimeException(new Phrase('Product transaction ids do not match'));
             }
-            $status = $fortrisTransaction->reason_code_id;
+            $status = $fortisTransaction->reason_code_id;
             switch ($status) {
                 case 1000:  // Success
                     // Check for stored card and save if necessary
-                    $model = $this->_paymentMethod;
-                    $model->saveVaultData($order, $data);
+                    $model = $this->paymentMethod;
+                    $this->fortisMethodService->saveVaultData($order, $data);
 
-                    $status = \Magento\Sales\Model\Order::STATE_PROCESSING;
-                    if ($this->getConfigData('Successful_Order_status') != "") {
-                        $status = $this->getConfigData('Successful_Order_status');
+                    $status = Order::STATE_PROCESSING;
+                    if ($this->checkoutProcessor->getConfigData('Successful_Order_status') != "") {
+                        $status = $this->checkoutProcessor->getConfigData('Successful_Order_status');
                     }
 
                     $order_successful_email = $model->getConfigData('order_email');
 
                     if ($order_successful_email != '0') {
-                        $this->OrderSender->send($order);
-                        $order->addStatusHistoryComment(
+                        $this->orderSender->send($order);
+                        $order->addCommentToStatusHistory(
                             __('Notified customer about order #%1.', $order->getId())
-                        )->setIsCustomerNotified(true)->save();
+                        )->setIsCustomerNotified(true);
+
+                        $this->orderRepository->save($order);
                     }
 
                     // Save Transaction Response
                     $this->createTransaction($rawTransaction);
 
-                    $order->setPaymentAuthorizationAmount($fortrisTransaction->auth_amount / 100.0);
+                    $order->setPaymentAuthorizationAmount($fortisTransaction->auth_amount / 100.0);
                     $order->setPayment();
 
-                    $order->setState($status)->setStatus($status)->save();
+                    $order->setState($status)->setStatus($status);
+                    $this->orderRepository->save($order);
 
                     // Create third level data - dispatch event for observer
                     try {
@@ -161,32 +334,31 @@ class Authorise extends AbstractFortis
                             'fortispay_fortis_create_third_level_data_after_success',
                             [
                                 'order'                    => $order,
-                                'storeManager'             => $this->_storeManager,
-                                'type'                     => $fortrisTransaction->account_type,
+                                'storeManager'             => $this->storeManager,
+                                'type'                     => $fortisTransaction->account_type,
                                 'countryFactory'           => $this->countryFactory,
                                 'countryCollectionFactory' => $this->countryCollectionFactory,
-                                'transactionId'            => $fortrisTransaction->id,
+                                'transactionId'            => $fortisTransaction->id,
                             ]
                         );
                     } catch (\Exception $exception) {
-                        $this->_logger->error('Could not create 3rd level data: ' . $exception->getMessage());
+                        $this->logger->error('Could not create 3rd level data: ' . $exception->getMessage());
                     }
 
                     if (!$tokenised) {
                         $resultJson = $this->resultJsonFactory->create();
 
                         return $resultJson->setData([
-                                                        'redirectTo' => $this->redirectToSuccessPageString,
+                                                        'redirectTo' => $redirectToSuccessPageString,
                                                     ]);
                     } else {
                         $redirect = $this->resultFactory->create(
-                            \Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT
+                            ResultFactory::TYPE_REDIRECT
                         );
-                        $redirect->setUrl($this->redirectToSuccessPageString);
+                        $redirect->setUrl($redirectToSuccessPageString);
 
                         return $redirect;
                     }
-                    break;
                 default:
                     if (isset($this->responseCodes[$status])) {
                         $message = "Not Authorised: " . $this->responseCodes[$status];
@@ -194,42 +366,37 @@ class Authorise extends AbstractFortis
                         $message = 'Not Authorised: Reason Unknown';
                     }
                     $this->messageManager->addNoticeMessage($message);
-                    $this->_order->addStatusToHistory(__("Failed: $message "));
-                    $this->_order->cancel()->save();
-                    $this->_checkoutSession->restoreQuote();
+                    $this->order->addStatusToHistory(__("Failed: $message "));
+                    $this->order->cancel();
+                    $this->orderRepository->save($order);
+                    $this->checkoutSession->restoreQuote();
                     $this->createTransaction($data);
                     if (!$tokenised) {
                         $resultJson = $this->resultJsonFactory->create();
 
                         return $resultJson->setData([
-                                                        'redirectTo' => $this->redirectToCartPageString,
+                                                        'redirectTo' => $redirectToCartPageString,
                                                     ]);
                     } else {
-                        $redirect = $this->resultFactory->create(
-                            \Magento\Framework\Controller\ResultFactory::TYPE_REDIRECT
-                        );
-                        $redirect->setUrl($this->redirectToCartPageString);
-
-                        return $redirect;
+                        $redirect->setUrl($redirectToCartPageString);
                     }
-                    break;
             }
         } catch (Exception $e) {
             // Save Transaction Response
             $this->createTransaction($data);
-            $this->_logger->error($pre . $e->getMessage());
+            $this->logger->error($pre . $e->getMessage());
             $this->messageManager->addExceptionMessage($e, __('We can\'t start Fortis Checkout.'));
 
-            return $this->redirectToSuccessPageString;
+            $redirect->setUrl($redirectToCartPageString);
         }
 
-        return '';
+        return $redirect;
     }
 
     /**
      * Create Transaction
      *
-     * @param array $rawData
+     * @param stdClass $rawData
      *
      * @return int|void
      */
@@ -238,7 +405,7 @@ class Authorise extends AbstractFortis
         try {
             $paymentData = $rawData->data;
             // Get payment object from order object
-            $payment = $this->_order->getPayment();
+            $payment = $this->order->getPayment();
             $payment->setAmountAuthorized($paymentData->transaction_amount / 100.0);
             $payment->setAmountPaid(0.00);
             $payment->setLastTransId($paymentData->id)
@@ -247,15 +414,15 @@ class Authorise extends AbstractFortis
                     ->setAdditionalInformation(
                         [Transaction::RAW_DETAILS => json_encode($paymentData)]
                     );
-            $formattedPrice = $this->_order->getBaseCurrency()->formatTxt(
-                $this->_order->getGrandTotal()
+            $formattedPrice = $this->order->getBaseCurrency()->formatTxt(
+                $this->order->getGrandTotal()
             );
 
             $message = __('The authorized amount is %1.', $formattedPrice);
             // Get the object of builder class
-            $trans       = $this->_transactionBuilder;
+            $trans       = $this->transactionBuilder;
             $transaction = $trans->setPayment($payment)
-                                 ->setOrder($this->_order)
+                                 ->setOrder($this->order)
                                  ->setTransactionId($paymentData->id)
                                  ->setAdditionalInformation(
                                      [Transaction::RAW_DETAILS => json_encode($paymentData)]
@@ -269,69 +436,45 @@ class Authorise extends AbstractFortis
                 $message
             );
             $payment->setParentTransactionId(null);
-            $payment->save();
-            $this->_order->save();
+            $this->orderRepository->save($this->order);
 
-            return $transaction->save()->getTransactionId();
+            return $transaction->getTransactionId();
         } catch (Exception $e) {
-            $this->_logger->error($e->getMessage());
+            $this->logger->error($e->getMessage());
         }
-    }
-
-    /**
-     * Get Order By Increment Id
-     *
-     * @param int $incrementId
-     *
-     * @return \Magento\Sales\Model\Order
-     */
-    public function getOrderByIncrementId(int $incrementId)
-    {
-        return $this->order->loadByIncrementId($incrementId);
     }
 
     /**
      * Set Last Order Details
      *
-     * @return void
+     * @return OrderInterface
      */
     public function setlastOrderDetails()
     {
-        $orderId      = $this->getRequest()->getParam('gid');
-        $this->_order = $this->getOrderByIncrementId($orderId);
-        $order        = $this->_order;
-        $this->_checkoutSession->setData('last_order_id', $order->getId());
-        $this->_checkoutSession->setData('last_success_quote_id', $order->getQuoteId());
-        $this->_checkoutSession->setData('last_quote_id', $order->getQuoteId());
-        $this->_checkoutSession->setData('last_real_order_id', $orderId);
+        $orderId = $this->request->getParam('gid');
+        $order   = $this->orderRepository->get($orderId);
+        $this->checkoutSession->setData('last_order_id', $order->getId());
+        $this->checkoutSession->setData('last_success_quote_id', $order->getQuoteId());
+        $this->checkoutSession->setData('last_quote_id', $order->getQuoteId());
+        $this->checkoutSession->setData('last_real_order_id', $orderId);
+
+        return $order;
     }
 
     /**
-     * Get Order
-     *
-     * @return \Magento\Sales\Model\Order
+     * @inheritDoc
      */
-    private function getOrder()
-    {
-        if (!$this->_order->getId()) {
-            $this->setlastOrderDetails();
-
-            return $this->_order;
-        } else {
-            return $this->_order;
-        }
+    public function createCsrfValidationException(
+        RequestInterface $request
+    ): ?InvalidRequestException {
+        return null;
     }
 
     /**
-     * Redirect If Order Not Found
-     *
-     * @return void
+     * @inheritDoc
      */
-    private function redirectIfOrderNotFound()
+    public function validateForCsrf(RequestInterface $request): ?bool
     {
-        if (!$this->_order->getId()) {
-            // Redirect to Cart if Order not found
-            return $this->redirectToSuccessPageString;
-        }
+        return true;
     }
 }

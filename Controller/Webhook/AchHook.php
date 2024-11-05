@@ -4,6 +4,8 @@ namespace Fortispay\Fortis\Controller\Webhook;
 
 use Exception;
 use Fortispay\Fortis\Model\Config;
+use Magento\Framework\App\Action\HttpGetActionInterface;
+use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\App\CsrfAwareActionInterface;
 use Magento\Framework\App\Request\InvalidRequestException;
 use Magento\Framework\App\RequestInterface;
@@ -21,8 +23,9 @@ use Magento\Sales\Model\Service\InvoiceService;
 use \Magento\Framework\DB\Transaction;
 use \Magento\Sales\Model\Order\CreditmemoFactory;
 use \Magento\Sales\Model\Service\CreditmemoService;
+use Magento\Sales\Api\OrderRepositoryInterface;
 
-class AchHook implements CsrfAwareActionInterface
+class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAwareActionInterface
 {
     /**
      * @var \Magento\Sales\Api\TransactionRepositoryInterface
@@ -82,7 +85,23 @@ class AchHook implements CsrfAwareActionInterface
      * @var \Magento\Sales\Model\Service\CreditmemoService
      */
     private CreditmemoService $creditMemoService;
+    private OrderRepositoryInterface $orderRepository;
 
+    /**
+     * @param RequestInterface $request
+     * @param ResourceConnection $resourceConnection
+     * @param TransactionRepositoryInterface $transactionRepository
+     * @param LoggerInterface $logger
+     * @param RawFactory $resultFactory
+     * @param Config $config
+     * @param OrderSender $orderSender
+     * @param InvoiceService $invoiceService
+     * @param InvoiceSender $invoiceSender
+     * @param Transaction $dbTransaction
+     * @param CreditmemoService $creditMemoService
+     * @param CreditmemoFactory $creditMemoFactory
+     * @param OrderRepositoryInterface $orderRepository
+     */
     public function __construct(
         RequestInterface $request,
         ResourceConnection $resourceConnection,
@@ -95,7 +114,8 @@ class AchHook implements CsrfAwareActionInterface
         InvoiceSender $invoiceSender,
         Transaction $dbTransaction,
         CreditmemoService $creditMemoService,
-        CreditmemoFactory $creditMemoFactory
+        CreditmemoFactory $creditMemoFactory,
+        OrderRepositoryInterface $orderRepository
     ) {
         $this->request               = $request;
         $this->resourceConnection    = $resourceConnection;
@@ -109,6 +129,7 @@ class AchHook implements CsrfAwareActionInterface
         $this->invoiceSender         = $invoiceSender;
         $this->creditMemoFactory     = $creditMemoFactory;
         $this->creditMemoService     = $creditMemoService;
+        $this->orderRepository       = $orderRepository;
     }
 
     /**
@@ -160,11 +181,15 @@ class AchHook implements CsrfAwareActionInterface
             // Query sales_payment_transaction to find transaction
             $connection = $this->resourceConnection->getConnection();
             $tableName  = $this->resourceConnection->getTableName('sales_payment_transaction');
-            $query      = "select * from $tableName where txn_id='$transactionId'";
-            $result     = $connection->fetchRow($query);
+
+            $query = "SELECT * FROM $tableName WHERE txn_id = :transaction_id";
+            $binds = ['transaction_id' => $transactionId];
+
+            $result = $connection->fetchRow($query, $binds);
 
             $transaction           = $this->transactionRepository->get($result['transaction_id']);
-            $order                 = $transaction->getOrder();
+            $orderId               = $transaction->getOrderId();
+            $order                 = $this->orderRepository->get($orderId);
             $additionalInformation = $transaction->getAdditionalInformation();
             if (empty($additionalInformation['webhook_update_info'])) {
                 $webhookUpdateInformation = [];
@@ -178,33 +203,28 @@ class AchHook implements CsrfAwareActionInterface
                     // Still payment pending, update transaction only
                     $webhookUpdateInformation[] = json_encode($data);
                     $transaction->setAdditionalInformation('webhook_update_info', $webhookUpdateInformation);
-                    $transaction->save();
                     break;
                 case 201:
                 case 301:
                     // Payment failed
                     $webhookUpdateInformation[] = json_encode($data);
                     $transaction->setAdditionalInformation('webhook_update_info', $webhookUpdateInformation);
-                    $transaction->save();
                     $error = "Payment failed. Status code: $transactionStatus ";
                     $error .= self::$achResponseStatuses[$transactionStatus];
                     $order->addStatusToHistory($error);
                     $orderState = Order::STATE_CANCELED;
                     $order->setState($orderState)->setStatus($orderState);
-                    $order->save();
                     break;
                 case 331:
                     // Charge back i.e refunded
                     $webhookUpdateInformation[] = json_encode($data);
                     $transaction->setAdditionalInformation('webhook_update_info', $webhookUpdateInformation);
                     $transaction->setTxnType(TransactionInterface::TYPE_REFUND);
-                    $transaction->save();
                     $error = "Payment refunded. Status code: $transactionStatus ";
                     $error .= self::$achResponseStatuses[$transactionStatus];
                     $order->addStatusToHistory($error);
                     $orderState = Order::STATE_CANCELED;
                     $order->setState($orderState)->setStatus($orderState);
-                    $order->save();
 
                     // Get invoices for order
                     $invoices = $order->getInvoiceCollection();
@@ -219,7 +239,6 @@ class AchHook implements CsrfAwareActionInterface
                     $webhookUpdateInformation[] = json_encode($data);
                     $transaction->setAdditionalInformation('webhook_update_info', $webhookUpdateInformation);
                     $transaction->setTxnType(TransactionInterface::TYPE_CAPTURE);
-                    $transaction->save();
 
                     // Send email if configured
                     if ($this->config->orderSuccessfulEmail()) {
@@ -252,12 +271,13 @@ class AchHook implements CsrfAwareActionInterface
                     $order->addStatusToHistory($message);
                     $orderState = Order::STATE_PROCESSING;
                     $order->setState($orderState)->setStatus($orderState);
-                    $order->save();
                     break;
                 default:
                     $this->logger->error("Response code received was $transactionStatus");
                     break;
             }
+            $this->orderRepository->save($order);
+
             $response->setHttpResponseCode(200);
             $response->setContents('OK');
 
@@ -274,10 +294,9 @@ class AchHook implements CsrfAwareActionInterface
     /**
      * @inheritDoc
      */
-    public function createCsrfValidationException(RequestInterface $request): ?InvalidRequestException
-    {
-        $this->_logger->debug("Invalid request exception when attempting to validate CSRF");
-
+    public function createCsrfValidationException(
+        RequestInterface $request
+    ): ?InvalidRequestException {
         return null;
     }
 

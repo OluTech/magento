@@ -2,13 +2,13 @@
 
 namespace Fortispay\Fortis\Model;
 
-use Magento\Framework\Option\ArrayInterface;
+use Magento\Framework\Data\OptionSourceInterface;
 
 /**
  * @api
  * @since 100.0.2
  */
-class FortisEnvironment implements ArrayInterface
+class FortisEnvironment implements OptionSourceInterface
 {
     /**
      * Options getter
@@ -20,19 +20,6 @@ class FortisEnvironment implements ArrayInterface
         return [
             ['value' => 'sandbox', 'label' => __('Sandbox')],
             ['value' => 'production', 'label' => __('Production')],
-        ];
-    }
-
-    /**
-     * Get options in "key-value" format
-     *
-     * @return array
-     */
-    public function toArray()
-    {
-        return [
-            'sandbox'    => __('Sandbox'),
-            'production' => __('Production'),
         ];
     }
 }

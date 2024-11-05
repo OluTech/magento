@@ -1,0 +1,73 @@
+<tests xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:noNamespaceSchemaLocation="urn:magento:mftf:Test/etc/testSchema.xsd">
+    <test name="FortisAuthPaymentTest">
+        <annotations>
+            <features value="FortisPaymentModule"/>
+            <stories value="Fortis Payment Checkout"/>
+            <title value="Test Fortis Auth"/>
+            <severity value="CRITICAL"/>
+            <testCaseId value="fortis-auth-payment-test"/>
+            <group value="fortis-payment"/>
+        </annotations>
+
+        <before>
+            <magentoCLI command="config:set {{EnableFreeShippingConfigData.path}} {{EnableFreeShippingConfigData.value}}" stepKey="enableFreeShipping"/>
+            <magentoCLI command="config:set payment/fortis/fortis_single_view single" stepKey="setFortisClassicView"/>
+            <!-- Set order intention to auth-->
+            <magentoCLI command="config:set payment/fortis/order_intention auth-only" stepKey="setFortisPaymentType"/>
+            <magentoCLI command="config:set payment/fortis/fortis_checkout_iframe_enabled iframe" stepKey="setFortisIFrameEnabled"/>
+
+            <!-- Login -->
+            <actionGroup ref="AdminLoginActionGroup" stepKey="login"/>
+            <createData entity="_defaultCategory" stepKey="createCategory"/>
+            <createData entity="VirtualProduct" stepKey="createVirtualProduct">
+                <requiredEntity createDataKey="createCategory"/>
+            </createData>
+
+            <!-- Create Customer -->
+            <createData entity="Simple_US_Customer" stepKey="createCustomer"/>
+        </before>
+
+        <after>
+            <!-- Delete category and product -->
+            <deleteData stepKey="deleteCategory" createDataKey="createCategory"/>
+            <!-- <deleteData stepKey="deleteProduct" createDataKey="createProduct"/>-->
+            <deleteData createDataKey="createVirtualProduct" stepKey="deleteVirtualProduct"/>
+            <!-- Logout -->
+            <actionGroup ref="AdminLogoutActionGroup" stepKey="logout"/>
+        </after>
+
+        <!-- Login to storefront as previously created customer -->
+        <actionGroup ref="LoginToStorefrontActionGroup" stepKey="loginAsCustomer">
+            <argument name="Customer" value="$$createCustomer$$"/>
+        </actionGroup>
+        <amOnPage url="{{StorefrontProductPage.url($createVirtualProduct.custom_attributes[url_key]$)}}" stepKey="amOnStorefrontVirtualProductPage"/>
+        <waitForPageLoad stepKey="waitForPageLoad2"/>
+        <actionGroup ref="AddToCartFromStorefrontProductPageActionGroup" stepKey="cartAddVirtualProductToCart">
+            <argument name="productName" value="$createVirtualProduct.name$"/>
+        </actionGroup>
+        <actionGroup ref="GoToCheckoutFromMinicartActionGroup" stepKey="goToCheckoutFromMinicart"/>
+
+        <actionGroup ref="SelectMethodActionGroup" stepKey="selectPaymentMethod">
+            <argument name="selector" value="{{FortisSection.FortisPaymentMethodRadio}}"/>
+        </actionGroup>
+
+        <!--SubmitOrder-->
+        <waitForPageLoad stepKey="waitForLoadingMaskAfterPaymentMethodSelection"/>
+
+        <!--Click Place Order button-->
+        <click selector="{{CheckoutPaymentSection.placeOrder}}" stepKey="clickPlaceOrder"/>
+        <waitForAjaxLoad stepKey="waitforiframe"/>
+
+        <actionGroup ref="FillCreditCardSuccessActionGroup" stepKey="fillSuccessCard"/>
+
+        <!--Click Pay Now button-->
+        <click selector="{{FortisSection.FortisPayNowButton}}" stepKey="clickPayNow"/>
+        <waitForAjaxLoad stepKey="waitforiframe2"/>
+
+        <waitForPageLoad stepKey="waitForPaymentSuccessPageLoad"/>
+
+        <!-- Check for order success Page -->
+        <actionGroup ref="AssertStorefrontCheckoutSuccessActionGroup" stepKey="assertCheckoutSuccess"/>
+    </test>
+</tests>

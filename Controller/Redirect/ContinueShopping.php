@@ -10,10 +10,15 @@ use Magento\Framework\Exception\LocalizedException;
 
 class ContinueShopping implements HttpGetActionInterface
 {
-    protected QuoteRegenerator $quoteRegenerator;
-    protected ResultFactory $resultFactory;
-    protected RequestInterface $request;
+    private QuoteRegenerator $quoteRegenerator;
+    private ResultFactory $resultFactory;
+    private RequestInterface $request;
 
+    /**
+     * @param QuoteRegenerator $quoteRegenerator
+     * @param ResultFactory $resultFactory
+     * @param RequestInterface $request
+     */
     public function __construct(
         QuoteRegenerator $quoteRegenerator,
         ResultFactory $resultFactory,

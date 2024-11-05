@@ -12,13 +12,14 @@ class Request extends Template
 {
     private IFrameData $iFrame;
     private ?array $jsConfig;
-    private $cspNonceProvider;
+    private CspNonceProvider $cspNonceProvider;
 
     /**
      * Construct
      *
      * @param Context $context
      * @param IFrameData $iFrame
+     * @param CspNonceProvider $cspNonceProvider
      * @param array $data
      */
     public function __construct(
@@ -28,6 +29,7 @@ class Request extends Template
         array $data = []
     ) {
         parent::__construct($context, $data);
+        $this->jsConfig         = null;
         $this->iFrame           = $iFrame;
         $this->cspNonceProvider = $cspNonceProvider;
     }
@@ -62,6 +64,7 @@ class Request extends Template
      * Get CSP Nonce
      *
      * @return String
+     * @throws LocalizedException
      */
     public function getNonce(): string
     {

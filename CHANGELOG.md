@@ -1,5 +1,15 @@
 # Changelog
 
+## [[1.3.0]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
+
+### Changed
+- Refactored deprecated `AbstractMethod` and `ArrayInterface` classes.
+- Updated 'object'->save() methods to remove deprecated usage.
+- Replaced inheritance with composition for improved code design.
+- Upgraded `curl_init` to Magento's HTTP classes for better integration.
+- Enhanced general code quality standards and adhered to modern best practices.
+- Added a full MFTF test suite for improved testing coverage.
+
 ## [[1.2.1]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
 
 ### Fixed
