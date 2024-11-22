@@ -197,7 +197,7 @@ class Fortis implements MethodInterface
     public function initialize($paymentAction, $stateObject)
     {
         $stateObject->setState(Order::STATE_PENDING_PAYMENT);
-        $stateObject->setStatus('pending_payment');
+        $stateObject->setStatus(Order::STATE_PENDING_PAYMENT);
         $stateObject->setIsNotified(false);
 
         return $this;
@@ -292,6 +292,14 @@ class Fortis implements MethodInterface
 
     public function canCapture()
     {
+        $payment = $this->getInfoInstance();
+
+        $order = $payment->getOrder();
+
+        if ($order->getStatus() === Order::STATE_PENDING_PAYMENT) {
+            return false;
+        }
+
         return true;
     }
 
@@ -307,7 +315,7 @@ class Fortis implements MethodInterface
 
     public function canVoid()
     {
-        return false;
+        return true;
     }
 
     public function canUseInternal()
@@ -452,10 +460,10 @@ class Fortis implements MethodInterface
             throw new LocalizedException(__('The capture action is not available.'));
         }
 
-        $d = json_decode($payment->getAdditionalInformation()['raw_details_info'] ?? "");
+        $paymentDetails = json_decode($payment->getAdditionalInformation()['raw_details_info'] ?? "");
 
         // Check for non-auth-only
-        if (!$d || $d->payment_method === 'ach' || !isset($d->auth_amount)) {
+        if (!$paymentDetails || $paymentDetails->payment_method === 'ach' || !isset($paymentDetails->auth_amount)) {
             return $this;
         }
 
@@ -463,8 +471,8 @@ class Fortis implements MethodInterface
 
         $orderID = $order->getId();
 
-        $authAmount    = $d->auth_amount;
-        $transactionId = $d->id;
+        $authAmount    = $paymentDetails->auth_amount;
+        $transactionId = $paymentDetails->id;
 
         $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_id'));
         $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_api_key'));
@@ -485,9 +493,12 @@ class Fortis implements MethodInterface
      * @param InfoInterface $payment
      *
      * @return $this|Fortis
+     * @throws LocalizedException
      */
-    public function cancel(InfoInterface $payment)
+    public function cancel(InfoInterface $payment): Fortis|static
     {
+        $this->fortisMethodService->voidOnline($payment);
+
         return $this;
     }
 
@@ -497,11 +508,13 @@ class Fortis implements MethodInterface
      * @return $this|Fortis
      * @throws LocalizedException
      */
-    public function void(InfoInterface $payment)
+    public function void(InfoInterface $payment): Fortis|static
     {
         if (!$this->canVoid()) {
             throw new LocalizedException(__('The void action is not available.'));
         }
+
+        $this->fortisMethodService->voidOnline($payment);
 
         return $this;
     }

@@ -7,8 +7,10 @@ use Fortispay\Fortis\Model\FortisApi;
 use Magento\Framework\Exception\FileSystemException;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Payment\Model\InfoInterface;
+use Magento\Sales\Api\Data\TransactionInterface;
 use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
+use Magento\Sales\Model\Order\Payment\Transaction;
 use Magento\Vault\Api\Data\PaymentTokenFactoryInterface;
 use Magento\Framework\Filesystem\DirectoryList;
 use Magento\Framework\Filesystem\Io\File;
@@ -28,6 +30,7 @@ use DateTime;
 use DateTimeZone;
 use DateInterval;
 use Magento\Framework\Filesystem\Driver\File as FileDriver;
+use Magento\Sales\Model\Order\Payment\Transaction\Builder;
 
 class FortisMethodService
 {
@@ -98,6 +101,7 @@ class FortisMethodService
     private OrderRepositoryInterface $orderRepository;
     private FileDriver $driver;
     private FortisApi $fortisApi;
+    private Builder $transactionBuilder;
 
     /**
      * @param Config $config
@@ -131,7 +135,8 @@ class FortisMethodService
         PaymentTokenResourceModel $paymentTokenResourceModel,
         OrderRepositoryInterface $orderRepository,
         FileDriver $driver,
-        FortisApi $fortisApi
+        FortisApi $fortisApi,
+        Builder $transactionBuilder,
     ) {
         $this->config                    = $config;
         $this->logger                    = $logger;
@@ -148,6 +153,7 @@ class FortisMethodService
         $this->orderRepository           = $orderRepository;
         $this->driver                    = $driver;
         $this->fortisApi                 = $fortisApi;
+        $this->transactionBuilder        = $transactionBuilder;
 
         $this->checkApplePayFile();
     }
@@ -408,6 +414,61 @@ class FortisMethodService
             $this->orderRepository->save($order);
 
             return false;
+        }
+    }
+
+    /**
+     * @param InfoInterface $payment
+     *
+     * @return void
+     * @throws LocalizedException
+     */
+    public function voidOnline(InfoInterface $payment): void
+    {
+        $transactionId = $payment->getLastTransId();
+        $order         = $payment->getOrder();
+
+        $rawDetailsInfo = json_decode($payment->getAdditionalInformation()['raw_details_info']);
+        $authAmount     = $rawDetailsInfo->auth_amount;
+
+        $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_id'));
+        $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_api_key'));
+
+        // Do auth transaction
+        $intentData = [
+            'transaction_amount' => $authAmount,
+            'token_id'           => $rawDetailsInfo->token_id,
+            'transactionId'      => $transactionId,
+        ];
+
+        $response = $this->fortisApi->voidAuthAmount($intentData, $user_id, $user_api_key);
+
+        if ($response) {
+            // Create a void transaction
+            $data       = json_decode($response)->data;
+            $newPayment = $order->getPayment();
+            $newPayment->setAmountAuthorized($authAmount / 100.0);
+            $payment->setLastTransId($data->id)
+                    ->setTransactionId($data->id)
+                    ->setAdditionalInformation(
+                        [Transaction::RAW_DETAILS => json_encode($response)]
+                    );
+            $transaction = $this->transactionBuilder->setPayment($payment)
+                                                    ->setOrder($order)
+                                                    ->setTransactionId($data->id)
+                                                    ->setAdditionalInformation(
+                                                        [Transaction::RAW_DETAILS => json_encode($response)]
+                                                    )
+                                                    ->setFailSafe(true)
+                                                    ->build(TransactionInterface::TYPE_VOID);
+
+            $message = __('The authorised amount has been voided');
+            $payment->addTransactionCommentsToOrder($transaction, $message);
+            $payment->setParentTransactionId($transactionId);
+            $order->setShouldCloseParentTransaction(true);
+            $order->setStatus(Order::STATE_CLOSED);
+            $order->setState(Order::STATE_CLOSED);
+            $this->orderRepository->save($order);
         }
     }
 

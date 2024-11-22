@@ -77,18 +77,7 @@ class CheckoutProcessor
     {
         $pre = __METHOD__ . " : ";
         $this->logger->debug($pre . 'bof');
-        $this->order = $this->checkoutSession->getLastRealOrder();
-
-        if (!$this->order->getId()) {
-            throw new LocalizedException(__('We could not find "Order" for processing'));
-        }
-
-        if ($this->order->getState() != Order::STATE_PENDING_PAYMENT) {
-            $this->order->setState(
-                Order::STATE_PENDING_PAYMENT
-            );
-            $this->orderRepository->save($this->order);
-        }
+        $this->initOrderState();
 
         if ($this->order->getQuoteId()) {
             $this->checkoutSession->setFortisQuoteId($this->checkoutSession->getQuoteId());
@@ -101,6 +90,24 @@ class CheckoutProcessor
         }
 
         $this->logger->debug($pre . 'eof');
+    }
+
+    /**
+     * @return void
+     * @throws LocalizedException
+     */
+    public function initOrderState(): void
+    {
+        $this->order = $this->checkoutSession->getLastRealOrder();
+
+        if (!$this->order->getId()) {
+            throw new LocalizedException(__('We could not find "Order" for processing'));
+        }
+
+        if ($this->order->getState() != Order::STATE_PENDING_PAYMENT) {
+            $this->order->setState(Order::STATE_PENDING_PAYMENT)->setStatus(Order::STATE_PENDING_PAYMENT);
+            $this->orderRepository->save($this->order);
+        }
     }
 
     public function getRedirectToCartObject(): ResultInterface

@@ -1,13 +1,13 @@
 require(['fortis-commerce', 'mage/url',], function(Commerce, _urlBuilder) {
 
-    if (!document.getElementById('fortis_payment327')) {
+    const fortisDataElement = document.getElementById('fortis-data');
+    const config = JSON.parse(fortisDataElement.getAttribute('data-config'));
+
+    if (!document.getElementById('fortis_payment327') && config.success === true) {
         generateIFrame();
     }
 
     function generateIFrame() {
-        const fortisDataElement = document.getElementById('fortis-data');
-        const config = JSON.parse(fortisDataElement.getAttribute('data-config'));
-
         const fortisDiv = document.createElement('div');
         fortisDiv.id = 'fortis_payment327';
         fortisDiv.style.marginBottom = config.appearance_options.marginSpacing;

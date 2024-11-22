@@ -354,7 +354,7 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                     $message = "ACH Transaction: " . self::$achResponseStatuses[$status];
                     $this->messageManager->addNoticeMessage($message);
                     $this->order->addStatusToHistory(__($message));
-                    $status = Order::STATE_PENDING_PAYMENT;
+                    $status = Order::STATE_HOLDED;
                     // Save Transaction Response
                     $this->createTransaction($data);
                     $order->setState($status)->setStatus($status);

@@ -1,8 +1,20 @@
 # Changelog
 
+## [[1.3.1]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
+
+### Fixed
+
+- Resolved a console error caused by invalid credentials.
+- Added clear indicators for invalid configurations to guide users effectively.
+- Refactored the transaction void endpoint to use a single, consistent function for improved reliability.
+- Remove the ability for Pending Payment orders to Capture Online.
+- Set initial new order status to "Pending Payment".
+- Set initial ACH order status to "On Hold".
+
 ## [[1.3.0]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
 
 ### Changed
+
 - Refactored deprecated `AbstractMethod` and `ArrayInterface` classes.
 - Updated 'object'->save() methods to remove deprecated usage.
 - Replaced inheritance with composition for improved code design.

@@ -122,7 +122,7 @@ class Config
     /**
      * @return string
      */
-    public function environment(): string
+    public function environment(): ?string
     {
         return $this->getConfig('fortis_environment');
     }
@@ -130,7 +130,7 @@ class Config
     /**
      * Return merchant country code, use default country if it not specified in General settings
      *
-     * @return string
+     * @return string|null
      */
     public function getMerchantCountry()
     {
@@ -460,7 +460,7 @@ class Config
     /**
      * @return string
      */
-    public function orderAction(): string
+    public function orderAction(): ?string
     {
         return $this->getConfig('order_intention');
     }
