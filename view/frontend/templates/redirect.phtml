@@ -1,4 +1,11 @@
 <div id="fortis-data" data-config='<?= json_encode($block->getJSConfig()) ?>'></div>
+<?php
+if ($block->getData('error_html')): ?>
+    <div class="error-container">
+        <?= $block->getData('error_html'); ?>
+    </div>
+    <?php
+endif; ?>
 <?= $secureRenderer->renderTag(
     'script',
     [

@@ -134,6 +134,8 @@ class FortisApi
                 }
             } elseif (isset($response->meta)) {
                 $errorStr = $response->meta->message;
+            } elseif (isset($response->detail)) {
+                $errorStr = $response->detail;
             }
 
             throw new LocalizedException(new Phrase($errorStr));
@@ -224,6 +226,7 @@ class FortisApi
      * @param string $user_api_key
      *
      * @return bool|string|null
+     * @throws LocalizedException
      */
     public function voidAuthAmount(array $intentData, string $user_id, string $user_api_key): bool|string|null
     {

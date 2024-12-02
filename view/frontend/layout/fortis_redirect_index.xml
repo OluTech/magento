@@ -2,6 +2,7 @@
       xsi:noNamespaceSchemaLocation="../../../../../../../lib/internal/Magento/Framework/View/Layout/etc/page_layout.xsd">
     <head>
         <title>Make Payment</title>
+        <css src="Fortispay_Fortis::css/iframe.css"/>
     </head>
     <body>
         <referenceContainer name="content">

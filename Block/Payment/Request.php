@@ -41,7 +41,9 @@ class Request extends Template
     {
         $this->jsConfig = $this->iFrame->buildIFrameData();
 
-        if (!$this->jsConfig) {
+        if ($this->jsConfig['success'] === false) {
+            $this->setData('error_html', '<div class="error-message error">' . $this->jsConfig['message'] . '</div>');
+
             return parent::_prepareLayout();
         }
 

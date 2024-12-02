@@ -10,7 +10,7 @@
                 <value id="fortis" type="host">https://js.fortis.tech</value>
                 <value id="fortis-elements-sandbox" type="host">https://elements.sandbox.fortis.tech</value>
                 <value id="fortis-elements" type="host">https://elements.fortis.tech</value>
-                <value id="fortis-iframe-script-hash" type="hash" algorithm="sha256">EVVVygeyUY/GHiZ3zujs5UjZoSTTaAfdVIaeOG0lGWY=</value>
+                <value id="fortis-iframe-script-hash" type="hash" algorithm="sha256">FKKbiJieM2skpjE6ROgk2UyVK46+c5ndvfoZBMf4JWc=</value>
             </values>
         </policy>
         <policy id="connect-src">

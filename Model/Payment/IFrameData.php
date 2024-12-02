@@ -4,6 +4,7 @@ namespace Fortispay\Fortis\Model\Payment;
 
 use Exception;
 use Magento\Checkout\Model\Session;
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Message\ManagerInterface;
 use Magento\Sales\Model\Order\Address;
 use Ramsey\Uuid\Uuid;
@@ -60,11 +61,10 @@ class IFrameData
         try {
             $config = $this->fortisMethodService->getFortisOrderToken($enableVaultForOrder);
         } catch (Exception $e) {
-            $this->messageManager->addExceptionMessage($e, $e->getMessage());
             $this->checkoutSession->restoreQuote();
             $this->logger->error('Something went wrong while fetching the Fortis order token: ' . $e->getMessage());
 
-            return null;
+            return ['success' => false, 'message' => $e->getMessage()];
         }
 
         $client_token            = $config['token'];
@@ -85,6 +85,7 @@ class IFrameData
         }
 
         return [
+            'success'                 => true,
             'client_token'            => $client_token,
             'main_options'            => $main_options,
             'floatingLabels'          => $floatingLabels,

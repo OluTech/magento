@@ -7,14 +7,6 @@
         <observer name="fortis_payment_type_data_assign"
                   instance="Fortispay\Fortis\Observer\SavePaymentTypeToOrderObserver"/>
     </event>
-    <event name="sales_order_payment_cancel_invoice">
-        <observer name="fortis_cancel_vault_authorisation"
-                  instance="Fortispay\Fortis\Observer\CancelOrderAuthorisation"/>
-    </event>
-    <event name="order_cancel_after">
-        <observer name="fortis_order_cancel_after"
-                  instance="Fortispay\Fortis\Observer\OrderCancelAfter"/>
-    </event>
     <event name="vault_payment_token_save_commit_after">
         <observer name="fortis_delete_saved_vault"
                   instance="Fortispay\Fortis\Observer\DeleteSavedVault"/>
