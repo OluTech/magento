@@ -121,7 +121,7 @@ class FortisApi
         }
 
         $response = json_decode($response);
-        if ($response?->type === 'Error') {
+        if (isset($response->type) && $response->type === 'Error') {
             $errorStr = '';
 
             if (isset($response->meta->errors)) {
@@ -141,7 +141,7 @@ class FortisApi
             throw new LocalizedException(new Phrase($errorStr));
         }
 
-        throw new LocalizedException(__("API Request failed after {$maxRetries} attempts."));
+        throw new LocalizedException(__("API Request failed after {$maxRetries} attempts. " . json_encode($response)));
     }
 
     /**
@@ -181,7 +181,13 @@ class FortisApi
 
     public function getTransaction(string $transactionId, string $user_id, string $user_api_key): stdClass
     {
-        $response = $this->makeApiRequest("/v1/transactions/{$transactionId}", $user_id, $user_api_key, [], 'GET');
+        $response = $this->makeApiRequest(
+            "/v1/transactions/{$transactionId}?expand=surcharge",
+            $user_id,
+            $user_api_key,
+            [],
+            'GET'
+        );
 
         return json_decode($response);
     }
@@ -216,6 +222,19 @@ class FortisApi
         $user_api_key = $this->config->userApiKey();
 
         return $this->makeApiRequest('/v1/transactions/ach/refund/prev-trxn', $user_id, $user_api_key, $intentData);
+    }
+
+    /**
+     * @throws LocalizedException
+     */
+    public function calculateSurcharge(array $intentData): string
+    {
+        $user_id      = $this->config->userId();
+        $user_api_key = $this->config->userApiKey();
+
+        $intentData['product_transaction_id'] = $this->config->ccProductId();
+
+        return $this->makeApiRequest("/v1/public/calculate-surcharge", $user_id, $user_api_key, $intentData);
     }
 
     /**

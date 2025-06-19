@@ -2,6 +2,7 @@
 
 namespace Fortispay\Fortis\Model;
 
+use Fortispay\Fortis\Service\FortisMethodService;
 use Magento\Checkout\Model\ConfigProviderInterface;
 use Magento\Customer\Helper\Session\CurrentCustomer;
 use Magento\Framework\App\RequestInterface;
@@ -12,6 +13,9 @@ use Magento\Framework\View\Asset\Repository;
 use Magento\Payment\Helper\Data as PaymentHelper;
 use Magento\Vault\Model\PaymentTokenManagement;
 use Psr\Log\LoggerInterface;
+use Fortispay\Fortis\Service\CheckoutProcessor;
+use Fortispay\Fortis\Model\FortisApi;
+use Exception;
 
 class FortisConfigProvider implements ConfigProviderInterface
 {
@@ -59,6 +63,8 @@ class FortisConfigProvider implements ConfigProviderInterface
      * @var PaymentTokenManagement
      */
     private $paymentTokenManagement;
+    private CheckoutProcessor $checkoutProcessor;
+    private FortisApi $fortisApi;
 
     /**
      * Construct
@@ -83,7 +89,9 @@ class FortisConfigProvider implements ConfigProviderInterface
         Repository $assetRepo,
         UrlInterface $urlBuilder,
         RequestInterface $request,
-        PaymentTokenManagement $paymentTokenManagement
+        PaymentTokenManagement $paymentTokenManagement,
+        CheckoutProcessor $checkoutProcessor,
+        FortisApi $fortisApi
     ) {
         $this->logger = $logger;
         $pre          = __METHOD__ . ' : ';
@@ -97,12 +105,15 @@ class FortisConfigProvider implements ConfigProviderInterface
         $this->urlBuilder             = $urlBuilder;
         $this->request                = $request;
         $this->paymentTokenManagement = $paymentTokenManagement;
+        $this->checkoutProcessor      = $checkoutProcessor;
+        $this->fortisApi              = $fortisApi;
     }
 
     /**
      * Get Config
      *
      * {@inheritdoc}
+     * @throws LocalizedException
      */
     public function getConfig()
     {
@@ -125,6 +136,7 @@ class FortisConfigProvider implements ConfigProviderInterface
                         'token'     => $card['public_hash'],
                         'card_type' => $cardDetails->type,
                         'text'      => $text,
+                        'id'        => $card['entity_id'],
                     ];
                     $cards[]    = $cardDetail;
                     $cardCount++;
@@ -148,7 +160,8 @@ class FortisConfigProvider implements ConfigProviderInterface
                     'achIsEnabled'              => $this->config->achIsActive(),
                     'isCheckoutIframe'          => $this->config->isCheckoutIframe(),
                     'isSingleView'              => $this->config->isSingleView(),
-                    'placeOrderBtnText'         => $this->config->getPlaceOrderBtnText()
+                    'placeOrderBtnText'         => $this->config->getPlaceOrderBtnText(),
+                    'surchargeDisclaimer'       => FortisMethodService::FORTIS_SURCHARGE_DISCLAIMER
                 ],
             ],
         ];

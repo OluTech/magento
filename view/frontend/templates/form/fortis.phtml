@@ -9,7 +9,7 @@ if ($instructions = $block->getMethod()->getInstructions()) { ?>
     $block->getMethodCode()
 ?>" style="display: none;">
     "<?= /* @noEscape */
-    nl2br($block->escapeHtml($instructions)) ?>
+    nl2br($escaper->escapeHtml($instructions)) ?>
     </div>
     <?php
 } ?>

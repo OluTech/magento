@@ -7,6 +7,7 @@ use Fortispay\Fortis\Model\Fortis;
 use Fortispay\Fortis\Model\FortisApi;
 use Fortispay\Fortis\Service\CheckoutProcessor;
 use Fortispay\Fortis\Service\FortisMethodService;
+use Fortispay\Fortis\Service\MagentoOrderService;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Directory\Model\CountryFactory;
 use Magento\Directory\Model\ResourceModel\Country\CollectionFactory as CountryCollectionFactory;
@@ -81,7 +82,7 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
         1628 => 'BAD_MERCH_ID',
         1629 => 'DUPLICATE_BATCH',
         1630 => 'REJECTED_BATCH (First attempt at batch close will fail with a transaction in the batch for $6.30. ' .
-                'The second batch close attempt will succeed.)',
+            'The second batch close attempt will succeed.)',
         1631 => 'ACCOUNT_CLOSED'
     ];
 
@@ -163,6 +164,7 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
      */
     private FortisApi $fortisApi;
     private CheckoutProcessor $checkoutProcessor;
+    private MagentoOrderService $magentoOrderService;
 
     /**
      * @param PageFactory $pageFactory
@@ -204,7 +206,8 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
         CountryCollectionFactory $countryCollectionFactory,
         FortisMethodService $fortisMethodService,
         FortisApi $fortisApi,
-        CheckoutProcessor $checkoutProcessor
+        CheckoutProcessor $checkoutProcessor,
+        MagentoOrderService $magentoOrderService
     ) {
         $pre = __METHOD__ . " : ";
 
@@ -230,6 +233,7 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
         $this->fortisMethodService      = $fortisMethodService;
         $this->fortisApi                = $fortisApi;
         $this->checkoutProcessor        = $checkoutProcessor;
+        $this->magentoOrderService      = $magentoOrderService;
 
         $this->logger->debug($pre . 'eof');
     }
@@ -303,6 +307,9 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
                     $model = $this->paymentMethod;
                     $this->fortisMethodService->saveVaultData($order, $data);
 
+                    $orderData      = $order->getPayment()->getData();
+                    $additionalData = $orderData['additional_information'];
+
                     $status = Order::STATE_PROCESSING;
                     if ($this->checkoutProcessor->getConfigData('Successful_Order_status') != "") {
                         $status = $this->checkoutProcessor->getConfigData('Successful_Order_status');
@@ -317,6 +324,21 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
                         )->setIsCustomerNotified(true);
 
                         $this->orderRepository->save($order);
+                    }
+
+                    $surchargeAmount = 0.00;
+                    if (isset($additionalData['fortis-surcharge-data'])) {
+                        $surchargeData   = json_decode($additionalData['fortis-surcharge-data'], true);
+                        $surchargeAmount = $surchargeData['surcharge_amount'];
+                    } elseif (isset($data->surcharge_amount)) {
+                        $surchargeAmount = $data->surcharge_amount;
+                    }
+
+                    try {
+                        $this->magentoOrderService->applySurcharge($order, $surchargeAmount);
+                    } catch (\Exception $e) {
+                        $this->logger->error('Error applying surcharge: ' . $e->getMessage());
+                        // Continue processing without surcharge
                     }
 
                     // Save Transaction Response
@@ -349,8 +371,8 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
                         $resultJson = $this->resultJsonFactory->create();
 
                         return $resultJson->setData([
-                                                        'redirectTo' => $redirectToSuccessPageString,
-                                                    ]);
+                            'redirectTo' => $redirectToSuccessPageString,
+                        ]);
                     } else {
                         $redirect = $this->resultFactory->create(
                             ResultFactory::TYPE_REDIRECT
@@ -375,8 +397,8 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
                         $resultJson = $this->resultJsonFactory->create();
 
                         return $resultJson->setData([
-                                                        'redirectTo' => $redirectToCartPageString,
-                                                    ]);
+                            'redirectTo' => $redirectToCartPageString,
+                        ]);
                     } else {
                         $redirect->setUrl($redirectToCartPageString);
                     }

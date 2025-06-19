@@ -43,6 +43,7 @@ use Magento\Vault\Api\PaymentTokenManagementInterface;
 use Psr\Log\LoggerInterface;
 use stdClass;
 use Fortispay\Fortis\Service\CheckoutProcessor;
+use Fortispay\Fortis\Service\MagentoOrderService;
 
 /**
  * Responsible for loading page content.
@@ -146,6 +147,7 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
      */
     private FortisApi $fortisApi;
     private CheckoutProcessor $checkoutProcessor;
+    private MagentoOrderService $magentoOrderService;
 
     /**
      * @param PageFactory $pageFactory
@@ -195,7 +197,8 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         FortisMethodService $fortisMethodService,
         InvoiceRepositoryInterface $invoiceRepository,
         FortisApi $fortisApi,
-        CheckoutProcessor $checkoutProcessor
+        CheckoutProcessor $checkoutProcessor,
+        MagentoOrderService $magentoOrderService,
     ) {
         $pre = __METHOD__ . " : ";
 
@@ -225,6 +228,7 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         $this->invoiceRepository        = $invoiceRepository;
         $this->fortisApi                = $fortisApi;
         $this->checkoutProcessor        = $checkoutProcessor;
+        $this->magentoOrderService      = $magentoOrderService;
 
         $this->logger->debug($pre . 'eof');
     }
@@ -368,8 +372,8 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                         $resultJson = $this->resultJsonFactory->create();
 
                         return $resultJson->setData([
-                                                        'redirectTo' => $redirectToSuccessPageString,
-                                                    ]);
+                            'redirectTo' => $redirectToSuccessPageString,
+                        ]);
                     } else {
                         $redirect->setUrl($redirectToSuccessPageString);
                     }
@@ -387,6 +391,9 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                     case 102:  // Success
                         // Check for stored card and save if necessary
                         $this->fortisMethodService->saveVaultData($order, $data);
+
+                        $orderData      = $order->getPayment()->getData();
+                        $additionalData = $orderData['additional_information'];
 
                         $status = Order::STATE_PROCESSING;
                         if ($this->checkoutProcessor->getConfigData('Successful_Order_status') != "") {
@@ -407,6 +414,18 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                         // Capture invoice when payment is successful
                         $invoice = $this->invoiceService->prepareInvoice($order);
                         $invoice->setRequestedCaptureCase(Invoice::CAPTURE_ONLINE);
+
+                        $surchargeAmount = 0.00;
+                        if (isset($additionalData['fortis-surcharge-data'])) {
+                            $surchargeData   = json_decode($additionalData['fortis-surcharge-data'], true);
+                            $surchargeAmount = $surchargeData['surcharge_amount'];
+                        } elseif (isset($data->surcharge_amount)) {
+                            $surchargeAmount = $data->surcharge_amount;
+                        }
+
+                        // Add surcharge to order
+                        $this->magentoOrderService->applySurcharge($order, $surchargeAmount, $invoice);
+
                         $invoice->register();
 
                         // Save the invoice to the order
@@ -457,8 +476,8 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                             $resultJson = $this->resultJsonFactory->create();
 
                             return $resultJson->setData([
-                                                            'redirectTo' => $redirectToSuccessPageString,
-                                                        ]);
+                                'redirectTo' => $redirectToSuccessPageString,
+                            ]);
                         } else {
                             $redirect->setUrl($redirectToSuccessPageString);
                         }
@@ -479,8 +498,8 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                             $resultJson = $this->resultJsonFactory->create();
 
                             return $resultJson->setData([
-                                                            'redirectTo' => $redirectToCartPageString,
-                                                        ]);
+                                'redirectTo' => $redirectToCartPageString,
+                            ]);
                         } else {
                             $redirect->setUrl($redirectToCartPageString);
                         }

@@ -8,9 +8,9 @@ $tokens = $block->getPaymentTokens();
         <table class="data table table-credit-cards" id="token-list-table">
             <thead>
             <tr>
-                <th scope="col" class="col"><?= $block->escapeHtml(__('Account Number')) ?></th>
-                <th scope="col" class="col expire"><?= $block->escapeHtml(__('Expiration Date')) ?></th>
-                <th scope="col" class="col card-type"><?= $block->escapeHtml(__('Type')) ?></th>
+                <th scope="col" class="col"><?= $escaper->escapeHtml(__('Account Number')) ?></th>
+                <th scope="col" class="col expire"><?= $escaper->escapeHtml(__('Expiration Date')) ?></th>
+                <th scope="col" class="col card-type"><?= $escaper->escapeHtml(__('Type')) ?></th>
                 <th scope="col" class="col actions">&nbsp;</th>
             </tr>
             </thead>
