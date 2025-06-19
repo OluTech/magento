@@ -9,7 +9,8 @@ use Magento\Quote\Api\Data\PaymentInterface;
 class SaveVaultInfoToOrderObserver extends AbstractDataAssignObserver
 {
 
-    public const VAULT_NAME_INDEX = 'fortis-vault-method';
+    public const VAULT_NAME_INDEX       = 'fortis-vault-method';
+    public const SURCHARGE_DATA_LITERAL = 'fortis-surcharge-data';
 
     /**
      * Execute
@@ -33,5 +34,12 @@ class SaveVaultInfoToOrderObserver extends AbstractDataAssignObserver
             self::VAULT_NAME_INDEX,
             $additionalData[self::VAULT_NAME_INDEX]
         );
+
+        if (isset($additionalData[self::SURCHARGE_DATA_LITERAL])) {
+            $paymentInfo->setAdditionalInformation(
+                self::SURCHARGE_DATA_LITERAL,
+                $additionalData[self::SURCHARGE_DATA_LITERAL]
+            );
+        }
     }
 }

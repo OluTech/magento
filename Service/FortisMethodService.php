@@ -86,6 +86,9 @@ class FortisMethodService
         'user_api_key',
     ];
 
+    public const FORTIS_SURCHARGE_DISCLAIMER = 'The Merchant assesses a surcharge of 3.00% on credit card purchases only.
+     This surcharge is no greater than the cost to Merchant of accepting the credit card. We do not surcharge debit cards.';
+
     private Config $config;
     private LoggerInterface $logger;
     private File $fileIo;
@@ -102,6 +105,7 @@ class FortisMethodService
     private FileDriver $driver;
     private FortisApi $fortisApi;
     private Builder $transactionBuilder;
+    private MagentoOrderService $magentoOrderService;
 
     /**
      * @param Config $config
@@ -137,6 +141,7 @@ class FortisMethodService
         FileDriver $driver,
         FortisApi $fortisApi,
         Builder $transactionBuilder,
+        MagentoOrderService $magentoOrderService
     ) {
         $this->config                    = $config;
         $this->logger                    = $logger;
@@ -154,6 +159,7 @@ class FortisMethodService
         $this->driver                    = $driver;
         $this->fortisApi                 = $fortisApi;
         $this->transactionBuilder        = $transactionBuilder;
+        $this->magentoOrderService       = $magentoOrderService;
 
         $this->checkApplePayFile();
     }
@@ -217,8 +223,8 @@ class FortisMethodService
         $achProductId         = $this->config->achProductId();
 
         $order      = $this->checkoutSession->getLastRealOrder();
-        $orderTotal = (int)($order->getTotalDue() * 100);
-        $orderTax   = (int)($order->getTaxAmount() * 100);
+        $orderTotal = (int)bcmul((string)$order->getTotalDue(), '100', 0);
+        $orderTax   = (int)bcmul((string)$order->getTaxAmount(), '100', 0);
         list($user_id, $user_api_key, $action, $options, $returnUrl) = $this->prepareFields(
             $order
         );
@@ -339,10 +345,11 @@ class FortisMethodService
      * @param float $amount
      *
      * @return bool
+     * @throws LocalizedException
      * @api
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function refundOnline(InfoInterface $payment, float $amount)
+    public function refundOnline(InfoInterface $payment, float $amount): bool
     {
         $order = $payment->getOrder();
 
@@ -374,10 +381,20 @@ class FortisMethodService
 
         $transactionId = $rawDetailsInfo?->id;
         $intentData    = [
-            'transaction_amount' => (int)($amount * 100),
+            'transaction_amount' => (int)bcmul((string)$amount, '100', 0),
             'transactionId'      => $transactionId,
-            'description'        => $order->getIncrementId()
+            'description'        => $order->getIncrementId(),
+            'tax'                => 0
         ];
+
+        $postalCode = $rawDetailsInfo->billing_address->postal_code ?? $rawDetailsInfo->billing_zip ?? null;
+
+        $this->populateTransactionIntent(
+            $rawDetailsInfo->first_six,
+            $postalCode,
+            $intentData['transaction_amount'],
+            $intentData
+        );
 
         try {
             if ($paymentMethod !== 'ach') {
@@ -393,6 +410,12 @@ class FortisMethodService
 
             $data = json_decode($response)->data ?? null;
 
+            $onlineRefundedAmount = (float)$intentData['transaction_amount'] / 100;
+
+            if ($onlineRefundedAmount > $amount) {
+                $this->magentoOrderService->updateOrderRefundData($payment, $onlineRefundedAmount, $amount);
+            }
+
             /* Set Comment to Order*/
             if ($data?->reason_code_id === 1000) {
                 $order->addCommentToStatusHistory(
@@ -400,6 +423,15 @@ class FortisMethodService
                         "Order Successfully Refunded with Transaction Id - $data->id Auth Code - $data->auth_code"
                     )
                 );
+                if (isset($intentData['surcharge_amount']) && $intentData['surcharge_amount'] > 0) {
+                    $order->addCommentToStatusHistory(
+                        __(
+                            "We refunded $%1 of the surcharge online.",
+                            (float)$intentData['surcharge_amount'] / 100
+                        )
+                    );
+                }
+
                 $this->orderRepository->save($order);
 
                 return true;
@@ -407,13 +439,44 @@ class FortisMethodService
                 $order->addCommentToStatusHistory(__("Refund not successful"));
                 $this->orderRepository->save($order);
 
-                return false;
+                throw new LocalizedException(__('Refund not successful.'));
             }
         } catch (Exception $exception) {
             $order->addCommentToStatusHistory(__("Refund not successful"));
             $this->orderRepository->save($order);
 
-            return false;
+            $this->logger->error('Refund failed: ' . $exception->getMessage());
+            throw new LocalizedException(__('Refund not successful. Please contact support.'));
+        }
+    }
+
+    /**
+     * @throws LocalizedException
+     */
+    public function populateTransactionIntent($firstSix, $postalCode, $amount, &$intentData): void
+    {
+        $surchargeIntentData = [
+            'subtotal_amount' => $amount,
+            'account_number'  => $firstSix,
+            'tax_amount'      => $intentData['tax'],
+            'zip'             => $postalCode,
+        ];
+
+        $surchargeResponse = $this->fortisApi->calculateSurcharge($surchargeIntentData);
+        $surchargeData     = null;
+
+        if (!empty($surchargeResponse)) {
+            $surchargeData = json_decode($surchargeResponse, true);
+        }
+
+        if (!$surchargeData) {
+            throw new LocalizedException(__('Failed to calculate surcharge data'));
+        }
+
+        if (isset($surchargeData['data']['surcharge_amount'])) {
+            $intentData['subtotal_amount']    = $surchargeData['data']['subtotal_amount'];
+            $intentData['surcharge_amount']   = $surchargeData['data']['surcharge_amount'];
+            $intentData['transaction_amount'] = $surchargeData['data']['transaction_amount'];
         }
     }
 
@@ -509,7 +572,7 @@ class FortisMethodService
         } else {
             $paymentTokenType = PaymentTokenFactoryInterface::TOKEN_TYPE_CREDIT_CARD;
             $tokenType        = self::AVAILABLE_CC_TYPES[$data->saved_account->account_type]
-                                ?? $data->saved_account->account_type;
+                ?? $data->saved_account->account_type;
         }
 
         $tokenDetails = [
@@ -573,7 +636,8 @@ class FortisMethodService
     private function isOrderVirtualOnly(Order $order)
     {
         foreach ($order->getAllItems() as $item) {
-            if (!$item->getProduct()->isVirtual()) {
+            $product = $item->getProduct();
+            if ($product && !$product->isVirtual()) {
                 return false;
             }
         }

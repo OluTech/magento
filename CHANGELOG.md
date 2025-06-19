@@ -1,5 +1,15 @@
 # Changelog
 
+## [[1.4.0]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
+
+### Added
+
+- Introduced surcharges.
+
+### Fixed
+
+- Fixed floating-point arithmetic errors on specific amounts.
+
 ## [[1.3.1]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
 
 ### Fixed

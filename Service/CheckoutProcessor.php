@@ -2,6 +2,7 @@
 
 namespace Fortispay\Fortis\Service;
 
+use Exception;
 use Fortispay\Fortis\Model\Fortis;
 use Magento\Framework\Controller\ResultFactory;
 use Magento\Framework\Controller\ResultInterface;
@@ -144,5 +145,62 @@ class CheckoutProcessor
     public function getLoginUrl(): string
     {
         return $this->customerUrl->getLoginUrl();
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getCurrentBillingPostalCode(): ?string
+    {
+        try {
+            $quote = $this->checkoutSession->getQuote();
+
+            $billingAddress = $quote->getBillingAddress();
+
+            $postalCode = $billingAddress->getPostcode();
+
+            return $postalCode ?: null;
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Get the current tax amount and subtotal from the checkout quote
+     * @return array|null
+     */
+    public function getCheckoutTotals(): ?array
+    {
+        try {
+            $quote = $this->checkoutSession->getQuote();
+
+            if (!$quote->getId() || !$quote->getIsActive()) {
+                return [
+                    'subtotal'   => 0,
+                    'tax_amount' => 0
+                ];
+            }
+
+            $quote->setTotalsCollectedFlag(false);
+            $quote->collectTotals();
+
+            $shippingAddress = $quote->getShippingAddress();
+            $billingAddress  = $quote->getBillingAddress();
+            $subtotal        = $quote->getSubtotal() + $shippingAddress->getShippingAmount();
+
+            $taxAmount = $shippingAddress->getTaxAmount();
+            if ($taxAmount === null || $taxAmount == 0) {
+                $taxAmount = $billingAddress->getTaxAmount();
+            }
+
+            return [
+                'subtotal'   => $subtotal ?: 0,
+                'tax_amount' => $taxAmount ?: 0
+            ];
+        } catch (Exception $e) {
+            $this->logger->error('Error calculating quote totals: ' . $e->getMessage());
+
+            return null;
+        }
     }
 }

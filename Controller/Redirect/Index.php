@@ -152,18 +152,30 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
                 $order->getCustomerId()
             );
 
-            $tokenType    = json_decode($cardData->getTokenDetails())->type;
-            $gatewayToken = $cardData->getGatewayToken();
-            $user_id      = $this->config->userId();
-            $user_api_key = $this->config->userApiKey();
-            $api          = $this->fortisApi;
-            $guid         = strtoupper(Uuid::uuid4());
-            $guid         = str_replace('-', '', $guid);
-            $intentData   = [
-                'transaction_amount' => (int)($order->getTotalDue() * 100),
+            $tokenType     = json_decode($cardData->getTokenDetails())->type;
+            $gatewayToken  = $cardData->getGatewayToken();
+            $surchargeData = [];
+            if (isset($additionalData['fortis-surcharge-data']) && !empty($additionalData['fortis-surcharge-data'])) {
+                $decodedData = json_decode($additionalData['fortis-surcharge-data'], true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $surchargeData = $decodedData;
+                } else {
+                    $this->logger->error("Error decoding surcharge data: " . json_last_error_msg());
+                }
+            }
+            $user_id        = $this->config->userId();
+            $user_api_key   = $this->config->userApiKey();
+            $api            = $this->fortisApi;
+            $guid           = strtoupper(Uuid::uuid4());
+            $guid           = str_replace('-', '', $guid);
+            $subtotalAmount = (int)bcmul((string)($order->getSubtotal() + $order->getShippingAmount()), '100', 0);
+            $intentData     = [
+                'transaction_amount' => (int)bcmul((string)$order->getTotalDue(), '100', 0),
                 'token_id'           => $gatewayToken,
                 'description'        => $incrementId,
                 'transaction_api_id' => $guid,
+                'subtotal_amount'    => $subtotalAmount,
+                'tax'                => (int)bcmul((string)$order->getTaxAmount(), '100', 0),
             ];
             if ($tokenType === 'ach') {
                 // Do the tokenised ach debit
@@ -205,6 +217,13 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
             } else {
                 // Do the tokenised card transaction
                 try {
+                    if (isset($surchargeData['surcharge_amount'])) {
+                        $intentData['transaction_amount'] = $surchargeData['transaction_amount'];
+                        $intentData['tax']                = $surchargeData['tax_amount'];
+                        $intentData['surcharge_amount']   = $surchargeData['surcharge_amount'];
+                        $intentData['subtotal_amount']    = $surchargeData['subtotal_amount'];
+                    }
+
                     $productTransactionId = $this->config->ccProductId();
                     if ($productTransactionId
                         && preg_match(

@@ -226,6 +226,7 @@ class Fortis implements MethodInterface
      * @param float $amount
      *
      * @return bool
+     * @throws LocalizedException
      * @api
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
@@ -477,12 +478,21 @@ class Fortis implements MethodInterface
         $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_id'));
         $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_api_key'));
 
+        $subtotal = $authAmount - ($paymentDetails->tax ?? 0);
+
         // Do auth transaction
         $intentData = [
             'transaction_amount' => $authAmount,
             "order_number"       => $orderID,
             'transactionId'      => $transactionId,
+            'tax'                => ($paymentDetails->tax ?? 0),
+            'subtotal_amount'    => $subtotal,
         ];
+
+        if (isset($paymentDetails->surcharge->surcharge_amount)) {
+            $intentData['subtotal_amount']  -= $paymentDetails->surcharge->surcharge_amount;
+            $intentData['surcharge_amount'] = $paymentDetails->surcharge->surcharge_amount;
+        }
 
         $this->fortisApi->doCompleteAuthTransaction($intentData, $user_id, $user_api_key);
 

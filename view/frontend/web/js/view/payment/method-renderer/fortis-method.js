@@ -25,6 +25,8 @@ define(
     'use strict';
     let fortisPaymentType;
     let fortisSavedCard = undefined;
+    let surchargeData;
+    let spinner = null;
 
     return Component.extend({
       defaults: {
@@ -32,11 +34,14 @@ define(
       },
       getData: function () {
         fortisPaymentType = $('input[name=fortis-payment-type]:checked').val();
+          if (typeof fortisSavedCard === 'undefined') {
+              fortisSavedCard = $('#fortis-saved_cards').val();
+          }
+
         let fortisVault;
         if ($('#fortis-vault-method').prop('checked') === true) {
           fortisVault = 1;
         } else {
-          fortisSavedCard = $('#fortis-saved_cards').find(':selected').val();
           if (fortisSavedCard !== undefined) {
             fortisVault = fortisSavedCard;
           } else {
@@ -51,7 +56,8 @@ define(
           'method': this.item.method,
           'additional_data': {
             'fortis-vault-method': fortisVault,
-            'fortis-payment-type': fortisPaymentType
+            'fortis-payment-type': fortisPaymentType,
+            'fortis-surcharge-data': JSON.stringify(surchargeData),
           }
         };
       },
@@ -201,9 +207,73 @@ define(
       achIsEnabled: function () {
         return window.checkoutConfig.payment.fortis.achIsEnabled;
       },
+        displaySurcharge: function (data, event) {
+            var selectElement = event.target;
+            var selectedValue = selectElement.value;
+            var surchargeDisclaimer = jQuery('#surcharge-disclaimer');
+            var documentedSurchargeDisclaimer = document.getElementById('surcharge-disclaimer');
+            var placeOrderBtn = jQuery('.action.primary.checkout');
+
+            var selectedOption = selectElement.options[selectElement.selectedIndex];
+            var cardType = selectedOption.getAttribute('data-card-type');
+
+            surchargeDisclaimer.html('');
+            placeOrderBtn.prop('disabled', true);
+
+            if (selectedValue !== 'new' && selectedValue !== 'new-save' && cardType !== 'ach') {
+                this.generateSpinner(documentedSurchargeDisclaimer);
+
+                this.calculateSurcharge(selectedValue)
+                    .done(function(response) {
+                        response = JSON.parse(response.surchargeData);
+                        fortisSavedCard = selectedValue;
+                        if (response.data && response.data.surcharge_amount) {
+                            surchargeData = response.data;
+                            surchargeDisclaimer.html(`<br><p>Subtotal: $${(surchargeData.subtotal_amount / 100).toFixed(2)}
+<br>Tax: $${(surchargeData.tax_amount / 100).toFixed(2)}
+<br>Surcharge Amount: $${(surchargeData.surcharge_amount / 100).toFixed(2)}
+<br><strong>Total: $${(surchargeData.transaction_amount / 100).toFixed(2)}</strong></p>
+<p>${window.checkoutConfig.payment.fortis.surchargeDisclaimer}</p>`);
+                        } else {
+                            surchargeDisclaimer.html('');
+                        }
+                    })
+                    .fail(function(xhr, status, error) {
+                        console.error('Error calculating surcharge:', error);
+                        surchargeDisclaimer.html('');
+                    })
+                    .always(function() {
+                        placeOrderBtn.prop('disabled', false);
+                    });
+            } else {
+                surchargeDisclaimer.html('');
+                fortisSavedCard = undefined;
+                placeOrderBtn.prop('disabled', false);
+            }
+        },
       /** Return text for place order button **/
       getPlaceOrderBtn: function () {
           return window.checkoutConfig.payment.fortis.placeOrderBtnText
+      },
+        calculateSurcharge: function (publicHash) {
+            // Returns a Promise
+            return $.ajax({
+                url: '/fortis/api/calculatesurcharge',
+                method: 'GET',
+                data: { public_hash: publicHash }
+            });
+        },
+
+        generateSpinner: function(container) {
+          spinner = document.createElement('div');
+          spinner.id = 'fortis-spinner';
+          spinner.style.cssText = 'display: flex; justify-content: center; align-items: center; height: 100%; margin: 20px 0;';
+          spinner.innerHTML = '<div style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>';
+          container.appendChild(spinner);
+
+          const styleSheet = document.createElement('style');
+          styleSheet.innerText = '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }';
+          document.head.appendChild(styleSheet);
       }
     });
   }

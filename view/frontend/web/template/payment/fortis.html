@@ -26,12 +26,11 @@
         </div>
         <!-- /ko -->
         <!-- ko if:(checkFortisSavedCard() > 0) -->
+
         <div class="saved_cards">
-            <select id="fortis-saved_cards" name="fortis-saved_cards">
+            <select id="fortis-saved_cards" name="fortis-saved_cards" data-bind="event: { change: displaySurcharge }">
                 <!-- ko foreach: { data: JSON.parse(getFortisSavedCardList()), as: 'card' } -->
-                <option data-bind="attr: {'value': card.token}">
-                    <!-- ko i18n: card.text --><!-- /ko -->
-                </option>
+                <option data-bind="attr: {'value': card.token, 'data-card-type': card.card_type}, text: card.text"></option>
                 <!-- /ko -->
                 <option data-bind="attr: {'value': 'new-save'}">
                     <!-- ko if: !achIsEnabled(); -->
@@ -50,6 +49,7 @@
                     <!-- /ko -->
                 </option>
             </select>
+            <div id="surcharge-disclaimer" style="margin-left: 23px;"></div>
         </div>
         <!-- /ko -->
         <!-- /ko -->
