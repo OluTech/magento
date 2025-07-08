@@ -1,19 +1,21 @@
-<div id="fortis-data" data-config='<?= json_encode($block->getJSConfig()) ?>'></div>
 <?php
-if ($block->getData('error_html')): ?>
+/** @var \Magento\Framework\View\Element\Template $block */
+/** @var \Magento\Framework\View\Helper\SecureHtmlRenderer $secureRenderer */
+/** @var \Magento\Framework\Escaper $escaper */
+?>
+    <div id="fortis-data" data-config='<?= $escaper->escapeHtmlAttr(json_encode($block->getJSConfig())) ?>'></div>
+<?php if ($block->getData('error_html')): ?>
     <div class="error-container">
-        <?= $block->getData('error_html'); ?>
+        <?= $escaper->escapeHtml($block->getData('error_html')); ?>
     </div>
-    <?php
-endif; ?>
+<?php endif; ?>
 <?= $secureRenderer->renderTag(
     'script',
     [
         'type' => 'text/javascript',
-        'src' => $block->getViewFileUrl('Fortispay_Fortis::js/view/payment/fortis-iframe.js'),
-        'nonce' => $block->getNonce()
+        'src' => $escaper->escapeUrl($block->getViewFileUrl('Fortispay_Fortis::js/view/payment/fortis-iframe.js')),
+        'nonce' => $escaper->escapeHtmlAttr($block->getNonce())
     ],
     '',
     false
 ); ?>
-
