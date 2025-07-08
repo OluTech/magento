@@ -54,7 +54,7 @@ class MagentoOrderService
      * @return void
      * @throws Exception
      */
-    public function applySurcharge(Order $order, float $surchargeAmount, Invoice $invoice = null): void
+    public function applySurcharge(Order $order, float $surchargeAmount, ?Invoice $invoice = null): void
     {
         if (!$surchargeAmount || $surchargeAmount <= 0) {
             return;

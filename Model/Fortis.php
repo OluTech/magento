@@ -161,7 +161,7 @@ class Fortis implements MethodInterface
      *
      * @return bool
      */
-    public function isAvailable(CartInterface $quote = null)
+    public function isAvailable(?CartInterface $quote = null)
     {
         return $this->config->isMethodAvailable();
     }
