@@ -5,6 +5,7 @@
 ### Added
 
 - Introduced surcharges.
+- Load Commerce.js source script according to the Test Mode setting.
 
 ### Fixed
 

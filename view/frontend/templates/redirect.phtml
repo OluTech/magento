@@ -9,13 +9,3 @@
         <?= $escaper->escapeHtml($block->getData('error_html')); ?>
     </div>
 <?php endif; ?>
-<?= $secureRenderer->renderTag(
-    'script',
-    [
-        'type' => 'text/javascript',
-        'src' => $escaper->escapeUrl($block->getViewFileUrl('Fortispay_Fortis::js/view/payment/fortis-iframe.js')),
-        'nonce' => $escaper->escapeHtmlAttr($block->getNonce())
-    ],
-    '',
-    false
-); ?>
