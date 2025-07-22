@@ -11,7 +11,8 @@ define(
     'Magento_Checkout/js/model/payment/additional-validators',
     'mage/url',
     'Magento_Payment/js/view/payment/cc-form',
-    'Magento_Vault/js/view/payment/vault-enabler'
+    'Magento_Vault/js/view/payment/vault-enabler',
+    'Fortispay_Fortis/js/view/payment/fortis-iframe' // <-- Ensure iframe script is loaded
   ],
   function ($,
     Component,
@@ -191,10 +192,15 @@ define(
             $frame[0].scrollIntoView();
             $frame.show();
 
+              if (typeof window.fortisGenerateIFrame === 'function') {
+                  window.fortisGenerateIFrame();
+              }
+
           }).fail(function (response) {
             $frame.trigger('processStop');
           });
         }
+
       },
       /** Returns payment acceptance mark link path */
       getPaymentAcceptanceMarkHref: function () {

@@ -4,7 +4,7 @@
     <default>
         <payment>
             <fortis>
-                <active>1</active>
+                <active>0</active>
                 <title>Fortis</title>
                 <instructions>Pay using Fortis provider</instructions>
                 <payment_action>Authorization</payment_action>
