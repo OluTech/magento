@@ -1,5 +1,12 @@
 # Changelog
 
+## [[1.4.1]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
+
+### Added
+
+- Support for Adobe Commerce 2.4.8 and Magento Open Source 2.4.8.
+- Support for PHP 8.4.
+
 ## [[1.4.0]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
 
 ### Added
