@@ -18,11 +18,11 @@ class ColorPicker extends Field
     protected function _getElementHtml(AbstractElement $element)
     {
         return '<input type="color" id="' .
-            $element->getHtmlId() .
-            '" name="' .
-            $element->getName() .
-            '" value="' .
-            $element->getEscapedValue() .
-            '"/>';
+               $element->getHtmlId() .
+               '" name="' .
+               $element->getName() .
+               '" value="' .
+               $element->getEscapedValue() .
+               '"/>';
     }
 }

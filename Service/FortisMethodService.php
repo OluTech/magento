@@ -10,6 +10,7 @@ use Magento\Payment\Model\InfoInterface;
 use Magento\Sales\Api\Data\TransactionInterface;
 use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
+use Magento\Sales\Model\Order\Address;
 use Magento\Sales\Model\Order\Payment\Transaction;
 use Magento\Vault\Api\Data\PaymentTokenFactoryInterface;
 use Magento\Framework\Filesystem\DirectoryList;
@@ -25,12 +26,14 @@ use Magento\Vault\Api\PaymentTokenManagementInterface;
 use Magento\Vault\Model\PaymentTokenFactory;
 use Magento\Vault\Model\ResourceModel\PaymentToken;
 use Magento\Vault\Api\Data\PaymentTokenInterface;
+use Ramsey\Uuid\Uuid;
 use StdClass;
 use DateTime;
 use DateTimeZone;
 use DateInterval;
 use Magento\Framework\Filesystem\Driver\File as FileDriver;
 use Magento\Sales\Model\Order\Payment\Transaction\Builder;
+use Fortispay\Fortis\Service\CheckoutProcessor;
 
 class FortisMethodService
 {
@@ -106,6 +109,7 @@ class FortisMethodService
     private FortisApi $fortisApi;
     private Builder $transactionBuilder;
     private MagentoOrderService $magentoOrderService;
+    private CheckoutProcessor $checkoutProcessor;
 
     /**
      * @param Config $config
@@ -141,7 +145,8 @@ class FortisMethodService
         FileDriver $driver,
         FortisApi $fortisApi,
         Builder $transactionBuilder,
-        MagentoOrderService $magentoOrderService
+        MagentoOrderService $magentoOrderService,
+        CheckoutProcessor $checkoutProcessor
     ) {
         $this->config                    = $config;
         $this->logger                    = $logger;
@@ -160,6 +165,7 @@ class FortisMethodService
         $this->fortisApi                 = $fortisApi;
         $this->transactionBuilder        = $transactionBuilder;
         $this->magentoOrderService       = $magentoOrderService;
+        $this->checkoutProcessor         = $checkoutProcessor;
 
         $this->checkApplePayFile();
     }
@@ -225,10 +231,13 @@ class FortisMethodService
         $order      = $this->checkoutSession->getLastRealOrder();
         $orderTotal = (int)bcmul((string)$order->getTotalDue(), '100', 0);
         $orderTax   = (int)bcmul((string)$order->getTaxAmount(), '100', 0);
-        list($user_id, $user_api_key, $action, $options, $returnUrl) = $this->prepareFields(
-            $order
-        );
-        $intentData = [
+        list($action, $options, $returnUrl) = $this->prepareFields();
+        $returnUrl .= '?gid=' . $order->getId();
+        $cred      = $this->getFortisCredentials();
+
+        $user_id      = $cred['user_id'];
+        $user_api_key = $cred['user_api_key'];
+        $intentData   = [
             'action'       => $action,
             'amount'       => $orderTotal,
             'save_account' => $saveAccount,
@@ -273,25 +282,40 @@ class FortisMethodService
     }
 
     /**
+     * @throws LocalizedException
+     */
+    public function getTicketIntentionToken(): string
+    {
+        $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_id'));
+        $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_api_key'));
+
+        $locationId           = $this->config->achLocationId();
+        $productTransactionId = $this->config->ccProductId();
+
+        $intentData = [
+            'location_id'            => $locationId,
+            'product_transaction_id' => $productTransactionId,
+        ];
+
+        return $this->fortisApi->getClientToken($intentData, $user_id, $user_api_key, true);
+    }
+
+    /**
      * Prepare Fields
      *
      * @param Order $order
      *
      * @return array
      */
-    public function prepareFields(Order $order): array
+    public function prepareFields(): array
     {
         $pre = __METHOD__ . ' : ';
-
-        $order->getPayment()->getData();
 
         $this->logger->debug($pre . 'serverMode : ' . $this->config->getConfig('test_mode'));
 
         $cred = $this->getFortisCredentials();
 
-        $user_id      = $cred['user_id'];
-        $user_api_key = $cred['user_api_key'];
-        $view         = ($cred['fortis_single_view'] === 'single') ? 'card-single-field' : 'default';
+        $view = ($cred['fortis_single_view'] === 'single') ? 'card-single-field' : 'default';
 
         $options = [
             'main_options'       => [
@@ -319,23 +343,137 @@ class FortisMethodService
             ],
         ];
 
-        $billing = $order->getBillingAddress();
-        $billing->getCountryId();
-
         $action = $this->config->orderAction();
         if ($action === 'sale') {
             $returnUrl = $this->urlBuilder->getUrl(
                 'fortis/redirect/success',
                 self::SECURE
-            ) . '?gid=' . $order->getId();
+            );
         } else {
             $returnUrl = $this->urlBuilder->getUrl(
                 'fortis/redirect/authorise',
                 self::SECURE
-            ) . '?gid=' . $order->getId();
+            );
         }
 
-        return [$user_id, $user_api_key, $action, $options, $returnUrl];
+        return [$action, $options, $returnUrl];
+    }
+
+    /**
+     * @return array
+     */
+    public function prepareTicketIntentionData(): array
+    {
+        list($action, $options, $returnUrl) = $this->prepareFields();
+
+        $config = [
+            'options'   => $options,
+            'returnUrl' => $returnUrl,
+        ];
+
+        $main_options            = $config['options']['main_options'];
+        $floatingLabels          = (int)$main_options['floatingLabels'] === 1 ? 'true' : 'false';
+        $showValidationAnimation = (int)$main_options['showValidationAnimation'] === 1 ? 'true' : 'false';
+        $appearance_options      = $config['options']['appearance_options'];
+        $guid                    = strtoupper(Uuid::uuid4());
+        $guid                    = str_replace('-', '', $guid);
+        list($address, $country, $city, $postalCode, $regionCode) = $this->checkoutProcessor->getAddresses();
+
+        $calculateSurchargeUrl = $this->urlBuilder->getUrl(
+            'fortis/api/calculatesurcharge',
+            self::SECURE
+        );
+
+        $ticketIntentionTokenUrl = $this->urlBuilder->getUrl(
+            'fortis/api/ticketintentiontoken',
+            self::SECURE
+        );
+
+        $ticketTransactionUrl = $this->urlBuilder->getUrl(
+            'fortis/api/tickettransaction',
+            self::SECURE
+        );
+
+        return [
+            'main_options'            => $main_options,
+            'floatingLabels'          => $floatingLabels,
+            'showValidationAnimation' => $showValidationAnimation,
+            'appearance_options'      => $appearance_options,
+            'returnUrl'               => $config['returnUrl'],
+            'calculateSurchargeUrl'   => $calculateSurchargeUrl,
+            'ticketIntentionTokenUrl' => $ticketIntentionTokenUrl,
+            'ticketTransactionUrl'    => $ticketTransactionUrl,
+            'guid'                    => $guid,
+            'billingFields'           => array_filter([
+                                                          $address ? [
+                                                              'name'     => 'address',
+                                                              'required' => false,
+                                                              'value'    => $address
+                                                          ] : null,
+                                                          $postalCode ? [
+                                                              'name'     => 'postal_code',
+                                                              'required' => false,
+                                                              'value'    => $postalCode
+                                                          ] : null,
+                                                          $regionCode ? [
+                                                              'name'     => 'state',
+                                                              'required' => false,
+                                                              'value'    => $regionCode
+                                                          ] : null
+                                                      ])
+        ];
+    }
+
+    /**
+     * Create a ticket transaction
+     *
+     * @return mixed
+     * @throws LocalizedException
+     */
+    public function createTicketTransaction(
+        array $ticketIntention,
+        array $totals,
+        array $billingInfo,
+        bool $enableVaultForOrder,
+        ?array $surchargeData
+    ): stdClass {
+        $user_id      = $this->config->userId();
+        $user_api_key = $this->config->userApiKey();
+
+        $productTransactionId = $this->config->ccProductId();
+
+        $orderIntention = $this->config->orderAction();
+
+        $intentData = [
+            'ticket_id'              => $ticketIntention['id'],
+            'description'            => $ticketIntention['order_id'],
+            'billing_address'        => $billingInfo,
+            'location_id'            => $ticketIntention['location_id'],
+            'product_transaction_id' => $productTransactionId,
+            'subtotal_amount'        => $totals['subtotal_amount'],
+            'tax'                    => $totals['tax'],
+            'transaction_amount'     => $totals['transaction_amount'],
+        ];
+
+        if ($surchargeData && isset($surchargeData['surcharge_amount'])) {
+            $intentData['subtotal_amount']    = $surchargeData['subtotal_amount'];
+            $intentData['surcharge_amount']   = $surchargeData['surcharge_amount'];
+            $intentData['transaction_amount'] = $surchargeData['transaction_amount'];
+        }
+
+        if ($enableVaultForOrder) {
+            $intentData['save_account'] = true;
+        }
+
+        if ($orderIntention === 'sale') {
+            $transactionResponse = json_decode($this->fortisApi->ccSaleTicket($intentData, $user_id, $user_api_key));
+        } else {
+            $transactionResponse = json_decode(
+                $this->fortisApi->ccAuthOnlyTicket($intentData, $user_id, $user_api_key)
+            );
+        }
+
+        return $transactionResponse;
     }
 
     /**
@@ -546,14 +684,16 @@ class FortisMethodService
     public function saveVaultData(Order $order, StdClass $data)
     {
         if (((int)($this->config->getConfig('fortis_cc_vault_active') ?? 0) !== 1) ||
-            !isset($data->saved_account)
+            (!isset($data->saved_account) && !isset($data->account_vault))
         ) {
             return;
         }
 
+        $savedAccount = $data->saved_account ?? $data->account_vault;
+
         // Check for existing card
         $paymentToken = $this->paymentTokenManagement->getByGatewayToken(
-            $data->saved_account->id,
+            $savedAccount->id,
             'fortis',
             $order->getCustomerId()
         );
@@ -563,21 +703,21 @@ class FortisMethodService
 
         $paymentToken->setPaymentMethodCode(Config::METHOD_CODE);
 
-        $paymentToken->setGatewayToken($data->saved_account->id);
-        $expDate = $data->saved_account->exp_date;
+        $paymentToken->setGatewayToken($savedAccount->id);
+        $expDate = $savedAccount->exp_date;
 
-        if ($data->saved_account->payment_method === 'ach') {
+        if ($savedAccount->payment_method === 'ach') {
             $paymentTokenType = PaymentTokenFactoryInterface::TOKEN_TYPE_ACCOUNT;
-            $tokenType        = $data->saved_account->payment_method;
+            $tokenType        = $savedAccount->payment_method;
         } else {
             $paymentTokenType = PaymentTokenFactoryInterface::TOKEN_TYPE_CREDIT_CARD;
-            $tokenType        = self::AVAILABLE_CC_TYPES[$data->saved_account->account_type]
-                ?? $data->saved_account->account_type;
+            $tokenType        = self::AVAILABLE_CC_TYPES[$savedAccount->account_type]
+                                ?? $savedAccount->account_type;
         }
 
         $tokenDetails = [
             'type'     => $tokenType,
-            'maskedCC' => $data->saved_account->last_four,
+            'maskedCC' => $savedAccount->last_four,
         ];
 
         if (!$expDate) {
@@ -592,7 +732,7 @@ class FortisMethodService
 
         $paymentToken->setExpiresAt($this->getExpirationDate($month, $year));
 
-        $paymentToken->setIsActive((int)$data->saved_account->active === 1);
+        $paymentToken->setIsActive((int)$savedAccount->active === 1);
         $paymentToken->setIsVisible(true);
         $paymentToken->setType($paymentTokenType);
         $paymentToken->setCustomerId($order->getCustomerId());

@@ -162,10 +162,19 @@ class FortisApi
         ];
     }
 
-    public function getClientToken(array $intentData, string $user_id, string $user_api_key): string
-    {
+    /**
+     * @throws LocalizedException
+     */
+    public function getClientToken(
+        array $intentData,
+        string $user_id,
+        string $user_api_key,
+        bool $isTicketIntention = false
+    ): string {
+        $endpoint = $isTicketIntention ? '/v1/elements/ticket/intention' : '/v1/elements/transaction/intention';
+
         $response        = $this->makeApiRequest(
-            '/v1/elements/transaction/intention',
+            $endpoint,
             $user_id,
             $user_api_key,
             $intentData
@@ -179,10 +188,26 @@ class FortisApi
         throw new LocalizedException(__("Invalid response from API"));
     }
 
+    /**
+     * @throws LocalizedException
+     */
+    public function ccSaleTicket(array $intentData, string $user_id, string $user_api_key): string
+    {
+        return $this->makeApiRequest('/v1/transactions/cc/sale/ticket', $user_id, $user_api_key, $intentData);
+    }
+
+    /**
+     * @throws LocalizedException
+     */
+    public function ccAuthOnlyTicket(array $intentData, string $user_id, string $user_api_key): string
+    {
+        return $this->makeApiRequest('/v1/transactions/cc/auth-only/ticket', $user_id, $user_api_key, $intentData);
+    }
+
     public function getTransaction(string $transactionId, string $user_id, string $user_api_key): stdClass
     {
         $response = $this->makeApiRequest(
-            "/v1/transactions/{$transactionId}?expand=surcharge",
+            "/v1/transactions/{$transactionId}?expand=surcharge,account_vault",
             $user_id,
             $user_api_key,
             [],
@@ -190,6 +215,19 @@ class FortisApi
         );
 
         return json_decode($response);
+    }
+
+    /**
+     * Update the transaction with a new description
+     */
+    public function patchTransactionDescription(string $transactionId, string $newDescription): ?string
+    {
+        $user_id      = $this->config->userId();
+        $user_api_key = $this->config->userApiKey();
+        $endpoint     = "/v1/transactions/$transactionId";
+        $payload      = ['description' => $newDescription];
+
+        return $this->makeApiRequest($endpoint, $user_id, $user_api_key, $payload, 'PATCH');
     }
 
     public function doTokenisedTransaction(array $intentData, string $user_id, string $user_api_key): string

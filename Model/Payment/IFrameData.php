@@ -97,32 +97,32 @@ class IFrameData
             'guid'                    => $guid,
             'digitalWallets'          => $digitalWallets,
             'billingFields'           => array_filter([
-                $address ? [
-                    'name'     => 'address',
-                    'required' => false,
-                    'value'    => $address
-                ] : null,
-                $country ? [
-                    'name'     => 'country',
-                    'required' => false,
-                    'value'    => $country
-                ] : null,
-                $city ? [
-                    'name'     => 'city',
-                    'required' => false,
-                    'value'    => $city
-                ] : null,
-                $postalCode ? [
-                    'name'     => 'postal_code',
-                    'required' => false,
-                    'value'    => $postalCode
-                ] : null,
-                $regionCode ? [
-                    'name'     => 'state',
-                    'required' => false,
-                    'value'    => $regionCode
-                ] : null
-            ])
+                                                          $address ? [
+                                                              'name'     => 'address',
+                                                              'required' => false,
+                                                              'value'    => $address
+                                                          ] : null,
+                                                          $country ? [
+                                                              'name'     => 'country',
+                                                              'required' => false,
+                                                              'value'    => $country
+                                                          ] : null,
+                                                          $city ? [
+                                                              'name'     => 'city',
+                                                              'required' => false,
+                                                              'value'    => $city
+                                                          ] : null,
+                                                          $postalCode ? [
+                                                              'name'     => 'postal_code',
+                                                              'required' => false,
+                                                              'value'    => $postalCode
+                                                          ] : null,
+                                                          $regionCode ? [
+                                                              'name'     => 'state',
+                                                              'required' => false,
+                                                              'value'    => $regionCode
+                                                          ] : null
+                                                      ])
         ];
     }
 

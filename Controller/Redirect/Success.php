@@ -3,12 +3,12 @@
 namespace Fortispay\Fortis\Controller\Redirect;
 
 use Exception;
-use Fortispay\Fortis\Model\Config;
 use Fortispay\Fortis\Model\Fortis;
 use Fortispay\Fortis\Model\FortisApi;
+use Fortispay\Fortis\Service\CheckoutProcessor;
 use Fortispay\Fortis\Service\FortisMethodService;
+use Fortispay\Fortis\Service\MagentoOrderService;
 use Magento\Checkout\Model\Session as CheckoutSession;
-use Magento\Customer\Model\Url;
 use Magento\Directory\Model\CountryFactory;
 use Magento\Directory\Model\ResourceModel\Country\CollectionFactory as CountryCollectionFactory;
 use Magento\Framework\App\Action\HttpGetActionInterface;
@@ -19,15 +19,11 @@ use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Controller\ResultFactory;
 use Magento\Framework\DB\Transaction as DBTransaction;
-use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Event\ManagerInterface as EventManager;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\Exception\RuntimeException;
 use Magento\Framework\Message\ManagerInterface;
-use Magento\Framework\Session\Generic;
-use Magento\Framework\UrlInterface;
 use Magento\Framework\View\Result\PageFactory;
-use Magento\Quote\Model\QuoteRepository;
 use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Api\InvoiceRepositoryInterface;
 use Magento\Sales\Api\OrderRepositoryInterface;
@@ -39,11 +35,8 @@ use Magento\Sales\Model\Order\Payment\Transaction;
 use Magento\Sales\Model\Order\Payment\Transaction\Builder;
 use Magento\Sales\Model\Service\InvoiceService;
 use Magento\Store\Model\StoreManagerInterface;
-use Magento\Vault\Api\PaymentTokenManagementInterface;
 use Psr\Log\LoggerInterface;
 use stdClass;
-use Fortispay\Fortis\Service\CheckoutProcessor;
-use Fortispay\Fortis\Service\MagentoOrderService;
 
 /**
  * Responsible for loading page content.
@@ -297,21 +290,7 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         $json      = $this->request->getContent();
         $GET       = $this->request->getParams();
         $data      = json_decode($json);
-        $tokenised = false;
-        $orderId   = (int)$GET['gid'];
-        if (!$data) {
-            $tokenised = true;
-            $data      = new stdClass();
-            $data->id  = $GET['tid'];
-        }
-
-        $pre = __METHOD__ . " : ";
-        $this->logger->debug($pre . 'bof');
-        $order = $this->checkoutSession->getLastRealOrder();
-        if (!$order->getId()) {
-            $order = $this->setlastOrderDetails();
-        }
-        $this->order = $order;
+        $dataArray = json_decode($json, true);
 
         $baseurl  = $this->storeManager->getStore()->getBaseUrl();
         $redirect = $this->resultFactory->create(
@@ -321,8 +300,30 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         $redirectToSuccessPageString = $baseurl . 'checkout/onepage/success';
         $redirectToCartPageString    = $baseurl . 'checkout/cart';
 
-        if ((int)$order->getId() !== $orderId) {
-            $redirect->setUrl($redirectToSuccessPageString);
+        $isTicketTransaction = isset($dataArray) && ($dataArray['@action'] === 'ticket');
+
+        $tokenised = false;
+        $orderId   = isset($GET['gid']) ? (int)$GET['gid'] : null;
+        if (!$data) {
+            $tokenised = true;
+            $data      = new stdClass();
+            $data->id  = $GET['tid'] ?? null;
+        }
+
+        $pre = __METHOD__ . " : ";
+        $this->logger->debug($pre . 'bof');
+        $order = $this->checkoutSession->getLastRealOrder();
+        if (!$order->getId() && $this->request->getParam('gid')) {
+            $order = $this->setlastOrderDetails();
+        }
+
+        $orderData      = $order->getPayment()->getData();
+        $additionalData = $orderData['additional_information'];
+
+        $this->order = $order;
+
+        if ((!$isTicketTransaction && !$tokenised && ((int)$order->getId() !== $orderId)) || !$data) {
+            $redirect->setUrl($redirectToCartPageString);
 
             return $redirect;
         }
@@ -341,16 +342,30 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
 
         // Get the transaction
         try {
-            $api               = $this->fortisApi;
-            $user_id           = $this->checkoutProcessor->getConfigData('user_id');
-            $user_api_key      = $this->checkoutProcessor->getConfigData('user_api_key');
-            $fortisTransaction = $api->getTransaction($data->id, $user_id, $user_api_key)->data;
+            $api          = $this->fortisApi;
+            $user_id      = $this->paymentMethod->getSpecialConfigData('user_id');
+            $user_api_key = $this->paymentMethod->getSpecialConfigData('user_api_key');
+
+            if ($isTicketTransaction) {
+                $transactionId = $dataArray['transactionId'] ?? null;
+                if ($transactionId) {
+                    $fortisTransactionObj = $this->fortisApi->getTransaction($transactionId, $user_id, $user_api_key);
+                    $data                 = $fortisTransactionObj->data ?? $fortisTransactionObj;
+                    $fortisTransaction    = $data;
+                    $this->fortisApi->patchTransactionDescription($transactionId, $order->getIncrementId());
+                } else {
+                    $data              = (object)[];
+                    $fortisTransaction = $data;
+                }
+            } else {
+                $fortisTransaction = $api->getTransaction($data->id, $user_id, $user_api_key)->data;
+            }
 
             if ($tokenised) {
                 $data = $fortisTransaction;
             }
 
-            $status = $fortisTransaction->status_code;
+            $status = $isTicketTransaction ? $fortisTransaction->reason_code_id : $fortisTransaction->status_code;
             if ($fortisTransaction->payment_method === 'ach') {
                 // Handle response from ACH
                 // Pending Origination
@@ -372,32 +387,30 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                         $resultJson = $this->resultJsonFactory->create();
 
                         return $resultJson->setData([
-                            'redirectTo' => $redirectToSuccessPageString,
-                        ]);
+                                                        'redirectTo' => $redirectToSuccessPageString,
+                                                    ]);
                     } else {
                         $redirect->setUrl($redirectToSuccessPageString);
                     }
                 }
             } else {
                 // Handle response from CC transaction
-                if (!$tokenised && ($fortisTransaction->product_transaction_id !== $product_transaction_id_order)) {
+                if (!$tokenised && !$isTicketTransaction && ($fortisTransaction->product_transaction_id !== $product_transaction_id_order)) {
                     throw new RuntimeException(
                         __('Product transaction ids do not match')
                     );
                 }
                 $accountType = $fortisTransaction->account_type;
                 switch ($status) {
-                    case 101:  // Success
-                    case 102:  // Success
+                    case 1000:  // Success for ticket transaction
+                    case 101:   // Success for non-ticket transaction
+                    case 102:
                         // Check for stored card and save if necessary
                         $this->fortisMethodService->saveVaultData($order, $data);
 
-                        $orderData      = $order->getPayment()->getData();
-                        $additionalData = $orderData['additional_information'];
-
                         $status = Order::STATE_PROCESSING;
-                        if ($this->checkoutProcessor->getConfigData('Successful_Order_status') != "") {
-                            $status = $this->checkoutProcessor->getConfigData('Successful_Order_status');
+                        if ($this->paymentMethod->getSpecialConfigData('Successful_Order_status') != "") {
+                            $status = $this->paymentMethod->getSpecialConfigData('Successful_Order_status');
                         }
 
                         $model                  = $this->paymentMethod;
@@ -416,15 +429,22 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                         $invoice->setRequestedCaptureCase(Invoice::CAPTURE_ONLINE);
 
                         $surchargeAmount = 0.00;
-                        if (isset($additionalData['fortis-surcharge-data'])) {
+                        if (isset($surchargeData)) {
+                            $surchargeAmount = $surchargeData['surcharge_amount'];
+                        } elseif (!empty($additionalData['fortis-surcharge-data'])) {
                             $surchargeData   = json_decode($additionalData['fortis-surcharge-data'], true);
                             $surchargeAmount = $surchargeData['surcharge_amount'];
                         } elseif (isset($data->surcharge_amount)) {
                             $surchargeAmount = $data->surcharge_amount;
+                        } elseif (isset($data->surcharge->surcharge_amount)) {
+                            $surchargeAmount = $data->surcharge->surcharge_amount;
                         }
 
-                        // Add surcharge to order
-                        $this->magentoOrderService->applySurcharge($order, $surchargeAmount, $invoice);
+                        try {
+                            $this->magentoOrderService->applySurcharge($order, $surchargeAmount, $invoice);
+                        } catch (\Exception $e) {
+                            $this->logger->error('Error applying surcharge: ' . $e->getMessage());
+                        }
 
                         $invoice->register();
 
@@ -476,8 +496,8 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                             $resultJson = $this->resultJsonFactory->create();
 
                             return $resultJson->setData([
-                                'redirectTo' => $redirectToSuccessPageString,
-                            ]);
+                                                            'redirectTo' => $redirectToSuccessPageString,
+                                                        ]);
                         } else {
                             $redirect->setUrl($redirectToSuccessPageString);
                         }
@@ -498,8 +518,8 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                             $resultJson = $this->resultJsonFactory->create();
 
                             return $resultJson->setData([
-                                'redirectTo' => $redirectToCartPageString,
-                            ]);
+                                                            'redirectTo' => $redirectToCartPageString,
+                                                        ]);
                         } else {
                             $redirect->setUrl($redirectToCartPageString);
                         }

@@ -3,13 +3,18 @@
 namespace Fortispay\Fortis\Model;
 
 use Fortispay\Fortis\Block\Form;
+use Fortispay\Fortis\Service\FortisMethodService;
+use Magento\Directory\Helper\Data as DirectoryHelper;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\DataObject;
 use Magento\Framework\Encryption\EncryptorInterface;
+use Magento\Framework\Event\ManagerInterface;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\UrlInterface;
+use Magento\Payment\Block\Info;
 use Magento\Payment\Model\InfoInterface;
+use Magento\Payment\Model\MethodInterface;
 use Magento\Payment\Observer\AbstractDataAssignObserver;
 use Magento\Quote\Api\Data\CartInterface;
 use Magento\Sales\Api\OrderRepositoryInterface;
@@ -18,11 +23,6 @@ use Magento\Sales\Model\Order\Payment;
 use Magento\Store\Model\ScopeInterface;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
-use Magento\Payment\Model\MethodInterface;
-use Magento\Payment\Block\Info;
-use Magento\Framework\Event\ManagerInterface;
-use Fortispay\Fortis\Service\FortisMethodService;
-use Magento\Directory\Helper\Data as DirectoryHelper;
 
 /**
  * @SuppressWarnings(PHPMD.ExcessivePublicCount)
@@ -71,6 +71,10 @@ class Fortis implements MethodInterface
     private Config $config;
     private DirectoryHelper $directoryHelper;
     private FortisApi $fortisApi;
+    private static array $encryptedConfigKeys = [
+        'user_id',
+        'user_api_key',
+    ];
 
     /**
      * Construct
@@ -478,7 +482,7 @@ class Fortis implements MethodInterface
         $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_id'));
         $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_api_key'));
 
-        $subtotal = $authAmount - ($paymentDetails->tax ?? 0);
+        $subtotalAmount = (int)bcmul((string)($order->getSubtotal() + $order->getShippingAmount()), '100', 0);
 
         // Do auth transaction
         $intentData = [
@@ -486,12 +490,15 @@ class Fortis implements MethodInterface
             "order_number"       => $orderID,
             'transactionId'      => $transactionId,
             'tax'                => ($paymentDetails->tax ?? 0),
-            'subtotal_amount'    => $subtotal,
+            'subtotal_amount'    => $subtotalAmount,
         ];
 
         if (isset($paymentDetails->surcharge->surcharge_amount)) {
             $intentData['subtotal_amount']  -= $paymentDetails->surcharge->surcharge_amount;
             $intentData['surcharge_amount'] = $paymentDetails->surcharge->surcharge_amount;
+        } elseif (isset($paymentDetails->surcharge_amount) && $paymentDetails->surcharge_amount > 0) {
+            $intentData['subtotal_amount']  -= $paymentDetails->surcharge_amount;
+            $intentData['surcharge_amount'] = $paymentDetails->surcharge_amount;
         }
 
         $this->fortisApi->doCompleteAuthTransaction($intentData, $user_id, $user_api_key);
@@ -584,6 +591,24 @@ class Fortis implements MethodInterface
         $path = 'payment/' . $this->getCode() . '/' . $field;
 
         return $this->scopeConfig->getValue($path, ScopeInterface::SCOPE_STORE, $storeId);
+    }
+
+    /**
+     * Custom getter for payment configuration
+     *
+     * @param string $field i.e fortis_id, test_mode
+     *
+     * @return mixed
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     */
+    public function getSpecialConfigData($field)
+    {
+        $configValue = $this->getConfigData($field);
+        if (in_array($field, self::$encryptedConfigKeys)) {
+            $configValue = $this->encryptor->decrypt($configValue);
+        }
+
+        return $configValue;
     }
 
     /**

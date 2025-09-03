@@ -82,7 +82,7 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
         1628 => 'BAD_MERCH_ID',
         1629 => 'DUPLICATE_BATCH',
         1630 => 'REJECTED_BATCH (First attempt at batch close will fail with a transaction in the batch for $6.30. ' .
-            'The second batch close attempt will succeed.)',
+                'The second batch close attempt will succeed.)',
         1631 => 'ACCOUNT_CLOSED'
     ];
 
@@ -239,40 +239,48 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
     }
 
     /**
-     * Execute on fortis/redirect/success
+     * Execute on fortis/redirect/authorise
      * @throws NoSuchEntityException
      */
     public function execute()
     {
-        $json = $this->request->getContent();
-        $GET  = $this->request->getParams();
-        $data = json_decode($json);
+        $json      = $this->request->getContent();
+        $GET       = $this->request->getParams();
+        $data      = json_decode($json);
+        $dataArray = json_decode($json, true);
+
+        $baseurl                     = $this->storeManager->getStore()->getBaseUrl();
+        $redirect                    = $this->resultFactory->create(ResultFactory::TYPE_REDIRECT);
+        $redirectToSuccessPageString = $baseurl . 'checkout/onepage/success';
+        $redirectToCartPageString    = $baseurl . 'checkout/cart';
+
+        $isTicketTransaction = isset($dataArray) && ($dataArray['@action'] === 'ticket');
 
         $tokenised = false;
-        $orderId   = (int)$GET['gid'];
+        $orderId   = isset($GET['gid']) ? (int)$GET['gid'] : null;
         if (!$data) {
             $tokenised = true;
             $data      = new stdClass();
-            $data->id  = $GET['tid'];
+            $data->id  = $GET['tid'] ?? null;
         }
 
         $pre = __METHOD__ . " : ";
         $this->logger->debug($pre . 'bof');
         $order = $this->checkoutSession->getLastRealOrder();
-        if (!$order->getId()) {
+        if (!$order->getId() && $this->request->getParam('gid')) {
             $order = $this->setlastOrderDetails();
         }
         $this->order = $order;
 
-        $baseurl                     = $this->storeManager->getStore()->getBaseUrl();
-        $redirect                    = $this->resultFactory->create(
-            ResultFactory::TYPE_REDIRECT
-        );
-        $redirectToSuccessPageString = $baseurl . 'checkout/onepage/success';
-        $redirectToCartPageString    = $baseurl . 'checkout/cart';
+        $orderData      = $order->getPayment()->getData();
+        $additionalData = $orderData['additional_information'];
 
-        if ((int)$order->getId() !== $orderId) {
-            $redirect->setUrl($redirectToSuccessPageString);
+        if ($isTicketTransaction) {
+            $data = (object)($dataArray ?? []);
+        }
+
+        if ((!$isTicketTransaction && !$tokenised && ((int)$order->getId() !== $orderId)) || !$data) {
+            $redirect->setUrl($redirectToCartPageString);
 
             return $redirect;
         }
@@ -289,18 +297,39 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
         }
         $this->pageFactory->create();
 
-        // Get the transaction
         try {
-            $api               = $this->fortisApi;
-            $user_id           = $this->checkoutProcessor->getConfigData('user_id');
-            $user_api_key      = $this->checkoutProcessor->getConfigData('user_api_key');
-            $rawTransaction    = $api->getTransaction($data->id, $user_id, $user_api_key);
-            $fortisTransaction = $rawTransaction->data;
+            $api          = $this->fortisApi;
+            $user_id      = $this->paymentMethod->getSpecialConfigData('user_id');
+            $user_api_key = $this->paymentMethod->getSpecialConfigData('user_api_key');
 
-            if (!$tokenised && ($fortisTransaction->product_transaction_id !== $product_transaction_id_order)) {
+            if ($isTicketTransaction) {
+                $transactionId = $dataArray['transactionId'] ?? null;
+                if ($transactionId) {
+                    $user_id              = $this->paymentMethod->getSpecialConfigData('user_id');
+                    $user_api_key         = $this->paymentMethod->getSpecialConfigData('user_api_key');
+                    $fortisTransactionObj = $this->fortisApi->getTransaction($transactionId, $user_id, $user_api_key);
+                    $data                 = $fortisTransactionObj->data ?? $fortisTransactionObj;
+                    $fortisTransaction    = $data;
+                } else {
+                    $data              = (object)[];
+                    $fortisTransaction = $data;
+                }
+                $this->fortisApi->patchTransactionDescription($transactionId, $order->getIncrementId());
+            } else {
+                $rawTransaction    = $api->getTransaction($data->id, $user_id, $user_api_key);
+                $fortisTransaction = $rawTransaction->data;
+            }
+
+            if ($tokenised) {
+                $data = $fortisTransaction;
+            }
+
+            $status = $fortisTransaction->reason_code_id;
+            if ($isTicketTransaction) {
+                // For ticket, skip product_transaction_id check
+            } elseif (!$tokenised && ($fortisTransaction->product_transaction_id !== $product_transaction_id_order)) {
                 throw new RuntimeException(new Phrase('Product transaction ids do not match'));
             }
-            $status = $fortisTransaction->reason_code_id;
             switch ($status) {
                 case 1000:  // Success
                     // Check for stored card and save if necessary
@@ -311,8 +340,8 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
                     $additionalData = $orderData['additional_information'];
 
                     $status = Order::STATE_PROCESSING;
-                    if ($this->checkoutProcessor->getConfigData('Successful_Order_status') != "") {
-                        $status = $this->checkoutProcessor->getConfigData('Successful_Order_status');
+                    if ($this->paymentMethod->getSpecialConfigData('Successful_Order_status') != "") {
+                        $status = $this->paymentMethod->getSpecialConfigData('Successful_Order_status');
                     }
 
                     $order_successful_email = $model->getConfigData('order_email');
@@ -322,27 +351,29 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
                         $order->addCommentToStatusHistory(
                             __('Notified customer about order #%1.', $order->getId())
                         )->setIsCustomerNotified(true);
-
                         $this->orderRepository->save($order);
                     }
 
                     $surchargeAmount = 0.00;
-                    if (isset($additionalData['fortis-surcharge-data'])) {
+                    if (isset($surchargeData)) {
+                        $surchargeAmount = $surchargeData['surcharge_amount'];
+                    } elseif (!empty($additionalData['fortis-surcharge-data'])) {
                         $surchargeData   = json_decode($additionalData['fortis-surcharge-data'], true);
                         $surchargeAmount = $surchargeData['surcharge_amount'];
                     } elseif (isset($data->surcharge_amount)) {
                         $surchargeAmount = $data->surcharge_amount;
+                    } elseif (isset($data->surcharge->surcharge_amount)) {
+                        $surchargeAmount = $data->surcharge->surcharge_amount;
                     }
 
                     try {
                         $this->magentoOrderService->applySurcharge($order, $surchargeAmount);
                     } catch (\Exception $e) {
                         $this->logger->error('Error applying surcharge: ' . $e->getMessage());
-                        // Continue processing without surcharge
                     }
 
                     // Save Transaction Response
-                    $this->createTransaction($rawTransaction);
+                    $this->createTransaction($data);
 
                     $order->setPaymentAuthorizationAmount($fortisTransaction->auth_amount / 100.0);
                     $order->setPayment();
@@ -371,8 +402,8 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
                         $resultJson = $this->resultJsonFactory->create();
 
                         return $resultJson->setData([
-                            'redirectTo' => $redirectToSuccessPageString,
-                        ]);
+                                                        'redirectTo' => $redirectToSuccessPageString,
+                                                    ]);
                     } else {
                         $redirect = $this->resultFactory->create(
                             ResultFactory::TYPE_REDIRECT
@@ -397,8 +428,8 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
                         $resultJson = $this->resultJsonFactory->create();
 
                         return $resultJson->setData([
-                            'redirectTo' => $redirectToCartPageString,
-                        ]);
+                                                        'redirectTo' => $redirectToCartPageString,
+                                                    ]);
                     } else {
                         $redirect->setUrl($redirectToCartPageString);
                     }
@@ -408,6 +439,14 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
             $this->createTransaction($data);
             $this->logger->error($pre . $e->getMessage());
             $this->messageManager->addExceptionMessage($e, __('We can\'t start Fortis Checkout.'));
+
+            if ($isTicketTransaction) {
+                $resultJson = $this->resultJsonFactory->create();
+
+                return $resultJson->setData([
+                                                'redirectTo' => $redirectToSuccessPageString,
+                                            ]);
+            }
 
             $redirect->setUrl($redirectToCartPageString);
         }
@@ -425,7 +464,7 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
     public function createTransaction(stdClass $rawData)
     {
         try {
-            $paymentData = $rawData->data;
+            $paymentData = $rawData->data ?? $rawData;
             // Get payment object from order object
             $payment = $this->order->getPayment();
             $payment->setAmountAuthorized($paymentData->transaction_amount / 100.0);
