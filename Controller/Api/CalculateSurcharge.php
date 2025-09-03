@@ -51,13 +51,9 @@ class CalculateSurcharge implements HttpGetActionInterface
 
             $this->logger->info("Calculate Surcharge Request Data: " . json_encode($requestData));
 
-            if (!isset($requestData['public_hash'])) {
+            if (!isset($requestData['public_hash']) && !isset($requestData['ticket_id'])) {
                 throw new InvalidArgumentException("Missing required parameters.");
             }
-
-            $customerId = $this->currentCustomer->getCustomerId();
-            $publicHash = $requestData['public_hash'];
-            $card       = $this->paymentTokenManagement->getByPublicHash($publicHash, $customerId);
 
             $totals     = $this->checkoutProcessor->getCheckoutTotals();
             $postalCode = $this->checkoutProcessor->getCurrentBillingPostalCode();
@@ -65,9 +61,19 @@ class CalculateSurcharge implements HttpGetActionInterface
             $intentData = [
                 'subtotal_amount' => (int)bcmul((string)$totals['subtotal'], '100', 0),
                 'tax_amount'      => (int)bcmul((string)$totals['tax_amount'], '100', 0),
-                'token_id'        => $card['gateway_token'],
                 'zip'             => $postalCode
             ];
+
+            if (isset($requestData['public_hash'])) {
+                $publicHash             = $requestData['public_hash'];
+                $customerId             = $this->currentCustomer->getCustomerId();
+                $card                   = $this->paymentTokenManagement->getByPublicHash($publicHash, $customerId);
+                $intentData['token_id'] = $card['gateway_token'];
+            } elseif (isset($requestData['ticket_id'])) {
+                $intentData['ticket_id'] = $requestData['ticket_id'];
+            } else {
+                throw new InvalidArgumentException("Invalid parameters provided.");
+            }
 
             $surchargeData = $this->fortisApi->calculateSurcharge($intentData);
 

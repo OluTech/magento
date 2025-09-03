@@ -3,6 +3,7 @@
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
     <head>
         <script src="Fortispay_Fortis::js/view/payment/fortis-iframe.js" src_type="module"/>
+        <script src="Fortispay_Fortis::js/view/payment/fortis-ticket-intention.js" src_type="module"/>
     </head>
     <body>
         <referenceBlock name="checkout.root">

@@ -466,6 +466,14 @@ class Config
     }
 
     /**
+     * @return string|null
+     */
+    public function getIntentionFlow(): ?string
+    {
+        return $this->getConfig('intention_flow');
+    }
+
+    /**
      * @return bool
      */
     public function orderSuccessfulEmail(): bool

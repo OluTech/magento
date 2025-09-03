@@ -10,6 +10,7 @@ use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
+use Magento\Sales\Model\Order\Address;
 use Psr\Log\LoggerInterface;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Quote\Model\QuoteRepository;
@@ -18,13 +19,7 @@ use Magento\Customer\Model\Url;
 class CheckoutProcessor
 {
     private const CART_URL = 'checkout/cart';
-    /**
-     * @var array|string[]
-     */
-    private static array $encryptedConfigKeys = [
-        'user_id',
-        'user_api_key',
-    ];
+
     private LoggerInterface $logger;
     private Order $order;
     private OrderRepositoryInterface $orderRepository;
@@ -32,8 +27,6 @@ class CheckoutProcessor
     private QuoteRepository $quoteRepository;
     private ResultFactory $resultFactory;
     private Url $customerUrl;
-    private Fortis $paymentMethod;
-    private EncryptorInterface $encryptor;
 
     /**
      * @param LoggerInterface $logger
@@ -53,9 +46,7 @@ class CheckoutProcessor
         CheckoutSession $checkoutSession,
         QuoteRepository $quoteRepository,
         ResultFactory $resultFactory,
-        Url $customerUrl,
-        Fortis $paymentMethod,
-        EncryptorInterface $encryptor
+        Url $customerUrl
     ) {
         $this->logger          = $logger;
         $this->order           = $order;
@@ -64,8 +55,6 @@ class CheckoutProcessor
         $this->quoteRepository = $quoteRepository;
         $this->resultFactory   = $resultFactory;
         $this->customerUrl     = $customerUrl;
-        $this->paymentMethod   = $paymentMethod;
-        $this->encryptor       = $encryptor;
     }
 
     /**
@@ -119,23 +108,6 @@ class CheckoutProcessor
         return $redirect;
     }
 
-    /**
-     * Custom getter for payment configuration
-     *
-     * @param string $field i.e fortis_id, test_mode
-     *
-     * @return mixed
-     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
-     */
-    public function getConfigData($field)
-    {
-        $configValue = $this->paymentMethod->getConfigData($field);
-        if (in_array($field, self::$encryptedConfigKeys)) {
-            $configValue = $this->encryptor->decrypt($configValue);
-        }
-
-        return $configValue;
-    }
 
     /**
      * Returns login url parameter for redirect
@@ -165,6 +137,20 @@ class CheckoutProcessor
         }
     }
 
+    public function getAddresses(): array
+    {
+        $quote = $this->checkoutSession->getQuote();
+
+        $addressAll = $quote->getBillingAddress();
+        $address    = implode(', ', $addressAll->getStreet());
+        $country    = $addressAll->getCountryId() ?? '';
+        $city       = $addressAll->getCity() ?? '';
+        $postalCode = $addressAll->getPostcode() ?? '';
+        $regionCode = $addressAll->getRegionCode() ?? '';
+
+        return [$address, $country, $city, $postalCode, $regionCode];
+    }
+
     /**
      * Get the current tax amount and subtotal from the checkout quote
      * @return array|null
@@ -176,8 +162,9 @@ class CheckoutProcessor
 
             if (!$quote->getId() || !$quote->getIsActive()) {
                 return [
-                    'subtotal'   => 0,
-                    'tax_amount' => 0
+                    'subtotal'    => 0,
+                    'tax_amount'  => 0,
+                    'grand_total' => 0
                 ];
             }
 
@@ -193,9 +180,12 @@ class CheckoutProcessor
                 $taxAmount = $billingAddress->getTaxAmount();
             }
 
+            $grandTotal = $quote->getGrandTotal();
+
             return [
-                'subtotal'   => $subtotal ?: 0,
-                'tax_amount' => $taxAmount ?: 0
+                'subtotal'    => $subtotal ?: 0,
+                'tax_amount'  => $taxAmount ?: 0,
+                'grand_total' => $grandTotal ?: 0
             ];
         } catch (Exception $e) {
             $this->logger->error('Error calculating quote totals: ' . $e->getMessage());

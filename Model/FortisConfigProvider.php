@@ -2,6 +2,7 @@
 
 namespace Fortispay\Fortis\Model;
 
+use Fortispay\Fortis\Service\CheckoutProcessor;
 use Fortispay\Fortis\Service\FortisMethodService;
 use Magento\Checkout\Model\ConfigProviderInterface;
 use Magento\Customer\Helper\Session\CurrentCustomer;
@@ -13,9 +14,6 @@ use Magento\Framework\View\Asset\Repository;
 use Magento\Payment\Helper\Data as PaymentHelper;
 use Magento\Vault\Model\PaymentTokenManagement;
 use Psr\Log\LoggerInterface;
-use Fortispay\Fortis\Service\CheckoutProcessor;
-use Fortispay\Fortis\Model\FortisApi;
-use Exception;
 
 class FortisConfigProvider implements ConfigProviderInterface
 {
@@ -65,6 +63,7 @@ class FortisConfigProvider implements ConfigProviderInterface
     private $paymentTokenManagement;
     private CheckoutProcessor $checkoutProcessor;
     private FortisApi $fortisApi;
+    private FortisMethodService $fortisMethodService;
 
     /**
      * Construct
@@ -91,7 +90,8 @@ class FortisConfigProvider implements ConfigProviderInterface
         RequestInterface $request,
         PaymentTokenManagement $paymentTokenManagement,
         CheckoutProcessor $checkoutProcessor,
-        FortisApi $fortisApi
+        FortisApi $fortisApi,
+        FortisMethodService $fortisMethodService
     ) {
         $this->logger = $logger;
         $pre          = __METHOD__ . ' : ';
@@ -107,6 +107,7 @@ class FortisConfigProvider implements ConfigProviderInterface
         $this->paymentTokenManagement = $paymentTokenManagement;
         $this->checkoutProcessor      = $checkoutProcessor;
         $this->fortisApi              = $fortisApi;
+        $this->fortisMethodService    = $fortisMethodService;
     }
 
     /**
@@ -165,6 +166,18 @@ class FortisConfigProvider implements ConfigProviderInterface
                 ],
             ],
         ];
+
+        if ($this->config->getIntentionFlow() === 'ticket-intention') {
+            $ticketIntentionToken = $this->fortisMethodService->getTicketIntentionToken();
+            $ticketIntentionData  = $this->fortisMethodService->prepareTicketIntentionData();
+
+            $fortisConfig['payment']['fortis'] =
+                array_merge(
+                    $fortisConfig['payment']['fortis'],
+                    $ticketIntentionData,
+                    ['ticketIntentionToken' => $ticketIntentionToken]
+                );
+        }
 
         $this->logger->debug($pre . 'eof', $fortisConfig);
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## [[1.5.0]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
+
+### Added
+
+- Introduced ticket intention payment flow.
+
 ## [[1.4.1]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
 
 ### Added

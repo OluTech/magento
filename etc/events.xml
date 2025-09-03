@@ -3,9 +3,7 @@
         xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
     <event name="payment_method_assign_data_fortis">
         <observer name="fortis_payment_data_assign"
-                  instance="Fortispay\Fortis\Observer\SaveVaultInfoToOrderObserver"/>
-        <observer name="fortis_payment_type_data_assign"
-                  instance="Fortispay\Fortis\Observer\SavePaymentTypeToOrderObserver"/>
+                  instance="Fortispay\Fortis\Observer\PaymentDataAssignObserver"/>
     </event>
     <event name="vault_payment_token_save_commit_after">
         <observer name="fortis_delete_saved_vault"

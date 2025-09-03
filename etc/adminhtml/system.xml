@@ -38,6 +38,9 @@
                     <label>Enable ACH</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>Select Yes to enable ACH support</comment>
+                    <depends>
+                        <field id="intention_flow">transaction-intention</field>
+                    </depends>
                 </field>
                 <field id="fortis_googlepay_active" translate="label" type="select" sortOrder="3" showInDefault="1"
                        showInWebsite="1"
@@ -45,6 +48,9 @@
                     <label>Enable Google Pay</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>Select Yes to enable Google Pay support</comment>
+                    <depends>
+                        <field id="intention_flow">transaction-intention</field>
+                    </depends>
                 </field>
                 <field id="fortis_applepay_active" translate="label" type="select" sortOrder="3" showInDefault="1"
                        showInWebsite="1"
@@ -52,6 +58,16 @@
                     <label>Enable Apple Pay</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment>Select Yes to enable Apple Pay support</comment>
+                    <depends>
+                        <field id="intention_flow">transaction-intention</field>
+                    </depends>
+                </field>
+                <field id="fortis_ach_location_id" translate="label" type="obscure" sortOrder="3" showInDefault="1"
+                       showInWebsite="1"
+                       showInStore="1">
+                    <validate>required-entry</validate>
+                    <label>Location ID</label>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
                 </field>
                 <field id="fortis_ach_product_id" translate="label" type="obscure" sortOrder="3" showInDefault="1"
                        showInWebsite="1"
@@ -61,6 +77,7 @@
                     <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
                     <depends>
                         <field id="fortis_ach_active">1</field>
+                        <field id="intention_flow">transaction-intention</field>
                     </depends>
                 </field>
                 <field id="fortis_ach_cc_product_id" translate="label" type="obscure" sortOrder="3" showInDefault="1"
@@ -73,22 +90,13 @@
                         <field id="fortis_ach_active">1</field>
                     </depends>
                 </field>
-                <field id="fortis_ach_location_id" translate="label" type="obscure" sortOrder="3" showInDefault="1"
-                       showInWebsite="1"
-                       showInStore="1">
-                    <validate>required-entry</validate>
-                    <label>ACH Location ID (required)</label>
-                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
-                    <depends>
-                        <field id="fortis_ach_active">1</field>
-                    </depends>
-                </field>
                 <field id="fortis_ach_webhook_url" translate="label" type="text" sortOrder="3" showInDefault="1"
                        showInWebsite="1"
                        showInStore="1">
                     <label>ACH Webhook URL</label>
                     <depends>
                         <field id="fortis_ach_active">1</field>
+                        <field id="intention_flow">transaction-intention</field>
                     </depends>
                 </field>
                 <field id="fortis_ach_webhook_id" translate="label" type="hidden" sortOrder="3" showInDefault="0"
@@ -105,6 +113,9 @@
                     <label>Show iFrame on Checkout Page</label>
                     <source_model>Fortispay\Fortis\Model\PaymentPortalLocation</source_model>
                     <comment>Choose whether to render the Payment Gateway on the Checkout page or not</comment>
+                    <depends>
+                        <field id="intention_flow">transaction-intention</field>
+                    </depends>
                 </field>
 
                 <field id="fortis_single_view" translate="label" type="select" sortOrder="3" showInDefault="1"
@@ -141,6 +152,11 @@
                     <label>Order Intention</label>
                     <source_model>Fortispay\Fortis\Model\IntentionType</source_model>
                     <comment>'Sale' processes transaction immediately</comment>
+                </field>
+                <field id="intention_flow" translate="label" type="select" sortOrder="5.5" showInDefault="1"
+                       showInWebsite="1" showInStore="1">
+                    <label>Intention Flow</label>
+                    <source_model>Fortispay\Fortis\Model\IntentionFlow</source_model>
                 </field>
                 <field id="fortis_theme" translate="label" type="select" sortOrder="6" showInDefault="1"
                        showInWebsite="1" showInStore="1">
@@ -184,6 +200,9 @@
                        showInWebsite="1"
                        showInStore="1">
                     <label>Cancel Order Button Text (optional)</label>
+                    <depends>
+                        <field id="intention_flow">transaction-intention</field>
+                    </depends>
                 </field>
                 <field id="fortis_color_button_action_background" translate="label" type="text" sortOrder="7"
                        showInDefault="1" showInWebsite="1" showInStore="0">
