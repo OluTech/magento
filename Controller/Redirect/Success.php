@@ -550,10 +550,10 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
             // Get payment object from order object
             $payment = $this->order->getPayment();
             $payment->setLastTransId($paymentData->id)
-                    ->setTransactionId($paymentData->id)
-                    ->setAdditionalInformation(
-                        [Transaction::RAW_DETAILS => json_encode($paymentData)]
-                    );
+                ->setTransactionId($paymentData->id)
+                ->setAdditionalInformation(
+                    [Transaction::RAW_DETAILS => json_encode($paymentData)]
+                );
             $formattedPrice = $this->order->getBaseCurrency()->formatTxt(
                 $this->order->getGrandTotal()
             );
@@ -562,18 +562,18 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
             // Get the object of builder class
             $trans       = $this->transactionBuilder;
             $transaction = $trans->setPayment($payment)
-                                 ->setOrder($this->order)
-                                 ->setTransactionId($paymentData->id)
-                                 ->setAdditionalInformation(
-                                     [Transaction::RAW_DETAILS => json_encode($paymentData)]
-                                 )
-                                 ->setFailSafe(true)
+                ->setOrder($this->order)
+                ->setTransactionId($paymentData->id)
+                ->setAdditionalInformation(
+                    [Transaction::RAW_DETAILS => json_encode($paymentData)]
+                )
+                ->setFailSafe(true)
                 // Build method creates the transaction and returns the object
-                                 ->build(
-                                     $paymentData->payment_method === 'ach'
-                                     ? Transaction::TYPE_ORDER
-                                     : Transaction::TYPE_CAPTURE
-                                 );
+                ->build(
+                    $paymentData->payment_method === 'ach'
+                        ? Transaction::TYPE_ORDER
+                        : Transaction::TYPE_CAPTURE
+                );
 
             $payment->addTransactionCommentsToOrder(
                 $transaction,

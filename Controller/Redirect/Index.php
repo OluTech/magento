@@ -266,7 +266,7 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
         }
 
         $page_object->getLayout()
-                    ->getBlock('fortis_redirect');
+            ->getBlock('fortis_redirect');
 
         return $page_object;
     }

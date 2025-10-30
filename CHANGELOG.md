@@ -1,5 +1,18 @@
 # Changelog
 
+## [[1.6.0]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
+
+### Added
+
+- Added ACH payment authorization prompt for customers to provide explicit consent, protecting merchants from future
+  charge disputes.
+
+### Fixed
+
+- Resolved compatibility issues with Magento 2.4.6-p6
+- Removed the requirement for users to provide phone numbers during payment processing.
+- Limited street address input to 32 characters to prevent payment submission errors.
+
 ## [[1.5.0]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
 
 ### Added

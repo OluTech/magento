@@ -2,13 +2,13 @@
 
 ?>
 <div class="rk button">
-    <form action="<?= /* @noEscape */
-    $block->getGateUrl(); ?>" method="POST">
+    <form action="<?=/* @noEscape */
+    $block->getGateUrl();?>" method="POST">
         <?php
         foreach ($block->getPostData() as $key => $value): ?>
-            <input type="hidden" name="<?= /* @noEscape */
-            $key; ?>" value="<?= /* @noEscape */
-            $value; ?>"></input>
+            <input type="hidden" name="<?=/* @noEscape */
+            $key;?>" value="<?=/* @noEscape */
+            $value;?>"></input>
             <?php
         endforeach; ?>
         <button type="submit">Pay</button>

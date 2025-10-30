@@ -6,32 +6,32 @@ use Fortispay\Fortis\Model\Payment\IFrameData;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\Element\Template\Context;
-use Magento\Csp\Helper\CspNonceProvider;
 
 class Request extends Template
 {
     private IFrameData $iFrame;
     private ?array $jsConfig;
-    private CspNonceProvider $cspNonceProvider;
+    private $cspNonceProvider = null;
 
     /**
      * Construct
      *
      * @param Context $context
      * @param IFrameData $iFrame
-     * @param CspNonceProvider $cspNonceProvider
      * @param array $data
      */
     public function __construct(
         Context $context,
         IFrameData $iFrame,
-        CspNonceProvider $cspNonceProvider,
         array $data = []
     ) {
         parent::__construct($context, $data);
-        $this->jsConfig         = null;
-        $this->iFrame           = $iFrame;
-        $this->cspNonceProvider = $cspNonceProvider;
+        $this->jsConfig = null;
+        $this->iFrame   = $iFrame;
+        if (class_exists('Magento\\Csp\\Helper\\CspNonceProvider')) {
+            $objectManager          = \Magento\Framework\App\ObjectManager::getInstance();
+            $this->cspNonceProvider = $objectManager->get('Magento\\Csp\\Helper\\CspNonceProvider');
+        }
     }
 
     /**
@@ -43,12 +43,16 @@ class Request extends Template
 
         if ($this->jsConfig['success'] === false) {
             $this->setData('error_html', '<div class="error-message error">' . $this->jsConfig['message'] . '</div>');
-
             return parent::_prepareLayout();
         }
 
+        $options = [];
+        if ($this->cspNonceProvider) {
+            $options['attributes'] = ['nonce' => $this->cspNonceProvider->generateNonce()];
+        }
         $this->pageConfig->addPageAsset(
             'Fortispay_Fortis::js/view/payment/fortis-iframe.js',
+            $options
         );
 
         return parent::_prepareLayout();
@@ -63,13 +67,15 @@ class Request extends Template
     }
 
     /**
-     * Get CSP Nonce
+     * Get CSP Nonce if available
      *
-     * @return String
-     * @throws LocalizedException
+     * @return string|null
      */
-    public function getNonce(): string
+    public function getNonce(): ?string
     {
-        return $this->cspNonceProvider->generateNonce();
+        if ($this->cspNonceProvider) {
+            return $this->cspNonceProvider->generateNonce();
+        }
+        return null;
     }
 }

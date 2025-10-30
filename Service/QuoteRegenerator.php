@@ -65,8 +65,8 @@ class QuoteRegenerator
 
         if ($order->getCustomerId()) {
             $quote->setCustomerId($order->getCustomerId())
-                  ->setCustomerEmail($order->getCustomerEmail())
-                  ->setCustomerIsGuest(false);
+                ->setCustomerEmail($order->getCustomerEmail())
+                ->setCustomerIsGuest(false);
         } else {
             $quote->setCustomerIsGuest(true);
         }

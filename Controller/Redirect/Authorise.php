@@ -82,7 +82,7 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
         1628 => 'BAD_MERCH_ID',
         1629 => 'DUPLICATE_BATCH',
         1630 => 'REJECTED_BATCH (First attempt at batch close will fail with a transaction in the batch for $6.30. ' .
-                'The second batch close attempt will succeed.)',
+            'The second batch close attempt will succeed.)',
         1631 => 'ACCOUNT_CLOSED'
     ];
 
@@ -470,11 +470,11 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
             $payment->setAmountAuthorized($paymentData->transaction_amount / 100.0);
             $payment->setAmountPaid(0.00);
             $payment->setLastTransId($paymentData->id)
-                    ->setTransactionId($paymentData->id)
-                    ->setIsTransactionClosed(false)
-                    ->setAdditionalInformation(
-                        [Transaction::RAW_DETAILS => json_encode($paymentData)]
-                    );
+                ->setTransactionId($paymentData->id)
+                ->setIsTransactionClosed(false)
+                ->setAdditionalInformation(
+                    [Transaction::RAW_DETAILS => json_encode($paymentData)]
+                );
             $formattedPrice = $this->order->getBaseCurrency()->formatTxt(
                 $this->order->getGrandTotal()
             );
@@ -483,14 +483,14 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
             // Get the object of builder class
             $trans       = $this->transactionBuilder;
             $transaction = $trans->setPayment($payment)
-                                 ->setOrder($this->order)
-                                 ->setTransactionId($paymentData->id)
-                                 ->setAdditionalInformation(
-                                     [Transaction::RAW_DETAILS => json_encode($paymentData)]
-                                 )
-                                 ->setFailSafe(true)
+                ->setOrder($this->order)
+                ->setTransactionId($paymentData->id)
+                ->setAdditionalInformation(
+                    [Transaction::RAW_DETAILS => json_encode($paymentData)]
+                )
+                ->setFailSafe(true)
                 // Build method creates the transaction and returns the object
-                                 ->build(TransactionInterface::TYPE_AUTH);
+                ->build(TransactionInterface::TYPE_AUTH);
 
             $payment->addTransactionCommentsToOrder(
                 $transaction,

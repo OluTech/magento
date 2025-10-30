@@ -100,7 +100,11 @@ class IFrameData
                                                           $address ? [
                                                               'name'     => 'address',
                                                               'required' => false,
-                                                              'value'    => $address
+                                                              'value'    => strlen($address) > 32 ? substr(
+                                                                  $address,
+                                                                  0,
+                                                                  32
+                                                              ) : $address
                                                           ] : null,
                                                           $country ? [
                                                               'name'     => 'country',

@@ -78,11 +78,15 @@ class TicketTransaction implements HttpPostActionInterface, CsrfAwareActionInter
                     $address     = $this->addressRepository->getById($addressId);
                     $streetArray = $address->getStreet();
                     $telephone   = $address->getTelephone();
+                    $street      = !empty($streetArray) ? implode(' ', $streetArray) : '';
+                    if (strlen($street) > 32) {
+                        $street = substr($street, 0, 32);
+                    }
                     $billingInfo = [
                         'city'        => $address->getCity(),
                         'state'       => $address->getRegion()->getRegionCode(),
                         'postal_code' => $address->getPostcode(),
-                        'street'      => !empty($streetArray) ? implode(' ', $streetArray) : '',
+                        'street'      => $street,
                         'phone'       => preg_replace('/\D/', '', $telephone)
                     ];
                 } catch (\Exception $e) {
@@ -98,13 +102,20 @@ class TicketTransaction implements HttpPostActionInterface, CsrfAwareActionInter
                 $streetArray = $billingAddress ? $billingAddress->getStreet() : [];
                 $telephone   = $billingAddress && $billingAddress->getTelephone() ? $billingAddress->getTelephone(
                 ) : '';
+                $street      = !empty($streetArray) ? implode(' ', $streetArray) : '';
+                if (strlen($street) > 32) {
+                    $street = substr($street, 0, 32);
+                }
                 $billingInfo = [
                     'city'        => $billingAddress ? $billingAddress->getCity() : '',
                     'state'       => $billingAddress ? $billingAddress->getRegion() : '',
                     'postal_code' => $billingAddress ? $billingAddress->getPostcode() : '',
-                    'street'      => !empty($streetArray) ? implode(' ', $streetArray) : '',
-                    'phone'       => preg_replace('/\D/', '', $telephone)
+                    'street'      => $street,
                 ];
+
+                if ($telephone) {
+                    $billingInfo['phone'] = preg_replace('/\D/', '', $telephone);
+                }
             }
 
             $totals = [
