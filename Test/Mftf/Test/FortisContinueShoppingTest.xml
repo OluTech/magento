@@ -11,8 +11,11 @@
         </annotations>
 
         <before>
-            <magentoCLI command="config:set {{EnableFreeShippingConfigData.path}} {{EnableFreeShippingConfigData.value}}" stepKey="enableFreeShipping"/>
-            <magentoCLI command="config:set payment/fortis/fortis_checkout_iframe_enabled iframe" stepKey="setFortisIFrameEnabled"/>
+            <magentoCLI
+                    command="config:set {{EnableFreeShippingConfigData.path}} {{EnableFreeShippingConfigData.value}}"
+                    stepKey="enableFreeShipping"/>
+            <magentoCLI command="config:set payment/fortis/fortis_checkout_iframe_enabled iframe"
+                        stepKey="setFortisIFrameEnabled"/>
             <magentoCLI command="config:set payment/fortis/fortis_single_view single" stepKey="setFortisClassicView"/>
 
             <!-- Login -->
@@ -39,7 +42,8 @@
         <actionGroup ref="LoginToStorefrontActionGroup" stepKey="loginAsCustomer">
             <argument name="Customer" value="$$createCustomer$$"/>
         </actionGroup>
-        <amOnPage url="{{StorefrontProductPage.url($createVirtualProduct.custom_attributes[url_key]$)}}" stepKey="amOnStorefrontVirtualProductPage"/>
+        <amOnPage url="{{StorefrontProductPage.url($createVirtualProduct.custom_attributes[url_key]$)}}"
+                  stepKey="amOnStorefrontVirtualProductPage"/>
         <waitForPageLoad stepKey="waitForPageLoad2"/>
         <actionGroup ref="AddToCartFromStorefrontProductPageActionGroup" stepKey="cartAddVirtualProductToCart">
             <argument name="productName" value="$createVirtualProduct.name$"/>
@@ -56,7 +60,8 @@
         <click selector="{{CheckoutPaymentSection.placeOrder}}" stepKey="clickPlaceOrder"/>
 
         <waitForAjaxLoad stepKey="waitforiframe"/>
-        <waitForElementVisible selector="{{FortisSection.FortisContinueShoppingButton}}" stepKey="waitForContinueShopping"/>
+        <waitForElementVisible selector="{{FortisSection.FortisContinueShoppingButton}}"
+                               stepKey="waitForContinueShopping"/>
 
         <!--Click Continue Shopping button-->
         <click selector="{{FortisSection.FortisContinueShoppingButton}}" stepKey="clickContinueShopping"/>

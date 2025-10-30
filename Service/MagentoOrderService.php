@@ -89,9 +89,9 @@ class MagentoOrderService
     private function updateOrderTotals(Order $order, float $surchargeAmount): void
     {
         $order->setSubtotal($order->getSubtotal() + $surchargeAmount)
-              ->setBaseSubtotal($order->getBaseSubtotal() + $surchargeAmount)
-              ->setGrandTotal($order->getGrandTotal() + $surchargeAmount)
-              ->setBaseGrandTotal($order->getBaseGrandTotal() + $surchargeAmount);
+            ->setBaseSubtotal($order->getBaseSubtotal() + $surchargeAmount)
+            ->setGrandTotal($order->getGrandTotal() + $surchargeAmount)
+            ->setBaseGrandTotal($order->getBaseGrandTotal() + $surchargeAmount);
     }
 
     /**

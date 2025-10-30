@@ -5,25 +5,26 @@
 $accNumberView = $escaper->escapeHtml($block->getNumberLast4Digits());
 ?>
 <tr>
-    <td data-th="<?= $escaper->escapeHtml(__('Account Number')) ?>" class="col card-number">
-        <span><?= $escaper->escapeHtml(__('ending')) ?></span> <?= /* @noEscape */ $accNumberView ?>
+    <td data-th="<?=$escaper->escapeHtml(__('Account Number'))?>" class="col card-number">
+        <span><?=$escaper->escapeHtml(__('ending'))?></span> <?=/* @noEscape */
+        $accNumberView?>
     </td>
-    <td data-th="<?= $escaper->escapeHtml(__('Expiration Date')) ?>" class="col card-expire">
-        <?= $escaper->escapeHtml($block->getExpDate()) ?>
+    <td data-th="<?=$escaper->escapeHtml(__('Expiration Date'))?>" class="col card-expire">
+        <?=$escaper->escapeHtml($block->getExpDate())?>
     </td>
-    <td data-th="<?= $escaper->escapeHtmlAttr(__('ACH Account')) ?>" class="col ach-account card-type">
-        <img src="<?= $escaper->escapeHtmlAttr($block->getIconUrl()) ?>"
-             width="<?= $escaper->escapeHtmlAttr($block->getIconWidth()) ?>"
-             height="<?= $escaper->escapeHtmlAttr($block->getIconHeight()) ?>"
-             alt="<?= $escaper->escapeHtmlAttr(__('Fortis Logo')) ?>">
+    <td data-th="<?=$escaper->escapeHtmlAttr(__('ACH Account'))?>" class="col ach-account card-type">
+        <img src="<?=$escaper->escapeHtmlAttr($block->getIconUrl())?>"
+             width="<?=$escaper->escapeHtmlAttr($block->getIconWidth())?>"
+             height="<?=$escaper->escapeHtmlAttr($block->getIconHeight())?>"
+             alt="<?=$escaper->escapeHtmlAttr(__('Fortis Logo'))?>">
     </td>
-    <td data-th="<?= $escaper->escapeHtmlAttr(__('Actions')) ?>" class="col actions">
+    <td data-th="<?=$escaper->escapeHtmlAttr(__('Actions'))?>" class="col actions">
         <form class="form"
-              action="<?= $escaper->escapeUrl($block->getUrl('vault/cards/deleteaction')) ?>"
+              action="<?=$escaper->escapeUrl($block->getUrl('vault/cards/deleteaction'))?>"
               method="post">
-            <?= $block->getBlockHtml('formkey') ?>
+            <?=$block->getBlockHtml('formkey')?>
             <input name="public_hash"
-                   value="<?= $escaper->escapeHtmlAttr($block->getToken()->getPublicHash()) ?>"
+                   value="<?=$escaper->escapeHtmlAttr($block->getToken()->getPublicHash())?>"
                    type="hidden"/>
             <button type="submit"
                     class="action delete"
@@ -32,11 +33,11 @@ $accNumberView = $escaper->escapeHtml($block->getNumberLast4Digits());
                             "type": "popup",
                             "modalClass": "my-credit-cards-popup",
                             "toggleEvent": "click",
-                            "title": "<?= $escaper->escapeHtmlAttr(__('Delete')) ?>",
+                            "title": "<?=$escaper->escapeHtmlAttr(__('Delete'))?>",
                             "content": "Are you sure you want to delete this Fortis ACH account?"
                         }
                     }'>
-                <span><?= $escaper->escapeHtml(__('Delete')) ?></span>
+                <span><?=$escaper->escapeHtml(__('Delete'))?></span>
             </button>
         </form>
     </td>

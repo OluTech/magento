@@ -10,11 +10,13 @@
 
         <!-- Fill credit card number -->
         <waitForElement selector="{{FortisSection.FortisCreditCardNumberField}}" stepKey="waitForCardNumberInput"/>
-        <fillField userInput="4111111111111111" selector="{{FortisSection.FortisCreditCardNumberField}}" stepKey="appendCardNumber"/>
+        <fillField userInput="4111111111111111" selector="{{FortisSection.FortisCreditCardNumberField}}"
+                   stepKey="appendCardNumber"/>
 
         <!-- Fill credit card expiration date -->
         <waitForElement selector="{{FortisSection.FortisCreditCardExpField}}" stepKey="waitForCardExpInput"/>
-        <fillField userInput="1225" selector="{{FortisSection.FortisCreditCardExpField}}" stepKey="appendExpirationDate"/>
+        <fillField userInput="1225" selector="{{FortisSection.FortisCreditCardExpField}}"
+                   stepKey="appendExpirationDate"/>
 
         <!-- Fill credit card cvv code -->
         <waitForElement selector="{{FortisSection.FortisCreditCardCVVField}}" stepKey="waitForCardCVVInput"/>

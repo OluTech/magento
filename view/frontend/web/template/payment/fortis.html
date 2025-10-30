@@ -5,13 +5,10 @@
                name="payment[method]"
                type="radio"/>
         <label class="label" data-bind="attr: {'for': getCode()}">
-            <!-- Fortis Logo -->
             <img alt=""
                  class="payment-icon"
                  width="150"
                  data-bind="attr: {src: getPaymentAcceptanceMarkSrc(), alt: $t('Acceptance Mark')}"/>
-            <!--alt tag replaced by knockout js via databind at loadtime-->
-            <!-- Fortis Logo -->
             <span data-bind="text: getTitle()"></span>
         </label>
     </div>
@@ -26,7 +23,6 @@
         </div>
         <!-- /ko -->
         <!-- ko if:(checkFortisSavedCard() > 0) -->
-
         <div class="saved_cards">
             <select id="fortis-saved_cards" name="fortis-saved_cards" data-bind="event: { change: displaySurcharge }">
                 <!-- ko foreach: { data: JSON.parse(getFortisSavedCardList()), as: 'card' } -->
@@ -49,21 +45,30 @@
                     <!-- /ko -->
                 </option>
             </select>
+
             <div id="surcharge-disclaimer" style="margin-left: 23px;"></div>
+            <div class="field choice fortis-agreement" style="margin: 15px; display: none;">
+        <input type="checkbox" id="fortis-agreement-checkbox" name="fortis-agreement" />
+        <label for="fortis-agreement-checkbox">
+            I authorize Merchant to electronically debit my Bank Account indicated above for any fees due Merchant.
+            If this item is dishonored for any reason, I authorize Merchant to initiate an additional electronic debit to the same Account
+            for a returned item fee in the amount of $30.
+            My signature and/or electronic submission on this agreement below shall be my authorization to execute these electronic transactions.
+            This authorization shall remain in full force and effect until Merchant has received written notification from me of its termination
+            in such a time and manner as to afford Merchant a reasonable opportunity to act on it.
+        </label>
+</div>
         </div>
         <!-- /ko -->
         <!-- /ko -->
-
         <div class="payment-method-billing-address">
             <!-- ko foreach: $parent.getRegion(getBillingAddressFormName()) -->
             <!-- ko template: getTemplate() --><!-- /ko -->
             <!--/ko-->
         </div>
-
         <div id="fortis-payment-form-container"></div>
 
         <div id="ticket-surcharge-disclaimer" style="margin-left: 23px;"></div>
-
         <div class="checkout-agreements-block">
             <!-- ko foreach: $parent.getRegion('before-place-order') -->
             <!-- ko template: getTemplate() --><!-- /ko -->

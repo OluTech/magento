@@ -162,9 +162,9 @@ class FortisConfigProvider implements ConfigProviderInterface
                     'isCheckoutIframe'          => $this->config->isCheckoutIframe(),
                     'isSingleView'              => $this->config->isSingleView(),
                     'placeOrderBtnText'         => $this->config->getPlaceOrderBtnText(),
-                    'surchargeDisclaimer'       => FortisMethodService::FORTIS_SURCHARGE_DISCLAIMER
-                ],
-            ],
+                    'surchargeDisclaimer'       => FortisMethodService::FORTIS_SURCHARGE_DISCLAIMER,
+                ]
+            ]
         ];
 
         if ($this->config->getIntentionFlow() === 'ticket-intention') {

@@ -42,8 +42,8 @@ class Classic implements HttpPostActionInterface, HttpGetActionInterface
         $pageObject = $this->pageFactory->create();
 
         $blockContent = $pageObject->getLayout()
-                                   ->getBlock('fortis_redirect')
-                                   ->toHtml();
+            ->getBlock('fortis_redirect')
+            ->toHtml();
 
         try {
             $this->checkoutProcessor->initOrderState();

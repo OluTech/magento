@@ -2,10 +2,12 @@
           xsi:noNamespaceSchemaLocation="urn:magento:mftf:Page/etc/SectionObject.xsd">
     <section name="FortisSection">
         <element name="FortisPaymentMethodRadio" type="radio" selector="input#fortis" timeout="30"/>
-        <element name="FortisContinueShoppingButton" type="button" selector="#fortis-continue-shopping-btn" timeout="30"/>
+        <element name="FortisContinueShoppingButton" type="button" selector="#fortis-continue-shopping-btn"
+                 timeout="30"/>
         <element name="FortisPayNowButton" type="button" selector="#submit-button > div > button" timeout="30"/>
         <element name="FortisPayIFrame" type="iframe" selector="#fortis_payment327 iframe" timeout="30"/>
-        <element name="FortisClassicBillingInfo" type="iframe" selector="#form-main > section.billing-info" timeout="30"/>
+        <element name="FortisClassicBillingInfo" type="iframe" selector="#form-main > section.billing-info"
+                 timeout="30"/>
         <element name="FortisCreditCardNumberField" type="input" selector="input#cc_account_number.input" timeout="30"/>
         <element name="FortisCreditCardExpField" type="input" selector="input#cc_exp.input" timeout="30"/>
         <element name="FortisCreditCardCVVField" type="input" selector="input#cc_cvv.input" timeout="30"/>

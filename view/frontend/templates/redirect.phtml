@@ -1,11 +1,14 @@
 <?php
 /** @var \Magento\Framework\View\Element\Template $block */
+
 /** @var \Magento\Framework\View\Helper\SecureHtmlRenderer $secureRenderer */
 /** @var \Magento\Framework\Escaper $escaper */
 ?>
-    <div id="fortis-data" data-config='<?= $escaper->escapeHtmlAttr(json_encode($block->getJSConfig())) ?>'></div>
-<?php if ($block->getData('error_html')): ?>
+<div id="fortis-data" data-config='<?=$escaper->escapeHtmlAttr(json_encode($block->getJSConfig()))?>'></div>
+<?php
+if ($block->getData('error_html')): ?>
     <div class="error-container">
-        <?= $escaper->escapeHtml($block->getData('error_html')); ?>
+        <?=$escaper->escapeHtml($block->getData('error_html'));?>
     </div>
-<?php endif; ?>
+    <?php
+endif; ?>

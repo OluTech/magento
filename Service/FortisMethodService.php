@@ -408,7 +408,11 @@ class FortisMethodService
                                                           $address ? [
                                                               'name'     => 'address',
                                                               'required' => false,
-                                                              'value'    => $address
+                                                              'value'    => strlen($address) > 32 ? substr(
+                                                                  $address,
+                                                                  0,
+                                                                  32
+                                                              ) : $address
                                                           ] : null,
                                                           $postalCode ? [
                                                               'name'     => 'postal_code',
@@ -650,18 +654,18 @@ class FortisMethodService
             $newPayment = $order->getPayment();
             $newPayment->setAmountAuthorized($authAmount / 100.0);
             $payment->setLastTransId($data->id)
-                    ->setTransactionId($data->id)
-                    ->setAdditionalInformation(
-                        [Transaction::RAW_DETAILS => json_encode($response)]
-                    );
+                ->setTransactionId($data->id)
+                ->setAdditionalInformation(
+                    [Transaction::RAW_DETAILS => json_encode($response)]
+                );
             $transaction = $this->transactionBuilder->setPayment($payment)
-                                                    ->setOrder($order)
-                                                    ->setTransactionId($data->id)
-                                                    ->setAdditionalInformation(
-                                                        [Transaction::RAW_DETAILS => json_encode($response)]
-                                                    )
-                                                    ->setFailSafe(true)
-                                                    ->build(TransactionInterface::TYPE_VOID);
+                ->setOrder($order)
+                ->setTransactionId($data->id)
+                ->setAdditionalInformation(
+                    [Transaction::RAW_DETAILS => json_encode($response)]
+                )
+                ->setFailSafe(true)
+                ->build(TransactionInterface::TYPE_VOID);
 
             $message = __('The authorised amount has been voided');
             $payment->addTransactionCommentsToOrder($transaction, $message);
@@ -712,7 +716,7 @@ class FortisMethodService
         } else {
             $paymentTokenType = PaymentTokenFactoryInterface::TOKEN_TYPE_CREDIT_CARD;
             $tokenType        = self::AVAILABLE_CC_TYPES[$savedAccount->account_type]
-                                ?? $savedAccount->account_type;
+                ?? $savedAccount->account_type;
         }
 
         $tokenDetails = [

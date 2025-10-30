@@ -50,11 +50,11 @@ class ProcessTokenizedPayment implements HttpPostActionInterface
     public function execute()
     {
         $result = $this->resultJsonFactory->create();
-        $pre = __METHOD__ . " : ";
+        $pre    = __METHOD__ . " : ";
 
         try {
             $requestData = $this->request->getContent();
-            $data = json_decode($requestData, true);
+            $data        = json_decode($requestData, true);
 
             $this->logger->debug($pre . "Tokenized Payment Request Data: " . json_encode($data));
 
@@ -93,8 +93,8 @@ class ProcessTokenizedPayment implements HttpPostActionInterface
             $guid = str_replace('-', '', $guid);
 
             $subtotalAmount = (int)bcmul((string)($totals['subtotal']), '100', 0);
-            $totalAmount = (int)bcmul((string)$totals['grand_total'], '100', 0);
-            $taxAmount = (int)bcmul((string)$totals['tax_amount'], '100', 0);
+            $totalAmount    = (int)bcmul((string)$totals['grand_total'], '100', 0);
+            $taxAmount      = (int)bcmul((string)$totals['tax_amount'], '100', 0);
 
             $intentData = [
                 'transaction_amount' => $totalAmount,
@@ -123,12 +123,11 @@ class ProcessTokenizedPayment implements HttpPostActionInterface
                 }
 
                 $result->setData([
-                    'success' => true,
-                    'transaction_id' => $transactionResult->data->id,
-                    'type' => 'ach',
-                    'message' => 'ACH transaction processed successfully'
-                ]);
-
+                                     'success'        => true,
+                                     'transaction_id' => $transactionResult->data->id,
+                                     'type'           => 'ach',
+                                     'message'        => 'ACH transaction processed successfully'
+                                 ]);
             } else {
                 if (isset($surchargeData['surcharge_amount'])) {
                     $intentData['transaction_amount'] = $surchargeData['transaction_amount'];
@@ -156,29 +155,28 @@ class ProcessTokenizedPayment implements HttpPostActionInterface
                 }
 
                 $result->setData([
-                    'success' => true,
-                    'transaction_id' => $transactionResult->data->id,
-                    'reason_code_id' => $transactionResult->data->reason_code_id,
-                    'type' => 'card',
-                    'action' => $action,
-                    'message' => 'Card transaction processed successfully'
-                ]);
+                                     'success'        => true,
+                                     'transaction_id' => $transactionResult->data->id,
+                                     'reason_code_id' => $transactionResult->data->reason_code_id,
+                                     'type'           => 'card',
+                                     'action'         => $action,
+                                     'message'        => 'Card transaction processed successfully'
+                                 ]);
             }
-
         } catch (LocalizedException $e) {
             $this->logger->error($pre . $e->getMessage());
             $result->setHttpResponseCode(400);
             $result->setData([
-                'success' => false,
-                'error' => $e->getMessage()
-            ]);
+                                 'success' => false,
+                                 'error'   => $e->getMessage()
+                             ]);
         } catch (Exception $e) {
             $this->logger->error($pre . $e->getMessage());
             $result->setHttpResponseCode(500);
             $result->setData([
-                'success' => false,
-                'error' => 'An unexpected error occurred. Please try again.'
-            ]);
+                                 'success' => false,
+                                 'error'   => 'An unexpected error occurred. Please try again.'
+                             ]);
         }
 
         return $result;
