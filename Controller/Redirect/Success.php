@@ -395,7 +395,12 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                 }
             } else {
                 // Handle response from CC transaction
-                if (!$tokenised && !$isTicketTransaction && ($fortisTransaction->product_transaction_id !== $product_transaction_id_order)) {
+                if (!$tokenised && !$isTicketTransaction &&
+                    ($fortisTransaction->product_transaction_id !== $product_transaction_id_order && !empty(
+                        $this->paymentMethod->getSpecialConfigData(
+                            'product_transaction_id'
+                        )
+                        ))) {
                     throw new RuntimeException(
                         __('Product transaction ids do not match')
                     );

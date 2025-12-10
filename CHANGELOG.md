@@ -1,5 +1,11 @@
 # Changelog
 
+## [[1.6.1]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
+
+### Fixed
+
+- Fixed a cart page error that occurred when using Payment then Order Intention Flow with an empty product ID field.
+
 ## [[1.6.0]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
 
 ### Added

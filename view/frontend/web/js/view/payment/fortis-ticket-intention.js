@@ -6,6 +6,11 @@
     let spinner = null;
     let ticketIntentionData = null;
 
+    function isFortisPaymentSelected() {
+        const fortisRadio = document.querySelector('input[name="payment[method]"][value="fortis"]');
+        return fortisRadio && fortisRadio.checked;
+    }
+
     function getFortisModuleName(env) {
         return env === 'production' ? 'fortis-commerce-prod' : 'fortis-commerce-sandbox';
     }
@@ -140,7 +145,10 @@
             if (spinner) {
                 spinner.remove();
             }
-            if (window.checkoutConfig.selectedPaymentMethod === 'fortis') {
+            const isFortisSelected = isFortisPaymentSelected() || 
+                                   window.checkoutConfig?.selectedPaymentMethod === 'fortis';
+                                   
+            if (isFortisSelected) {
                 const container = document.getElementById('fortis-payment-form-container');
                 const paymentForm = document.getElementById('fortis_payment420');
                 if (paymentForm && container && paymentForm instanceof Node && paymentForm.parentNode !== container) {
@@ -200,8 +208,13 @@
             return;
         }
         const cancelBtn = document.getElementById('cancel-order-btn');
+        const continueBtn = document.getElementById('continue-order-btn');
+
         if (cancelBtn) {
             cancelBtn.disabled = true;
+        }
+        if (continueBtn) {
+            continueBtn.disabled = true;
         }
         let ticketTransactionData = null;
         let transactionId = null;
@@ -228,6 +241,8 @@
                     );
                     if (!ticketTransactionResponse.ok) {
                         console.error('Ticket transaction request failed:', ticketTransactionResponse.status);
+                        continueBtn.disabled = false;
+                        cancelBtn.disabled = false;
                         return;
                     }
                     try {
@@ -248,10 +263,14 @@
                     } catch (jsonErr) {
                         const text = await ticketTransactionResponse.text();
                         console.error('Ticket transaction response is not valid JSON. Raw response:', text);
+                        continueBtn.disabled = false;
+                        cancelBtn.disabled = false;
                         return;
                     }
                 } catch (err) {
                     console.error('Error running ticketTransaction:', err);
+                    continueBtn.disabled = false;
+                    cancelBtn.disabled = false;
                     return;
                 }
 
@@ -329,15 +348,4 @@
 
     window.fortisGenerateTicketIntentionPayForm = generateTicketIntentionPayForm;
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            if (window.checkoutConfig?.payment?.fortis) {
-                generateTicketIntentionPayForm();
-            }
-        });
-    } else {
-        if (window.checkoutConfig?.payment?.fortis) {
-            generateTicketIntentionPayForm();
-        }
-    }
 })();

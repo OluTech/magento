@@ -59,6 +59,8 @@ define(
         this.isChecked.subscribe(function (isChecked) {
           if (isChecked) {
             this.onPaymentMethodSelected();
+          } else {
+            this.onPaymentMethodDeselected();
           }
         }.bind(this));
 
@@ -93,6 +95,13 @@ define(
       },
       onPaymentMethodSelected: function () {
         this.checkTicketIntentionLoad();
+      },
+
+      onPaymentMethodDeselected: function () {
+        const form = document.getElementById('fortis_payment420');
+        if (form) {
+          form.style.display = 'none';
+        }
       },
 
       getData: function () {
@@ -219,6 +228,10 @@ define(
         return true;
       },
       checkTicketIntentionLoad: function () {
+        if (window.fortisGenerateTicketIntentionPayForm && typeof window.fortisGenerateTicketIntentionPayForm === 'function') {
+          window.fortisGenerateTicketIntentionPayForm();
+        }
+        
         const form = document.getElementById('fortis_payment420');
         if (!form) return;
 

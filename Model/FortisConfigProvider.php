@@ -168,8 +168,14 @@ class FortisConfigProvider implements ConfigProviderInterface
         ];
 
         if ($this->config->getIntentionFlow() === 'ticket-intention') {
-            $ticketIntentionToken = $this->fortisMethodService->getTicketIntentionToken();
-            $ticketIntentionData  = $this->fortisMethodService->prepareTicketIntentionData();
+            try {
+                $ticketIntentionToken = $this->fortisMethodService->getTicketIntentionToken();
+            } catch (LocalizedException $e) {
+                $this->logger->critical($e);
+                $ticketIntentionToken = null;
+            }
+
+            $ticketIntentionData = $this->fortisMethodService->prepareTicketIntentionData();
 
             $fortisConfig['payment']['fortis'] =
                 array_merge(
