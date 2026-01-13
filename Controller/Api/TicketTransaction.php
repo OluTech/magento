@@ -3,6 +3,7 @@
 namespace Fortispay\Fortis\Controller\Api;
 
 use Fortispay\Fortis\Service\FortisMethodService;
+use Fortispay\Fortis\Service\CheckoutProcessor;
 use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\App\CsrfAwareActionInterface;
 use Magento\Framework\App\Request\InvalidRequestException;
@@ -23,6 +24,7 @@ class TicketTransaction implements HttpPostActionInterface, CsrfAwareActionInter
     private LoggerInterface $logger;
     private RequestInterface $request;
     private AddressRepositoryInterface $addressRepository;
+    private CheckoutProcessor $checkoutProcessor;
 
     public function __construct(
         JsonFactory $resultJsonFactory,
@@ -31,7 +33,8 @@ class TicketTransaction implements HttpPostActionInterface, CsrfAwareActionInter
         CheckoutSession $checkoutSession,
         LoggerInterface $logger,
         RequestInterface $request,
-        AddressRepositoryInterface $addressRepository
+        AddressRepositoryInterface $addressRepository,
+        CheckoutProcessor $checkoutProcessor
     ) {
         $this->resultJsonFactory   = $resultJsonFactory;
         $this->fortisMethodService = $fortisMethodService;
@@ -40,6 +43,7 @@ class TicketTransaction implements HttpPostActionInterface, CsrfAwareActionInter
         $this->logger              = $logger;
         $this->request             = $request;
         $this->addressRepository   = $addressRepository;
+        $this->checkoutProcessor   = $checkoutProcessor;
     }
 
     public function execute()
@@ -117,15 +121,12 @@ class TicketTransaction implements HttpPostActionInterface, CsrfAwareActionInter
                     $billingInfo['phone'] = preg_replace('/\D/', '', $telephone);
                 }
             }
-
+            $totals = $this->checkoutProcessor->getCheckoutTotals();
+            
             $totals = [
-                'subtotal_amount'    => (int)bcmul(
-                    (string)($quote->getSubtotal() + $quote->getShippingAddress()->getShippingAmount()),
-                    '100',
-                    0
-                ),
-                'tax'                => (int)bcmul((string)$quote->getShippingAddress()->getTaxAmount(), '100', 0),
-                'transaction_amount' => (int)bcmul((string)$quote->getGrandTotal(), '100', 0)
+                'subtotal_amount'    => (int)bcmul((string)$totals['subtotal'], '100', 0),
+                'tax'                => (int)bcmul((string)$totals['tax_amount'], '100', 0),
+                'transaction_amount' => (int)bcmul((string)$totals['grand_total'], '100', 0)
             ];
 
             $ticketIntention['order_id'] = $quote->getReservedOrderId() ?? $quote->getId();

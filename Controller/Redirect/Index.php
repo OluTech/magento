@@ -168,7 +168,11 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
             $api            = $this->fortisApi;
             $guid           = strtoupper(Uuid::uuid4());
             $guid           = str_replace('-', '', $guid);
-            $subtotalAmount = (int)bcmul((string)($order->getSubtotal() + $order->getShippingAmount()), '100', 0);
+            $subtotalAmount = (int)bcmul(
+                (string)($order->getSubtotal() + $order->getShippingAmount() + $order->getDiscountAmount()),
+                '100',
+                0
+            );
             $intentData     = [
                 'transaction_amount' => (int)bcmul((string)$order->getTotalDue(), '100', 0),
                 'token_id'           => $gatewayToken,
