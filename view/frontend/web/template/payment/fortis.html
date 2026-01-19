@@ -3,7 +3,7 @@
         <input class="radio"
                data-bind="attr: {'id': getCode()}, value: getCode(), checked: isChecked, click: selectPaymentMethod, visible: isRadioButtonVisible()"
                name="payment[method]"
-               type="radio"/>
+               type="radio">
         <label class="label" data-bind="attr: {'for': getCode()}">
             <img alt=""
                  class="payment-icon"
@@ -17,7 +17,7 @@
         <!-- ko if:(checkFortisSavedCard() <= 0) -->
         <div class="fortis-vault-method-block field choice" data-bind="visible: isFortisVaultEnabled()">
             <input type="checkbox" name="fortis-vault-method"
-                   data-bind="checked: checkFortisSavedCard, click: useFortisVaultEnabled, attr: {id: 'fortis-vault-method'}"/>
+                   data-bind="checked: checkFortisSavedCard, click: useFortisVaultEnabled, attr: {id: 'fortis-vault-method'}">
             <label data-bind="attr: {for: 'fortis-vault-method'}"><span
                     data-bind="i18n: 'Remember my payment method details'"></span></label>
         </div>
@@ -48,7 +48,7 @@
 
             <div id="surcharge-disclaimer" style="margin-left: 23px;"></div>
             <div class="field choice fortis-agreement" style="margin: 15px; display: none;">
-        <input type="checkbox" id="fortis-agreement-checkbox" name="fortis-agreement" />
+        <input type="checkbox" id="fortis-agreement-checkbox" name="fortis-agreement">
         <label for="fortis-agreement-checkbox">
             I authorize Merchant to electronically debit my Bank Account indicated above for any fees due Merchant.
             If this item is dishonored for any reason, I authorize Merchant to initiate an additional electronic debit to the same Account

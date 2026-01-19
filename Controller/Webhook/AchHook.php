@@ -24,6 +24,7 @@ use \Magento\Framework\DB\Transaction;
 use \Magento\Sales\Model\Order\CreditmemoFactory;
 use \Magento\Sales\Model\Service\CreditmemoService;
 use Magento\Sales\Api\OrderRepositoryInterface;
+use Magento\Framework\Api\SearchCriteriaBuilder;
 
 class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAwareActionInterface
 {
@@ -86,6 +87,7 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
      */
     private CreditmemoService $creditMemoService;
     private OrderRepositoryInterface $orderRepository;
+    private SearchCriteriaBuilder $searchCriteriaBuilder;
 
     /**
      * @param RequestInterface $request
@@ -101,6 +103,7 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
      * @param CreditmemoService $creditMemoService
      * @param CreditmemoFactory $creditMemoFactory
      * @param OrderRepositoryInterface $orderRepository
+     * @param SearchCriteriaBuilder $searchCriteriaBuilder
      */
     public function __construct(
         RequestInterface $request,
@@ -115,7 +118,8 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         Transaction $dbTransaction,
         CreditmemoService $creditMemoService,
         CreditmemoFactory $creditMemoFactory,
-        OrderRepositoryInterface $orderRepository
+        OrderRepositoryInterface $orderRepository,
+        SearchCriteriaBuilder $searchCriteriaBuilder
     ) {
         $this->request               = $request;
         $this->resourceConnection    = $resourceConnection;
@@ -130,6 +134,7 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         $this->creditMemoFactory     = $creditMemoFactory;
         $this->creditMemoService     = $creditMemoService;
         $this->orderRepository       = $orderRepository;
+        $this->searchCriteriaBuilder = $searchCriteriaBuilder;
     }
 
     /**
@@ -178,16 +183,20 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
             }
             $transactionId = $transactionData['id'] ?? '';
 
-            // Query sales_payment_transaction to find transaction
-            $connection = $this->resourceConnection->getConnection();
-            $tableName  = $this->resourceConnection->getTableName('sales_payment_transaction');
+            // Query sales_payment_transaction to find transaction using repository pattern
+            $searchCriteria = $this->searchCriteriaBuilder
+                ->addFilter('txn_id', $transactionId, 'eq')
+                ->create();
 
-            $query = "SELECT * FROM $tableName WHERE txn_id = :transaction_id";
-            $binds = ['transaction_id' => $transactionId];
+            $transactions     = $this->transactionRepository->getList($searchCriteria);
+            $transactionItems = $transactions->getItems();
 
-            $result = $connection->fetchRow($query, $binds);
+            if (empty($transactionItems)) {
+                $this->logger->error('Transaction not found with ID: ' . $transactionId);
+                return $this->resultFactory->create()->setContents('Transaction not found');
+            }
 
-            $transaction           = $this->transactionRepository->get($result['transaction_id']);
+            $transaction           = array_shift($transactionItems);
             $orderId               = $transaction->getOrderId();
             $order                 = $this->orderRepository->get($orderId);
             $additionalInformation = $transaction->getAdditionalInformation();

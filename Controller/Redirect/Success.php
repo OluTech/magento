@@ -400,7 +400,7 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                         $this->paymentMethod->getSpecialConfigData(
                             'product_transaction_id'
                         )
-                        ))) {
+                    ))) {
                     throw new RuntimeException(
                         __('Product transaction ids do not match')
                     );

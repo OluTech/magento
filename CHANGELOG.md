@@ -1,5 +1,13 @@
 # Changelog
 
+## [[1.6.2]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
+
+### Fixed
+
+- Resolved security vulnerabilities identified in scans.
+- Fixed AuthComplete error during invoice generation when discount codes are applied.
+- Resolved errors in tokenized payment processing when applying discount codes.
+
 ## [[1.6.1]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
 
 ### Fixed

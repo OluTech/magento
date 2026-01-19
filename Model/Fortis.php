@@ -482,9 +482,13 @@ class Fortis implements MethodInterface
         $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_id'));
         $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_api_key'));
 
-        $subtotalAmount = (int)bcmul((string)($order->getSubtotal() + $order->getShippingAmount()), '100', 0);
+        $totalAmount    = (int)bcmul((string)$order->getGrandTotal(), '100', 0);
+        $subtotalAmount = (int)bcmul(
+            (string)($order->getSubtotal() + $order->getShippingAmount() + $order->getDiscountAmount()),
+            '100',
+            0
+        );
 
-        // Do auth transaction
         $intentData = [
             'transaction_amount' => $authAmount,
             "order_number"       => $orderID,

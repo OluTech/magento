@@ -173,7 +173,7 @@ class CheckoutProcessor
 
             $shippingAddress = $quote->getShippingAddress();
             $billingAddress  = $quote->getBillingAddress();
-            $subtotal        = $quote->getSubtotal() + $shippingAddress->getShippingAmount();
+            $subtotal        = $quote->getSubtotalWithDiscount() + $shippingAddress->getShippingAmount();
 
             $taxAmount = $shippingAddress->getTaxAmount();
             if ($taxAmount === null || $taxAmount == 0) {
