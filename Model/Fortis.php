@@ -34,34 +34,34 @@ class Fortis implements MethodInterface
     /**
      * @var StoreManagerInterface
      */
-    private $storeManager;
+    private StoreManagerInterface $storeManager;
 
     /**
      * @var UrlInterface
      */
-    private $urlBuilder;
+    private UrlInterface $urlBuilder;
 
     /**
      * @var EncryptorInterface
      */
-    private $encryptor;
+    private EncryptorInterface $encryptor;
 
     /**
      * @var OrderRepositoryInterface $orderRepository
      */
-    private $orderRepository;
+    private OrderRepositoryInterface $orderRepository;
 
     private ScopeConfigInterface $scopeConfig;
     private InfoInterface $infoInstance;
     /**
      * @var string
      */
-    private $formBlockType = Form::class;
+    private string $formBlockType = Form::class;
 
     /**
      * @var string
      */
-    private $infoBlockType = Info::class;
+    private string $infoBlockType = Info::class;
 
     /**
      * @var ManagerInterface
@@ -297,7 +297,7 @@ class Fortis implements MethodInterface
 
     public function canCapture()
     {
-        $payment = $this->getInfoInstance();
+        $payment = $this->getPaymentInfo();
 
         $order = $payment->getOrder();
 
@@ -379,11 +379,21 @@ class Fortis implements MethodInterface
     }
 
     /**
+     * Get payment info instance
+     * @return InfoInterface
+     */
+    public function getPaymentInfo()
+    {
+        return $this->infoInstance;
+    }
+
+    /**
      * @inheritdoc
+     * @deprecated Use getPaymentInfo() instead
      */
     public function getInfoInstance()
     {
-        return $this->infoInstance;
+        return $this->getPaymentInfo();
     }
 
     /**
@@ -403,7 +413,7 @@ class Fortis implements MethodInterface
         /**
          * to validate payment method is allowed for billing country or not
          */
-        $paymentInfo = $this->getInfoInstance();
+        $paymentInfo = $this->getPaymentInfo();
         if ($paymentInfo instanceof Payment) {
             $billingCountry = $paymentInfo->getOrder()->getBillingAddress()->getCountryId();
         } else {
@@ -482,20 +492,22 @@ class Fortis implements MethodInterface
         $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_id'));
         $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_api_key'));
 
-        $totalAmount    = (int)bcmul((string)$order->getGrandTotal(), '100', 0);
         $subtotalAmount = (int)bcmul(
             (string)($order->getSubtotal() + $order->getShippingAmount() + $order->getDiscountAmount()),
             '100',
             0
         );
 
-        $intentData = [
+        $currencyCode = $order->getOrderCurrencyCode();
+        $intentData   = [
             'transaction_amount' => $authAmount,
             "order_number"       => $orderID,
             'transactionId'      => $transactionId,
             'tax'                => ($paymentDetails->tax ?? 0),
             'subtotal_amount'    => $subtotalAmount,
         ];
+
+        $this->fortisMethodService->applySecondaryCurrency($intentData, $currencyCode);
 
         if (isset($paymentDetails->surcharge->surcharge_amount)) {
             $intentData['subtotal_amount']  -= $paymentDetails->surcharge->surcharge_amount;
@@ -605,7 +617,7 @@ class Fortis implements MethodInterface
      * @return mixed
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function getSpecialConfigData($field)
+    public function getSpecialConfigData(string $field): mixed
     {
         $configValue = $this->getConfigData($field);
         if (in_array($field, self::$encryptedConfigKeys)) {
@@ -629,7 +641,7 @@ class Fortis implements MethodInterface
             'payment_method_assign_data_' . $this->getCode(),
             [
                 AbstractDataAssignObserver::METHOD_CODE => $this,
-                AbstractDataAssignObserver::MODEL_CODE  => $this->getInfoInstance(),
+                AbstractDataAssignObserver::MODEL_CODE  => $this->getPaymentInfo(),
                 AbstractDataAssignObserver::DATA_CODE   => $data
             ]
         );
@@ -638,7 +650,7 @@ class Fortis implements MethodInterface
             'payment_method_assign_data',
             [
                 AbstractDataAssignObserver::METHOD_CODE => $this,
-                AbstractDataAssignObserver::MODEL_CODE  => $this->getInfoInstance(),
+                AbstractDataAssignObserver::MODEL_CODE  => $this->getPaymentInfo(),
                 AbstractDataAssignObserver::DATA_CODE   => $data
             ]
         );

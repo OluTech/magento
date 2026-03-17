@@ -1,5 +1,33 @@
 # Changelog
 
+## [[1.7.0]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
+
+### Added
+
+- **Multi-currency pricing support** — products and checkout can now display and accept payments in multiple currencies.
+  This enables storefronts to present localized prices and process transactions in a customer's selected currency where
+  configured. Includes admin configuration for primary and secondary currencies, each mapped to a distinct Product
+  Transaction ID.
+- **Extended currency support** — added ARS, AUD, BRL, CAD, CLP, COP, PYG, INR, MXN, ILS, NZD, PEN, PHP, GBP, SGD,
+  KRW, and JPY to the list of accepted payment currencies (in addition to the existing USD, EUR, and ZAR).
+- **Transaction verification** — introduced a `TransactionVerifier` service that validates transaction integrity before
+  finalising orders in the Authorise, Success, and ACH webhook controllers. Mismatched or unverifiable transactions are
+  rejected and logged as critical security events.
+- Currency validation at checkout — unsupported currencies are now rejected early in the surcharge calculation,
+  tokenized payment, ticket transaction, and redirect payment flows, returning a clear error message to the customer.
+- Support for Adobe Commerce / Magento 2.4.8 and PHP 8.4 compatibility.
+- Platform code-quality updates: added return-type declarations and typed properties throughout the codebase to improve
+  compatibility with platform tooling (linting, typing, and static analysis).
+
+### Fixed
+
+- Fixed billing phone validation error that occurred when the phone field was left empty during payment processing.
+- Resolved tokenized payment failures that were triggered by discounted orders.
+- Fixed failed payment error responses for tokenised and ticket-transaction flows — these now return a structured JSON
+  error with an HTTP 403 status code instead of silently redirecting.
+- Corrected `Transaction::TYPE_ORDER` / `TYPE_CAPTURE` references to use `TransactionInterface` constants for
+  compatibility with recent Magento versions.
+
 ## [[1.6.2]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
 
 ### Fixed

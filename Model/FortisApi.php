@@ -3,16 +3,16 @@
 namespace Fortispay\Fortis\Model;
 
 use Exception;
+use Magento\Directory\Model\CountryFactory;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\HTTP\ClientInterface;
 use Magento\Framework\Phrase;
+use Magento\Framework\Url\DecoderInterface;
 use Magento\Framework\UrlInterface;
-use StdClass;
 use Magento\Sales\Model\Order;
 use Magento\Store\Model\StoreManagerInterface;
-use Magento\Directory\Model\CountryFactory;
-use Magento\Framework\Url\DecoderInterface;
+use StdClass;
 
 class FortisApi
 {
@@ -27,23 +27,27 @@ class FortisApi
     private DecoderInterface $decoder;
     private ClientInterface $httpClient;
     private UrlInterface $urlBuilder;
+    private \Psr\Log\LoggerInterface $logger;
 
     /**
      * @param Config $config
      * @param DecoderInterface $decoder
      * @param ClientInterface $httpClient
      * @param UrlInterface $urlBuilder
+     * @param \Psr\Log\LoggerInterface $logger
      */
     public function __construct(
         Config $config,
         DecoderInterface $decoder,
         ClientInterface $httpClient,
-        UrlInterface $urlBuilder
+        UrlInterface $urlBuilder,
+        \Psr\Log\LoggerInterface $logger
     ) {
         $this->config     = $config;
         $this->decoder    = $decoder;
         $this->httpClient = $httpClient;
         $this->urlBuilder = $urlBuilder;
+        $this->logger     = $logger;
 
         $this->initializeApiSettings();
     }
@@ -79,8 +83,12 @@ class FortisApi
         string $method = 'POST'
     ): ?string {
         $url = $this->fortisApi . $endpoint;
+
         $this->httpClient->setTimeout(30);
-        $this->httpClient->setHeaders($this->createHeaders($user_id, $user_api_key));
+
+        $headers = $this->createHeaders($user_id, $user_api_key);
+        $this->httpClient->setHeaders($headers);
+
         $this->httpClient->setOption(CURLOPT_RETURNTRANSFER, true);
         $this->httpClient->setOption(CURLOPT_MAXREDIRS, 10);
         $this->httpClient->setOption(CURLOPT_FOLLOWLOCATION, true);
@@ -92,8 +100,7 @@ class FortisApi
 
         $retryCount = 0;
         $maxRetries = 5;
-
-        $response = null;
+        $response   = null;
 
         while ($retryCount < $maxRetries) {
             try {
@@ -106,8 +113,10 @@ class FortisApi
                     $this->httpClient->post($url, $data);
                 }
 
-                $response = $this->httpClient->getBody();
-                if ($this->httpClient->getStatus() >= 200 && $this->httpClient->getStatus() < 300) {
+                $response   = $this->httpClient->getBody();
+                $statusCode = $this->httpClient->getStatus();
+
+                if ($statusCode >= 200 && $statusCode < 300) {
                     return $response;
                 }
 
@@ -120,16 +129,17 @@ class FortisApi
             }
         }
 
+        // If we get here, all retries failed
         $response = json_decode($response);
         if (isset($response->type) && $response->type === 'Error') {
             $errorStr = '';
 
             if (isset($response->meta->errors)) {
-                foreach ($response->meta->errors as $key => $error) {
+                foreach ($response->meta->errors as $error) {
                     $errorStr .= "$error[0]\n";
                 }
             } elseif (isset($response->meta->details)) {
-                foreach ($response->meta->details as $key => $error) {
+                foreach ($response->meta->details as $error) {
                     $errorStr .= "$error->message\n";
                 }
             } elseif (isset($response->meta)) {
@@ -270,8 +280,6 @@ class FortisApi
         $user_id      = $this->config->userId();
         $user_api_key = $this->config->userApiKey();
 
-        $intentData['product_transaction_id'] = $this->config->ccProductId();
-
         return $this->makeApiRequest("/v1/public/calculate-surcharge", $user_id, $user_api_key, $intentData);
     }
 
@@ -379,7 +387,7 @@ class FortisApi
 
         if ($decodedResponse->type === 'Error') {
             $errorStr = '';
-            foreach ($decodedResponse->meta->errors as $key => $error) {
+            foreach ($decodedResponse->meta->errors as $error) {
                 $errorStr .= "$error[0]\n";
             }
             throw new LocalizedException(new Phrase($errorStr));
@@ -542,5 +550,150 @@ class FortisApi
         $parts = explode('.', $token);
 
         return $this->decoder->decode($parts[1] ?? []);
+    }
+
+    /**
+     * Validate Product Transaction ID with currency against Fortis API
+     * Uses transaction intention endpoint only
+     *
+     * @param string $productId
+     * @param string $currency
+     * @param string|null $userId Optional user ID for validation
+     * @param string|null $userApiKey Optional user API key for validation
+     * @return bool
+     * @throws LocalizedException
+     */
+    public function validateProductIdCurrency(
+        string $productId,
+        string $currency,
+        ?string $userId = null,
+        ?string $userApiKey = null
+    ): bool {
+        $user_id      = $userId ?? $this->config->userId();
+        $user_api_key = $userApiKey ?? $this->config->userApiKey();
+
+        if (in_array($currency, ['USD', 'CAD'])) {
+            return true;
+        }
+
+        $testIntentionData = [
+            'action'        => 'sale',
+            'methods'       => [
+                [
+                    'type'                   => 'cc',
+                    'product_transaction_id' => $productId
+                ]
+            ],
+            'amount'        => $this->getMinorUnitsTestAmount($currency),
+            'currency_code' => $currency,
+            'location_id'   => $this->config->achLocationId(),
+        ];
+
+        try {
+            $clientToken = $this->getClientToken($testIntentionData, $user_id, $user_api_key);
+
+            if (!empty($clientToken)) {
+                return true;
+            }
+        } catch (LocalizedException $e) {
+            $errorMessage = $e->getMessage();
+
+            if (str_contains($errorMessage, 'methods[0].currency') && str_contains($errorMessage, 'not allowed')) {
+                throw new LocalizedException(
+                    __(
+                        'API request structure error for Product Transaction ID %1. The currency field should not be inside the methods array. This indicates a configuration issue with the Fortis API integration.',
+                        $productId
+                    )
+                );
+            }
+
+            if (str_contains($errorMessage, 'product_transaction_id') && str_contains($errorMessage, 'not found')) {
+                throw new LocalizedException(
+                    __(
+                        'Product Transaction ID %1 was not found in your Fortis %2 account during currency validation. Please verify: 1) The Product Transaction ID exists in your Fortis dashboard, 2) It is configured for credit card processing, 3) It supports currency %3, 4) You are using the correct environment. Current API endpoint: %4',
+                        $productId,
+                        $this->config->environment(),
+                        $currency,
+                        $this->fortisApi
+                    )
+                );
+            }
+
+            if (str_contains($errorMessage, 'currency') && str_contains($errorMessage, 'not allowed')) {
+                throw new LocalizedException(
+                    __(
+                        'Currency %1 is not supported for Product Transaction ID %2. Please contact Fortis to enable multicurrency support or verify the Product ID configuration.',
+                        $currency,
+                        $productId
+                    )
+                );
+            }
+
+            if (str_contains($errorMessage, '412') ||
+                str_contains($errorMessage, 'Multi-currency not enabled') ||
+                str_contains($errorMessage, 'not enabled on Product Transaction ID')) {
+                throw new LocalizedException(
+                    __(
+                        'Multi-currency is not enabled for Product Transaction ID %1. Please contact Fortis to enable multicurrency support for currency %2. (Error 412)',
+                        $productId,
+                        $currency
+                    )
+                );
+            }
+
+            if (strpos($errorMessage, '400') !== false &&
+                (strpos($errorMessage, 'currency') !== false || strpos($errorMessage, 'Missing currency') !== false)) {
+                throw new LocalizedException(
+                    __(
+                        'Currency field is required for Product Transaction ID %1 when using %2. Please ensure multicurrency is properly configured.',
+                        $productId,
+                        $currency
+                    )
+                );
+            }
+
+            if (str_contains($errorMessage, 'Unsupported card type')) {
+                throw new LocalizedException(
+                    __(
+                        'Some card types (e.g., Amex) may not be supported for currency %1. Please check with Fortis about card type restrictions.',
+                        $currency
+                    )
+                );
+            }
+
+            throw new LocalizedException(
+                __(
+                    'Failed to validate Product ID %1 with currency %2. API Error: %3',
+                    $productId,
+                    $currency,
+                    $errorMessage
+                )
+            );
+        }
+
+        return true;
+    }
+
+    /**
+     * Get test amount in minor units based on currency decimal rules
+     * Per Fortis Multicurrency Developer Guide
+     *
+     * @param string $currency
+     * @return int
+     */
+    private function getMinorUnitsTestAmount(string $currency): int
+    {
+        $zeroDecimalCurrencies = ['BIF', 'CLP', 'DJF', 'GNF', 'ISK', 'JPY', 'KRW', 'PYG', 'UGX', 'VND'];
+
+        if (in_array($currency, $zeroDecimalCurrencies)) {
+            return 100;
+        }
+
+        if ($currency === 'KWD') {
+            return 1000;
+        }
+
+
+        return 100;
     }
 }

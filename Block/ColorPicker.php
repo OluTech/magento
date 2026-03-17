@@ -15,7 +15,7 @@ class ColorPicker extends Field
      *
      * @return string
      */
-    protected function _getElementHtml(AbstractElement $element)
+    protected function _getElementHtml(AbstractElement $element): string
     {
         return '<input type="color" id="' .
             $element->getHtmlId() .

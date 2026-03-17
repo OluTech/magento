@@ -16,9 +16,9 @@
             : 'fortis-commerce-sandbox';
 
         require([moduleName, 'mage/url'], function(Commerce, _urlBuilder) {
-            if (!document.getElementById('fortis_payment327') && config.success === true) {
+            if (!document.getElementById('fortis_iframe_payment_form') && config.success === true) {
                 const fortisDiv = document.createElement('div');
-                fortisDiv.id = 'fortis_payment327';
+                fortisDiv.id = 'fortis_iframe_payment_form';
                 fortisDiv.style.marginBottom = config.appearance_options.marginSpacing;
 
                 let cancelBtn;
@@ -37,11 +37,12 @@
                 setTimeout(() => {
                     const elements = new Commerce.elements(config.client_token);
                     elements.create({
-                        container: '#fortis_payment327',
+                        container: '#fortis_iframe_payment_form',
                         theme: config.main_options.theme,
                         environment: config.main_options.environment,
                         floatingLabels: config.floatingLabels,
                         showValidationAnimation: config.showValidationAnimation,
+                        hideAgreementCheckbox: config.main_options.hideAgreementCheckbox,
                         showReceipt: false,
                         digitalWallets: config.digitalWallets,
                         view: config.main_options.view,
@@ -86,27 +87,78 @@
                     elements.on('done', async (result) => {
                         cancelBtn.style.display = 'none';
                         console.log(result);
-                        const response = await fetch(config.redirectUrl, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify(result.data)
-                        });
-                        if (response.status === 200) {
-                            const redirect = await response.json();
-                            setTimeout(() => {
-                                window.location.href = redirect.redirectTo;
-                            }, 2000);
+                        try {
+                            const response = await fetch(config.redirectUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify(result.data)
+                            });
+                            if (response.status === 200) {
+                                const redirect = await response.json();
+                                if (redirect.error) {
+                                    displayError(redirect.message || 'Payment verification failed');
+                                    cancelBtn.style.display = 'inline-block';
+                                    return;
+                                }
+                                setTimeout(() => {
+                                    window.location.href = redirect.redirectTo;
+                                }, 2000);
+                            } else if (response.status === 403) {
+                                try {
+                                    const errorData = await response.json();
+                                    displayError(errorData.message || 'Payment verification failed');
+                                } catch (e) {
+                                    displayError('Payment verification failed');
+                                }
+                                cancelBtn.style.display = 'inline-block';
+                            } else {
+                                displayError('Payment processing failed. Please try again.');
+                                cancelBtn.style.display = 'inline-block';
+                            }
+                        } catch (error) {
+                            console.error('Error processing payment:', error);
+                            displayError('An error occurred while processing your payment. Please try again.');
+                            cancelBtn.style.display = 'inline-block';
                         }
                     });
 
                     elements.on('error', (error) => {
                         console.log(error);
+                        displayError('Payment form error. Please check your payment details and try again.');
+                        cancelBtn.style.display = 'inline-block';
                     });
                 }, 1000);
             }
         });
+
+        function displayError(message) {
+            const existingError = document.getElementById('fortis-iframe-error');
+            if (existingError) {
+                existingError.remove();
+            }
+            
+            const errorDiv = document.createElement('div');
+            errorDiv.id = 'fortis-iframe-error';
+            errorDiv.style.color = '#e02b27';
+            errorDiv.style.background = '#ffebee';
+            errorDiv.style.border = '1px solid #e02b27';
+            errorDiv.style.padding = '10px';
+            errorDiv.style.margin = '10px 0';
+            errorDiv.style.borderRadius = '4px';
+            errorDiv.textContent = message;
+            
+            const iframeContainer = document.getElementById('fortis_iframe_payment_form');
+            if (iframeContainer && iframeContainer.parentNode) {
+                iframeContainer.parentNode.insertBefore(errorDiv, iframeContainer);
+            } else {
+                const mainDiv = document.querySelector('div.main');
+                if (mainDiv) {
+                    mainDiv.insertBefore(errorDiv, mainDiv.firstChild);
+                }
+            }
+        }
 
         function buildCancelButton(config, isCheckout)
         {

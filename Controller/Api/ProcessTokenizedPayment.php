@@ -6,6 +6,7 @@ use Exception;
 use Fortispay\Fortis\Model\Config;
 use Fortispay\Fortis\Model\FortisApi;
 use Fortispay\Fortis\Service\CheckoutProcessor;
+use Fortispay\Fortis\Service\FortisMethodService;
 use InvalidArgumentException;
 use Magento\Customer\Helper\Session\CurrentCustomer;
 use Magento\Framework\App\Action\HttpPostActionInterface;
@@ -26,6 +27,7 @@ class ProcessTokenizedPayment implements HttpPostActionInterface
     private CheckoutProcessor $checkoutProcessor;
     private CurrentCustomer $currentCustomer;
     private PaymentTokenManagement $paymentTokenManagement;
+    private FortisMethodService $fortisMethodService;
 
     public function __construct(
         JsonFactory $resultJsonFactory,
@@ -35,7 +37,8 @@ class ProcessTokenizedPayment implements HttpPostActionInterface
         Config $config,
         CheckoutProcessor $checkoutProcessor,
         CurrentCustomer $currentCustomer,
-        PaymentTokenManagement $paymentTokenManagement
+        PaymentTokenManagement $paymentTokenManagement,
+        FortisMethodService $fortisMethodService
     ) {
         $this->resultJsonFactory      = $resultJsonFactory;
         $this->request                = $request;
@@ -45,6 +48,7 @@ class ProcessTokenizedPayment implements HttpPostActionInterface
         $this->checkoutProcessor      = $checkoutProcessor;
         $this->currentCustomer        = $currentCustomer;
         $this->paymentTokenManagement = $paymentTokenManagement;
+        $this->fortisMethodService    = $fortisMethodService;
     }
 
     public function execute()
@@ -81,7 +85,7 @@ class ProcessTokenizedPayment implements HttpPostActionInterface
             $totals = $this->checkoutProcessor->getCheckoutTotals();
 
             $surchargeData = [];
-            if (isset($data['surcharge_data']) && !empty($data['surcharge_data'])) {
+            if (!empty($data['surcharge_data'])) {
                 $surchargeData = $data['surcharge_data'];
             }
 
@@ -103,6 +107,19 @@ class ProcessTokenizedPayment implements HttpPostActionInterface
                 'subtotal_amount'    => $subtotalAmount,
                 'tax'                => $taxAmount,
             ];
+
+            $currency = $this->checkoutProcessor->getCheckoutCurrency();
+
+            if (!$this->config->isCurrencySupported($currency)) {
+                $supportedCurrencies = implode(', ', $this->config->getSupportedCurrencies());
+                throw new LocalizedException(
+                    __(
+                        'Currency "%1" is not supported. Please select one of the supported currencies: %2',
+                        $currency,
+                        $supportedCurrencies
+                    )
+                );
+            }
 
             if ($tokenType === 'ach') {
                 $achProductId = $this->config->achProductId();
@@ -134,7 +151,9 @@ class ProcessTokenizedPayment implements HttpPostActionInterface
                     $intentData['surcharge_amount']   = $surchargeData['surcharge_amount'];
                 }
 
-                $productTransactionId = $this->config->ccProductId();
+                $productTransactionId = $this->config->getProductIdForCurrency($currency);
+                $this->fortisMethodService->applySecondaryCurrency($intentData, $currency);
+
                 if ($productTransactionId && preg_match(
                     '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',
                     $productTransactionId

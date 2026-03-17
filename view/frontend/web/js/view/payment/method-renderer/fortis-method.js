@@ -98,7 +98,7 @@ define(
       },
 
       onPaymentMethodDeselected: function () {
-        const form = document.getElementById('fortis_payment420');
+        const form = document.getElementById('fortis_ticket_payment_form');
         if (form) {
           form.style.display = 'none';
         }
@@ -203,10 +203,24 @@ define(
           $.when(placeOrder).fail(function () {
             self.isPlaceOrderActionAllowed(true);
           }).done(function () {
+            const currentCurrency = window.checkoutConfig?.quoteData?.quote_currency_code;
+            const supportedCurrencies = window.checkoutConfig?.payment?.fortis?.supportedCurrencies;
+            
+            if (currentCurrency && supportedCurrencies && !supportedCurrencies.includes(currentCurrency)) {
+              var $s = jQuery('#surcharge-disclaimer');
+              if (!$s.length) {
+                $s = jQuery('.payment-method._active');
+              }
+              $s.find('#ticketError').remove();
+              $s.prepend(jQuery(`<div id="ticketError" style="color: #e02b27; background: #ffebee; border: 1px solid #e02b27; padding: 10px; margin: 10px 0; border-radius: 4px;">Currency "${currentCurrency}" is not supported. Please select one of the supported currencies: ${supportedCurrencies.join(', ')}</div>`));
+              self.isPlaceOrderActionAllowed(true);
+              return;
+            }
+            
             if (fortisSavedCard !== undefined && !(fortisSavedCard === 'new' || fortisSavedCard === 'new-save')) {
               window.location.replace(_urlBuilder.build(window.checkoutConfig.payment.fortis.redirectUrl));
             } else if (window.FortisTicketIntention && window.FortisTicketIntention.elements) {
-              window.FortisTicketIntention.checkoutContext = self; // Ensure self is available
+              window.FortisTicketIntention.checkoutContext = self;
               window.FortisTicketIntention.elements.submit();
             } else if (!window.FortisTicketIntention.elements) {
               self.afterPlaceOrder();
@@ -232,7 +246,7 @@ define(
           window.fortisGenerateTicketIntentionPayForm();
         }
         
-        const form = document.getElementById('fortis_payment420');
+        const form = document.getElementById('fortis_ticket_payment_form');
         if (!form) return;
 
         let observer;
@@ -318,7 +332,7 @@ define(
         var surchargeDisclaimer = jQuery('#surcharge-disclaimer');
         var documentedSurchargeDisclaimer = document.getElementById('surcharge-disclaimer');
         var placeOrderBtn = jQuery('.action.primary.checkout');
-        var ticketIntentionForm = jQuery('#fortis_payment420');
+        var ticketIntentionForm = jQuery('#fortis_ticket_payment_form');
         var agreementBlock = jQuery('.fortis-agreement'); // grouped with ACH message
 
         var selectedOption = selectElement ? selectElement.options[selectElement.selectedIndex] : null;
@@ -436,12 +450,20 @@ define(
               .done(function (returnResponse) {
                 if (returnResponse.redirectTo) {
                   window.location.href = returnResponse.redirectTo;
+                } else if (returnResponse.error) {
+                  self.handleTokenizedPaymentError(returnResponse.message || 'Payment verification failed. Please try again.');
                 } else {
-                  console.error('Redirect URL not provided in response');
+                  self.handleTokenizedPaymentError('Redirect URL not provided in response');
                 }
               })
               .fail(function (xhr, status, error) {
-                console.error('Error calling returnUrl:', error);
+                var errorMessage = 'Error processing payment';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                  errorMessage = xhr.responseJSON.message;
+                } else if (xhr.responseJSON && xhr.responseJSON.error) {
+                  errorMessage = xhr.responseJSON.error;
+                }
+                self.handleTokenizedPaymentError(errorMessage);
               })
               .always(function () {
                 var spinner = document.getElementById('fortis-spinner');

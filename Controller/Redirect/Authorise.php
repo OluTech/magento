@@ -5,7 +5,7 @@ namespace Fortispay\Fortis\Controller\Redirect;
 use Exception;
 use Fortispay\Fortis\Model\Fortis;
 use Fortispay\Fortis\Model\FortisApi;
-use Fortispay\Fortis\Service\CheckoutProcessor;
+use Fortispay\Fortis\Service\TransactionVerifier;
 use Fortispay\Fortis\Service\FortisMethodService;
 use Fortispay\Fortis\Service\MagentoOrderService;
 use Magento\Checkout\Model\Session as CheckoutSession;
@@ -163,8 +163,8 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
      * @var FortisApi
      */
     private FortisApi $fortisApi;
-    private CheckoutProcessor $checkoutProcessor;
     private MagentoOrderService $magentoOrderService;
+    private TransactionVerifier $transactionVerifier;
 
     /**
      * @param PageFactory $pageFactory
@@ -173,7 +173,7 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
      * @param Fortis $paymentMethod
      * @param OrderRepositoryInterface $orderRepository
      * @param StoreManagerInterface $storeManager
-     * @param OrderSender $OrderSender
+     * @param OrderSender $orderSender
      * @param Builder $transactionBuilder
      * @param Order $order
      * @param RequestInterface $request
@@ -185,7 +185,8 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
      * @param CountryCollectionFactory $countryCollectionFactory
      * @param FortisMethodService $fortisMethodService
      * @param FortisApi $fortisApi
-     * @param CheckoutProcessor $checkoutProcessor
+     * @param MagentoOrderService $magentoOrderService
+     * @param TransactionVerifier $transactionVerifier
      */
     public function __construct(
         PageFactory $pageFactory,
@@ -194,7 +195,7 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
         Fortis $paymentMethod,
         OrderRepositoryInterface $orderRepository,
         StoreManagerInterface $storeManager,
-        OrderSender $OrderSender,
+        OrderSender $orderSender,
         Builder $transactionBuilder,
         Order $order,
         RequestInterface $request,
@@ -206,8 +207,8 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
         CountryCollectionFactory $countryCollectionFactory,
         FortisMethodService $fortisMethodService,
         FortisApi $fortisApi,
-        CheckoutProcessor $checkoutProcessor,
-        MagentoOrderService $magentoOrderService
+        MagentoOrderService $magentoOrderService,
+        TransactionVerifier $transactionVerifier
     ) {
         $pre = __METHOD__ . " : ";
 
@@ -218,7 +219,7 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
         $this->order                    = $order;
         $this->checkoutSession          = $checkoutSession;
         $this->pageFactory              = $pageFactory;
-        $this->orderSender              = $OrderSender;
+        $this->orderSender              = $orderSender;
         $this->paymentMethod            = $paymentMethod;
         $this->orderRepository          = $orderRepository;
         $this->storeManager             = $storeManager;
@@ -232,8 +233,8 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
         $this->countryCollectionFactory = $countryCollectionFactory;
         $this->fortisMethodService      = $fortisMethodService;
         $this->fortisApi                = $fortisApi;
-        $this->checkoutProcessor        = $checkoutProcessor;
         $this->magentoOrderService      = $magentoOrderService;
+        $this->transactionVerifier      = $transactionVerifier;
 
         $this->logger->debug($pre . 'eof');
     }
@@ -242,12 +243,12 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
      * Execute on fortis/redirect/authorise
      * @throws NoSuchEntityException
      */
-    public function execute()
+    public function execute(): \Magento\Framework\Controller\Result\Json|\Magento\Framework\Controller\ResultInterface|\Magento\Framework\App\ResponseInterface
     {
-        $json      = $this->request->getContent();
-        $GET       = $this->request->getParams();
-        $data      = json_decode($json);
-        $dataArray = json_decode($json, true);
+        $json          = $this->request->getContent();
+        $requestParams = $this->request->getParams();
+        $data          = json_decode($json);
+        $dataArray     = json_decode($json, true);
 
         $baseurl                     = $this->storeManager->getStore()->getBaseUrl();
         $redirect                    = $this->resultFactory->create(ResultFactory::TYPE_REDIRECT);
@@ -257,11 +258,11 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
         $isTicketTransaction = isset($dataArray) && ($dataArray['@action'] === 'ticket');
 
         $tokenised = false;
-        $orderId   = isset($GET['gid']) ? (int)$GET['gid'] : null;
+        $orderId   = isset($requestParams['gid']) ? (int)$requestParams['gid'] : null;
         if (!$data) {
             $tokenised = true;
             $data      = new stdClass();
-            $data->id  = $GET['tid'] ?? null;
+            $data->id  = $requestParams['tid'] ?? null;
         }
 
         $pre = __METHOD__ . " : ";
@@ -320,6 +321,22 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
                 $fortisTransaction = $rawTransaction->data;
             }
 
+            $orderTotal         = (int)bcmul($order->getGrandTotal(), '100', 0);
+            $verificationResult = $this->transactionVerifier->verifyTransactionById(
+                $data->id ?? $fortisTransaction->id,
+                $order->getIncrementId(),
+                $orderTotal
+            );
+
+            if (!$verificationResult['verified']) {
+                $this->logger->critical('SECURITY: Transaction verification failed', [
+                    'transactionId' => $data->id ?? $fortisTransaction->id,
+                    'order'         => $order->getIncrementId(),
+                    'errors'        => $verificationResult['errors']
+                ]);
+                throw new RuntimeException(new Phrase('Transaction verification failed'));
+            }
+
             if ($tokenised) {
                 $data = $fortisTransaction;
             }
@@ -330,123 +347,127 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
             } elseif (!$tokenised && ($fortisTransaction->product_transaction_id !== $product_transaction_id_order)) {
                 throw new RuntimeException(new Phrase('Product transaction ids do not match'));
             }
-            switch ($status) {
-                case 1000:  // Success
-                    // Check for stored card and save if necessary
-                    $model = $this->paymentMethod;
-                    $this->fortisMethodService->saveVaultData($order, $data);
+            if ($status === 1000) {  // Success
+                // Check for stored card and save if necessary
+                $model = $this->paymentMethod;
+                $this->fortisMethodService->saveVaultData($order, $data);
 
-                    $orderData      = $order->getPayment()->getData();
-                    $additionalData = $orderData['additional_information'];
+                $orderData      = $order->getPayment()->getData();
+                $additionalData = $orderData['additional_information'];
 
-                    $status = Order::STATE_PROCESSING;
-                    if ($this->paymentMethod->getSpecialConfigData('Successful_Order_status') != "") {
-                        $status = $this->paymentMethod->getSpecialConfigData('Successful_Order_status');
-                    }
+                $status = Order::STATE_PROCESSING;
+                if ($this->paymentMethod->getSpecialConfigData('Successful_Order_status') != "") {
+                    $status = $this->paymentMethod->getSpecialConfigData('Successful_Order_status');
+                }
 
-                    $order_successful_email = $model->getConfigData('order_email');
+                $order_successful_email = $model->getConfigData('order_email');
 
-                    if ($order_successful_email != '0') {
-                        $this->orderSender->send($order);
-                        $order->addCommentToStatusHistory(
-                            __('Notified customer about order #%1.', $order->getId())
-                        )->setIsCustomerNotified(true);
-                        $this->orderRepository->save($order);
-                    }
-
-                    $surchargeAmount = 0.00;
-                    if (isset($surchargeData)) {
-                        $surchargeAmount = $surchargeData['surcharge_amount'];
-                    } elseif (!empty($additionalData['fortis-surcharge-data'])) {
-                        $surchargeData   = json_decode($additionalData['fortis-surcharge-data'], true);
-                        $surchargeAmount = $surchargeData['surcharge_amount'];
-                    } elseif (isset($data->surcharge_amount)) {
-                        $surchargeAmount = $data->surcharge_amount;
-                    } elseif (isset($data->surcharge->surcharge_amount)) {
-                        $surchargeAmount = $data->surcharge->surcharge_amount;
-                    }
-
-                    try {
-                        $this->magentoOrderService->applySurcharge($order, $surchargeAmount);
-                    } catch (\Exception $e) {
-                        $this->logger->error('Error applying surcharge: ' . $e->getMessage());
-                    }
-
-                    // Save Transaction Response
-                    $this->createTransaction($data);
-
-                    $order->setPaymentAuthorizationAmount($fortisTransaction->auth_amount / 100.0);
-                    $order->setPayment();
-
-                    $order->setState($status)->setStatus($status);
+                if ($order_successful_email != '0') {
+                    $this->orderSender->send($order);
+                    $order->addCommentToStatusHistory(
+                        __('Notified customer about order #%1.', $order->getId())
+                    )->setIsCustomerNotified(true);
                     $this->orderRepository->save($order);
+                }
 
-                    // Create third level data - dispatch event for observer
-                    try {
-                        $this->eventManager->dispatch(
-                            'fortispay_fortis_create_third_level_data_after_success',
-                            [
-                                'order'                    => $order,
-                                'storeManager'             => $this->storeManager,
-                                'type'                     => $fortisTransaction->account_type,
-                                'countryFactory'           => $this->countryFactory,
-                                'countryCollectionFactory' => $this->countryCollectionFactory,
-                                'transactionId'            => $fortisTransaction->id,
-                            ]
-                        );
-                    } catch (\Exception $exception) {
-                        $this->logger->error('Could not create 3rd level data: ' . $exception->getMessage());
-                    }
+                $surchargeAmount = 0.00;
+                if (isset($surchargeData)) {
+                    $surchargeAmount = $surchargeData['surcharge_amount'];
+                } elseif (!empty($additionalData['fortis-surcharge-data'])) {
+                    $surchargeData   = json_decode($additionalData['fortis-surcharge-data'], true);
+                    $surchargeAmount = $surchargeData['surcharge_amount'];
+                } elseif (isset($data->surcharge_amount)) {
+                    $surchargeAmount = $data->surcharge_amount;
+                } elseif (isset($data->surcharge->surcharge_amount)) {
+                    $surchargeAmount = $data->surcharge->surcharge_amount;
+                }
 
-                    if (!$tokenised) {
-                        $resultJson = $this->resultJsonFactory->create();
+                try {
+                    $this->magentoOrderService->applySurcharge($order, $surchargeAmount);
+                } catch (\Exception $e) {
+                    $this->logger->error('Error applying surcharge: ' . $e->getMessage());
+                }
 
-                        return $resultJson->setData([
-                                                        'redirectTo' => $redirectToSuccessPageString,
-                                                    ]);
-                    } else {
-                        $redirect = $this->resultFactory->create(
-                            ResultFactory::TYPE_REDIRECT
-                        );
-                        $redirect->setUrl($redirectToSuccessPageString);
+                // Save Transaction Response
+                $this->createTransaction($data);
 
-                        return $redirect;
-                    }
-                default:
-                    if (isset($this->responseCodes[$status])) {
-                        $message = "Not Authorised: " . $this->responseCodes[$status];
-                    } else {
-                        $message = 'Not Authorised: Reason Unknown';
-                    }
-                    $this->messageManager->addNoticeMessage($message);
-                    $this->order->addStatusToHistory(__("Failed: $message "));
-                    $this->order->cancel();
-                    $this->orderRepository->save($order);
-                    $this->checkoutSession->restoreQuote();
-                    $this->createTransaction($data);
-                    if (!$tokenised) {
-                        $resultJson = $this->resultJsonFactory->create();
+                $order->setPaymentAuthorizationAmount($fortisTransaction->auth_amount / 100.0);
+                $order->setPayment();
 
-                        return $resultJson->setData([
-                                                        'redirectTo' => $redirectToCartPageString,
-                                                    ]);
-                    } else {
-                        $redirect->setUrl($redirectToCartPageString);
-                    }
+                $order->setState($status)->setStatus($status);
+                $this->orderRepository->save($order);
+
+                // Create third level data - dispatch event for observer
+                try {
+                    $this->eventManager->dispatch(
+                        'fortispay_fortis_create_third_level_data_after_success',
+                        [
+                            'order'                    => $order,
+                            'storeManager'             => $this->storeManager,
+                            'type'                     => $fortisTransaction->account_type,
+                            'countryFactory'           => $this->countryFactory,
+                            'countryCollectionFactory' => $this->countryCollectionFactory,
+                            'transactionId'            => $fortisTransaction->id,
+                        ]
+                    );
+                } catch (\Exception $exception) {
+                    $this->logger->error('Could not create 3rd level data: ' . $exception->getMessage());
+                }
+
+                if (!$tokenised) {
+                    $resultJson = $this->resultJsonFactory->create();
+
+                    return $resultJson->setData([
+                                                    'redirectTo' => $redirectToSuccessPageString,
+                                                ]);
+                } else {
+                    $redirect = $this->resultFactory->create(
+                        ResultFactory::TYPE_REDIRECT
+                    );
+                    $redirect->setUrl($redirectToSuccessPageString);
+
+                    return $redirect;
+                }
+            } else {
+                if (isset($this->responseCodes[$status])) {
+                    $message = "Not Authorised: " . $this->responseCodes[$status];
+                } else {
+                    $message = 'Not Authorised: Reason Unknown';
+                }
+                $this->messageManager->addNoticeMessage($message);
+                $this->order->addStatusToHistory(__("Failed: $message "));
+                $this->order->cancel();
+                $this->orderRepository->save($order);
+                $this->checkoutSession->restoreQuote();
+                $this->createTransaction($data);
+                if (!$tokenised) {
+                    $resultJson = $this->resultJsonFactory->create();
+
+                    return $resultJson->setData([
+                                                    'redirectTo' => $redirectToCartPageString,
+                                                ]);
+                } else {
+                    $redirect->setUrl($redirectToCartPageString);
+                }
             }
         } catch (Exception $e) {
             // Save Transaction Response
-            $this->createTransaction($data);
-            $this->logger->error($pre . $e->getMessage());
-            $this->messageManager->addExceptionMessage($e, __('We can\'t start Fortis Checkout.'));
-
-            if ($isTicketTransaction) {
-                $resultJson = $this->resultJsonFactory->create();
-
-                return $resultJson->setData([
-                                                'redirectTo' => $redirectToSuccessPageString,
-                                            ]);
+            if (isset($data) && is_object($data)) {
+                $this->createTransaction($data);
             }
+            $this->logger->error($pre . $e->getMessage());
+
+            if ($tokenised || $isTicketTransaction) {
+                $resultJson = $this->resultJsonFactory->create();
+                return $resultJson->setData([
+                                                'error'   => true,
+                                                'message' => $e->getMessage() ?: __(
+                                                    'Payment verification failed. Please try again.'
+                                                )
+                                            ])->setHttpResponseCode(403);
+            }
+
+            $this->messageManager->addExceptionMessage($e, __('We can\'t start Fortis Checkout.'));
 
             $redirect->setUrl($redirectToCartPageString);
         }
@@ -510,7 +531,7 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
      *
      * @return OrderInterface
      */
-    public function setlastOrderDetails()
+    public function setlastOrderDetails(): OrderInterface
     {
         $orderId = $this->request->getParam('gid');
         $order   = $this->orderRepository->get($orderId);

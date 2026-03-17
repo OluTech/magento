@@ -3,13 +3,12 @@
 namespace Fortispay\Fortis\Model\Payment;
 
 use Exception;
+use Fortispay\Fortis\Service\FortisMethodService;
 use Magento\Checkout\Model\Session;
-use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Message\ManagerInterface;
 use Magento\Sales\Model\Order\Address;
-use Ramsey\Uuid\Uuid;
 use Psr\Log\LoggerInterface;
-use Fortispay\Fortis\Service\FortisMethodService;
+use Ramsey\Uuid\Uuid;
 
 class IFrameData
 {
@@ -100,11 +99,7 @@ class IFrameData
                                                           $address ? [
                                                               'name'     => 'address',
                                                               'required' => false,
-                                                              'value'    => strlen($address) > 32 ? substr(
-                                                                  $address,
-                                                                  0,
-                                                                  32
-                                                              ) : $address
+                                                              'value'    => $this->truncateAddressIfNeeded($address)
                                                           ] : null,
                                                           $country ? [
                                                               'name'     => 'country',
@@ -139,5 +134,16 @@ class IFrameData
         $regionCode = $addressAll->getRegionCode() ?? '';
 
         return [$address, $country, $city, $postalCode, $regionCode];
+    }
+
+    /**
+     * Truncates address to 32 characters if needed
+     *
+     * @param string $address
+     * @return string
+     */
+    private function truncateAddressIfNeeded(string $address): string
+    {
+        return strlen($address) > 32 ? substr($address, 0, 32) : $address;
     }
 }
