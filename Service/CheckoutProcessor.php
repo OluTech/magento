@@ -176,7 +176,7 @@ class CheckoutProcessor
             $subtotal        = $quote->getSubtotalWithDiscount() + $shippingAddress->getShippingAmount();
 
             $taxAmount = $shippingAddress->getTaxAmount();
-            if ($taxAmount === null || $taxAmount == 0) {
+            if ($taxAmount == 0) {
                 $taxAmount = $billingAddress->getTaxAmount();
             }
 
@@ -192,5 +192,22 @@ class CheckoutProcessor
 
             return null;
         }
+    }
+
+    /**
+     * Get the currency code for the current checkout quote
+     * @return string|null
+     */
+    public function getCheckoutCurrency(): ?string
+    {
+        try {
+            $quote = $this->checkoutSession->getQuote();
+            if ($quote && $quote->getId()) {
+                return $quote->getQuoteCurrencyCode();
+            }
+        } catch (Exception $e) {
+            $this->logger->error('Error getting quote currency: ' . $e->getMessage());
+        }
+        return null;
     }
 }

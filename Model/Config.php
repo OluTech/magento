@@ -4,14 +4,14 @@ namespace Fortispay\Fortis\Model;
 
 use Magento\Directory\Helper\Data;
 use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\App\Config\Storage\WriterInterface;
+use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\View\Asset\Repository;
 use Magento\Payment\Model\MethodInterface;
 use Magento\Store\Model\ScopeInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface;
-use Magento\Framework\Encryption\EncryptorInterface;
-use Magento\Framework\App\Config\Storage\WriterInterface;
 
 /**
  * Config model that is aware of all \Fortispay\Fortis payment methods
@@ -48,7 +48,29 @@ class Config
      * Currency codes supported by Fortis methods
      * @var string[]
      */
-    private array $supportedCurrencyCodes = ['USD', 'EUR', 'GPD', 'ZAR'];
+    private array $supportedCurrencyCodes = [
+        'USD',
+        'EUR',
+        'GPD',
+        'ZAR',
+        'ARS',
+        'AUD',
+        'BRL',
+        'CAD',
+        'CLP',
+        'COP',
+        'PYG',
+        'INR',
+        'MXN',
+        'ILS',
+        'NZD',
+        'PEN',
+        'PHP',
+        'GBP',
+        'SGD',
+        'KRW',
+        'JPY'
+    ];
 
     /**
      * @var LoggerInterface
@@ -132,7 +154,7 @@ class Config
      *
      * @return string|null
      */
-    public function getMerchantCountry()
+    public function getMerchantCountry(): ?string
     {
         return $this->directoryHelper->getDefaultCountry($this->storeId);
     }
@@ -148,7 +170,7 @@ class Config
      *
      * @return bool
      */
-    public function isMethodSupportedForCountry($method = null, $countryCode = null)
+    public function isMethodSupportedForCountry(?string $method = null, ?string $countryCode = null): bool
     {
         if ($method === null) {
             $method = $this->getMethodCode();
@@ -169,7 +191,7 @@ class Config
      * @return array
      * @SuppressWarnings(PHPMD.ExcessiveMethodLength)
      */
-    public function getCountryMethods($countryCode = null)
+    public function getCountryMethods(?string $countryCode = null): array
     {
         $countryMethods = [
             'other' => [
@@ -181,7 +203,7 @@ class Config
             return $countryMethods;
         }
 
-        return isset($countryMethods[$countryCode]) ? $countryMethods[$countryCode] : $countryMethods['other'];
+        return $countryMethods[$countryCode] ?? $countryMethods['other'];
     }
 
     /**
@@ -189,7 +211,7 @@ class Config
      *
      * @return string
      */
-    public function getPaymentMarkImageUrl()
+    public function getPaymentMarkImageUrl(): string
     {
         if ($this->achIsActive()) {
             return $this->assetRepo->getUrl('Fortispay_Fortis::images/logo-ach.png');
@@ -203,7 +225,7 @@ class Config
      *
      * @return string
      */
-    public function getFortisIconImageUrl()
+    public function getFortisIconImageUrl(): string
     {
         return $this->assetRepo->getUrl('Fortispay_Fortis::images/fortis_ach.png');
     }
@@ -213,7 +235,7 @@ class Config
      *
      * @return string
      */
-    public function getPaymentMarkWhatIsFortis()
+    public function getPaymentMarkWhatIsFortis(): string
     {
         return 'Fortis Payment Gateway';
     }
@@ -223,7 +245,7 @@ class Config
      *
      * @return string|null
      */
-    public function getPaymentAction()
+    public function getPaymentAction(): ?string
     {
         $paymentAction = null;
         $pre           = __METHOD__ . ' : ';
@@ -257,18 +279,18 @@ class Config
      *
      * @return bool
      */
-    public function isCurrencyCodeSupported($code)
+    public function isCurrencyCodeSupported(string $code): bool
     {
         $supported = false;
         $pre       = __METHOD__ . ' : ';
 
-        $this->logger->debug($pre . "bof and code: {$code}");
+        $this->logger->debug($pre . "bof and code: $code");
 
         if (in_array($code, $this->supportedCurrencyCodes)) {
             $supported = true;
         }
 
-        $this->logger->debug($pre . "eof and supported : {$supported}");
+        $this->logger->debug($pre . "eof and supported : $supported");
 
         return $supported;
     }
@@ -280,7 +302,7 @@ class Config
      *
      * @return mixed
      */
-    public function getConfig(mixed $field)
+    public function getConfig(mixed $field): mixed
     {
         $storeScope = ScopeInterface::SCOPE_STORE;
         $path       = 'payment/' . Config::METHOD_CODE . '/' . $field;
@@ -288,7 +310,7 @@ class Config
         return $this->scopeConfig->getValue($path, $storeScope);
     }
 
-    public function setConfig(string $key, string $value)
+    public function setConfig(string $key, string $value): void
     {
         $path = 'payment/' . Config::METHOD_CODE . '/' . $key;
 
@@ -355,7 +377,6 @@ class Config
         return $r === '1';
     }
 
-
     /**
      * ACH product ID (optional)
      *
@@ -398,6 +419,7 @@ class Config
     }
 
     /**
+     *
      * CC product ID (optional)
      *
      * @return string
@@ -415,6 +437,131 @@ class Config
         }
 
         return $t;
+    }
+
+    /**
+     * Get the appropriate Product Transaction ID based on currency
+     *
+     * @param string|null $currency
+     * @return string
+     */
+    public function getProductIdForCurrency(?string $currency = null): string
+    {
+        if (!$currency) {
+            $currency = $this->storeManager->getStore()->getCurrentCurrency()->getCode();
+        }
+
+        if (!$this->isMultiCurrencyEnabled()) {
+            return $this->ccProductId();
+        }
+
+        $primaryCurrency  = $this->getPrimaryCurrency();
+        $primaryProductId = $this->ccProductId();
+
+        if ($currency === $primaryCurrency) {
+            return $primaryProductId;
+        }
+
+        $secondaryCurrency  = $this->getSecondaryCurrency();
+        $secondaryProductId = $this->getSecondaryProductId();
+
+        if ($currency === $secondaryCurrency && !empty($secondaryProductId)) {
+            return $secondaryProductId;
+        }
+
+        return $primaryProductId;
+    }
+
+    /**
+     * Check if multi-currency support is enabled
+     *
+     * @return bool
+     */
+    public function isMultiCurrencyEnabled(): bool
+    {
+        return $this->getConfig('multi_currency_enabled') === '1';
+    }
+
+    /**
+     * Get primary currency
+     *
+     * @return string
+     */
+    public function getPrimaryCurrency(): string
+    {
+        return $this->getConfig('product_currency_primary') ?: 'USD';
+    }
+
+    /**
+     * Get secondary currency
+     *
+     * @return string
+     */
+    public function getSecondaryCurrency(): string
+    {
+        return $this->getConfig('product_currency_secondary') ?: '';
+    }
+
+    /**
+     * Get secondary Product Transaction ID
+     *
+     * @return string
+     */
+    public function getSecondaryProductId(): string
+    {
+        $productId = $this->getConfig('product_transaction_id_secondary') ?? '';
+        if ($productId !== '') {
+            $productId = $this->encryptor->decrypt($productId);
+        }
+        return $productId;
+    }
+
+    /**
+     * Get all configured currencies and their corresponding Product IDs
+     *
+     * @return array
+     */
+    public function getCurrencyProductIdMap(): array
+    {
+        $map = [];
+
+        $primaryCurrency  = $this->getPrimaryCurrency();
+        $primaryProductId = $this->ccProductId();
+        if ($primaryCurrency && $primaryProductId) {
+            $map[$primaryCurrency] = $primaryProductId;
+        }
+
+        if ($this->isMultiCurrencyEnabled()) {
+            $secondaryCurrency  = $this->getSecondaryCurrency();
+            $secondaryProductId = $this->getSecondaryProductId();
+            if ($secondaryCurrency && $secondaryProductId) {
+                $map[$secondaryCurrency] = $secondaryProductId;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * Check if a currency is supported by the configured Product IDs
+     *
+     * @param string $currency
+     * @return bool
+     */
+    public function isCurrencySupported(string $currency): bool
+    {
+        $supportedCurrencies = array_keys($this->getCurrencyProductIdMap());
+        return in_array($currency, $supportedCurrencies, true);
+    }
+
+    /**
+     * Get all supported currencies
+     *
+     * @return array
+     */
+    public function getSupportedCurrencies(): array
+    {
+        return array_keys($this->getCurrencyProductIdMap());
     }
 
     /**
@@ -520,11 +667,11 @@ class Config
      *
      * @return $this
      */
-    public function setMethod($method)
+    public function setMethod(MethodInterface|string $method): static
     {
         if ($method instanceof MethodInterface) {
             $this->methodCode = $method->getCode();
-        } elseif (is_string($method)) {
+        } else {
             $this->methodCode = $method;
         }
 
@@ -536,7 +683,7 @@ class Config
      *
      * @return string
      */
-    public function getMethodCode()
+    public function getMethodCode(): string
     {
         return $this->methodCode;
     }
@@ -548,7 +695,7 @@ class Config
      *
      * @return $this
      */
-    public function setStoreId($storeId)
+    public function setStoreId(int $storeId): static
     {
         $this->storeId = (int)$storeId;
 
@@ -560,7 +707,7 @@ class Config
      *
      * @return int
      */
-    public function getStoreId()
+    public function getStoreId(): int
     {
         return $this->storeId;
     }
@@ -572,7 +719,7 @@ class Config
      *
      * @return bool
      */
-    public function isMethodAvailable($methodCode = null)
+    public function isMethodAvailable(?string $methodCode = null): bool
     {
         $methodCode = $methodCode ?: $this->methodCode;
 
@@ -591,7 +738,7 @@ class Config
     public function isMethodActive(string $method): bool
     {
         $isEnabled = $this->scopeConfig->isSetFlag(
-            "payment/{$method}/active",
+            "payment/$method/active",
             ScopeInterface::SCOPE_STORE,
             $this->storeId
         );

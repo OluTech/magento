@@ -18,51 +18,39 @@ use Psr\Log\LoggerInterface;
 class FortisConfigProvider implements ConfigProviderInterface
 {
     /**
-     * @var ResolverInterface
-     */
-    private $localeResolver;
-
-    /**
      * @var Config
      */
-    private $config;
+    private Config $config;
 
     /**
      * @var CurrentCustomer
      */
-    private $currentCustomer;
+    private CurrentCustomer $currentCustomer;
 
     /**
      * @var LoggerInterface
      */
-    private $logger;
-
-    /**
-     * @var PaymentHelper
-     */
-    private $paymentHelper;
+    private LoggerInterface $logger;
 
     /**
      * @var Repository
      */
-    private $assetRepo;
+    private Repository $assetRepo;
 
     /**
      * @var UrlInterface
      */
-    private $urlBuilder;
+    private UrlInterface $urlBuilder;
 
     /**
      * @var RequestInterface
      */
-    private $request;
+    private RequestInterface $request;
 
     /**
      * @var PaymentTokenManagement
      */
-    private $paymentTokenManagement;
-    private CheckoutProcessor $checkoutProcessor;
-    private FortisApi $fortisApi;
+    private PaymentTokenManagement $paymentTokenManagement;
     private FortisMethodService $fortisMethodService;
 
     /**
@@ -70,43 +58,33 @@ class FortisConfigProvider implements ConfigProviderInterface
      *
      * @param LoggerInterface $logger
      * @param ConfigFactory $configFactory
-     * @param ResolverInterface $localeResolver
      * @param CurrentCustomer $currentCustomer
-     * @param PaymentHelper $paymentHelper
      * @param Repository $assetRepo
      * @param UrlInterface $urlBuilder
      * @param RequestInterface $request
      * @param PaymentTokenManagement $paymentTokenManagement
-     *
+     * @param FortisMethodService $fortisMethodService
      */
     public function __construct(
         LoggerInterface $logger,
         ConfigFactory $configFactory,
-        ResolverInterface $localeResolver,
         CurrentCustomer $currentCustomer,
-        PaymentHelper $paymentHelper,
         Repository $assetRepo,
         UrlInterface $urlBuilder,
         RequestInterface $request,
         PaymentTokenManagement $paymentTokenManagement,
-        CheckoutProcessor $checkoutProcessor,
-        FortisApi $fortisApi,
         FortisMethodService $fortisMethodService
     ) {
         $this->logger = $logger;
         $pre          = __METHOD__ . ' : ';
         $this->logger->debug($pre . 'bof');
 
-        $this->localeResolver         = $localeResolver;
         $this->config                 = $configFactory->create();
         $this->currentCustomer        = $currentCustomer;
-        $this->paymentHelper          = $paymentHelper;
         $this->assetRepo              = $assetRepo;
         $this->urlBuilder             = $urlBuilder;
         $this->request                = $request;
         $this->paymentTokenManagement = $paymentTokenManagement;
-        $this->checkoutProcessor      = $checkoutProcessor;
-        $this->fortisApi              = $fortisApi;
         $this->fortisMethodService    = $fortisMethodService;
     }
 
@@ -116,7 +94,7 @@ class FortisConfigProvider implements ConfigProviderInterface
      * {@inheritdoc}
      * @throws LocalizedException
      */
-    public function getConfig()
+    public function getConfig(): array
     {
         $pre       = __METHOD__ . ' : ';
         $cards     = [];
@@ -163,6 +141,7 @@ class FortisConfigProvider implements ConfigProviderInterface
                     'isSingleView'              => $this->config->isSingleView(),
                     'placeOrderBtnText'         => $this->config->getPlaceOrderBtnText(),
                     'surchargeDisclaimer'       => FortisMethodService::FORTIS_SURCHARGE_DISCLAIMER,
+                    'supportedCurrencies'       => $this->config->getSupportedCurrencies(),
                 ]
             ]
         ];
@@ -198,7 +177,7 @@ class FortisConfigProvider implements ConfigProviderInterface
      *
      * @return string
      */
-    public function getViewFileUrl($fileId, array $params = [])
+    public function getViewFileUrl(string $fileId, array $params = []): string
     {
         try {
             $params = array_merge(['_secure' => $this->request->isSecure()], $params);

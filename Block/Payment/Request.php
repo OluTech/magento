@@ -11,7 +11,7 @@ class Request extends Template
 {
     private IFrameData $iFrame;
     private ?array $jsConfig;
-    private $cspNonceProvider = null;
+    private mixed $cspNonceProvider = null;
 
     /**
      * Construct

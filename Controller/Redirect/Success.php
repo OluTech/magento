@@ -5,6 +5,7 @@ namespace Fortispay\Fortis\Controller\Redirect;
 use Exception;
 use Fortispay\Fortis\Model\Fortis;
 use Fortispay\Fortis\Model\FortisApi;
+use Fortispay\Fortis\Service\TransactionVerifier;
 use Fortispay\Fortis\Service\CheckoutProcessor;
 use Fortispay\Fortis\Service\FortisMethodService;
 use Fortispay\Fortis\Service\MagentoOrderService;
@@ -25,6 +26,7 @@ use Magento\Framework\Exception\RuntimeException;
 use Magento\Framework\Message\ManagerInterface;
 use Magento\Framework\View\Result\PageFactory;
 use Magento\Sales\Api\Data\OrderInterface;
+use Magento\Sales\Api\Data\TransactionInterface;
 use Magento\Sales\Api\InvoiceRepositoryInterface;
 use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
@@ -141,6 +143,7 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
     private FortisApi $fortisApi;
     private CheckoutProcessor $checkoutProcessor;
     private MagentoOrderService $magentoOrderService;
+    private TransactionVerifier $transactionVerifier;
 
     /**
      * @param PageFactory $pageFactory
@@ -151,7 +154,7 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
      * @param Fortis $paymentMethod
      * @param OrderRepositoryInterface $orderRepository
      * @param StoreManagerInterface $storeManager
-     * @param OrderSender $OrderSender
+     * @param OrderSender $orderSender
      * @param Builder $transactionBuilder
      * @param DBTransaction $dbTransaction
      * @param Order $order
@@ -166,6 +169,8 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
      * @param InvoiceRepositoryInterface $invoiceRepository
      * @param FortisApi $fortisApi
      * @param CheckoutProcessor $checkoutProcessor
+     * @param MagentoOrderService $magentoOrderService
+     * @param TransactionVerifier $transactionVerifier
      */
     public function __construct(
         PageFactory $pageFactory,
@@ -176,7 +181,7 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         Fortis $paymentMethod,
         OrderRepositoryInterface $orderRepository,
         StoreManagerInterface $storeManager,
-        OrderSender $OrderSender,
+        OrderSender $orderSender,
         Builder $transactionBuilder,
         DBTransaction $dbTransaction,
         Order $order,
@@ -192,6 +197,7 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         FortisApi $fortisApi,
         CheckoutProcessor $checkoutProcessor,
         MagentoOrderService $magentoOrderService,
+        TransactionVerifier $transactionVerifier
     ) {
         $pre = __METHOD__ . " : ";
 
@@ -205,7 +211,7 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         $this->pageFactory              = $pageFactory;
         $this->invoiceService           = $invoiceService;
         $this->invoiceSender            = $invoiceSender;
-        $this->orderSender              = $OrderSender;
+        $this->orderSender              = $orderSender;
         $this->paymentMethod            = $paymentMethod;
         $this->orderRepository          = $orderRepository;
         $this->storeManager             = $storeManager;
@@ -222,6 +228,7 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         $this->fortisApi                = $fortisApi;
         $this->checkoutProcessor        = $checkoutProcessor;
         $this->magentoOrderService      = $magentoOrderService;
+        $this->transactionVerifier      = $transactionVerifier;
 
         $this->logger->debug($pre . 'eof');
     }
@@ -287,10 +294,10 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
      */
     public function execute()
     {
-        $json      = $this->request->getContent();
-        $GET       = $this->request->getParams();
-        $data      = json_decode($json);
-        $dataArray = json_decode($json, true);
+        $json          = $this->request->getContent();
+        $requestParams = $this->request->getParams();
+        $data          = json_decode($json);
+        $dataArray     = json_decode($json, true);
 
         $baseurl  = $this->storeManager->getStore()->getBaseUrl();
         $redirect = $this->resultFactory->create(
@@ -303,11 +310,11 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         $isTicketTransaction = isset($dataArray) && ($dataArray['@action'] === 'ticket');
 
         $tokenised = false;
-        $orderId   = isset($GET['gid']) ? (int)$GET['gid'] : null;
+        $orderId   = isset($requestParams['gid']) ? (int)$requestParams['gid'] : null;
         if (!$data) {
             $tokenised = true;
             $data      = new stdClass();
-            $data->id  = $GET['tid'] ?? null;
+            $data->id  = $requestParams['tid'] ?? null;
         }
 
         $pre = __METHOD__ . " : ";
@@ -359,6 +366,22 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                 }
             } else {
                 $fortisTransaction = $api->getTransaction($data->id, $user_id, $user_api_key)->data;
+            }
+
+            $orderTotal         = (int)bcmul($order->getGrandTotal(), '100', 0);
+            $verificationResult = $this->transactionVerifier->verifyTransactionById(
+                $data->id ?? $fortisTransaction->id,
+                $order->getIncrementId(),
+                $orderTotal
+            );
+
+            if (!$verificationResult['verified']) {
+                $this->logger->critical('SECURITY: Transaction verification failed', [
+                    'transactionId' => $data->id ?? $fortisTransaction->id,
+                    'order'         => $order->getIncrementId(),
+                    'errors'        => $verificationResult['errors']
+                ]);
+                throw new RuntimeException(new \Magento\Framework\Phrase('Transaction verification failed'));
             }
 
             if ($tokenised) {
@@ -532,10 +555,22 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
             }
         } catch (Exception $e) {
             // Save Transaction Response
-            $this->createTransaction($data);
+            if (isset($data) && is_object($data)) {
+                $this->createTransaction($data);
+            }
             $this->logger->error($pre . $e->getMessage());
-            $this->messageManager->addExceptionMessage($e, __('We can\'t start Fortis Checkout.'));
 
+            if ($tokenised || $isTicketTransaction) {
+                $resultJson = $this->resultJsonFactory->create();
+                return $resultJson->setData([
+                                                'error'   => true,
+                                                'message' => $e->getMessage() ?: __(
+                                                    'Payment verification failed. Please try again.'
+                                                )
+                                            ])->setHttpResponseCode(403);
+            }
+
+            $this->messageManager->addExceptionMessage($e, __('We can\'t start Fortis Checkout.'));
             $redirect->setUrl($redirectToCartPageString);
         }
 
@@ -576,8 +611,8 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                 // Build method creates the transaction and returns the object
                 ->build(
                     $paymentData->payment_method === 'ach'
-                        ? Transaction::TYPE_ORDER
-                        : Transaction::TYPE_CAPTURE
+                        ? TransactionInterface::TYPE_ORDER
+                        : TransactionInterface::TYPE_CAPTURE
                 );
 
             $payment->addTransactionCommentsToOrder(

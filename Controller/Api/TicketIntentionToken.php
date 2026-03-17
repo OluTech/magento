@@ -2,13 +2,10 @@
 
 namespace Fortispay\Fortis\Controller\Api;
 
-use Fortispay\Fortis\Model\FortisApi;
 use Fortispay\Fortis\Service\FortisMethodService;
 use Magento\Framework\App\Action\HttpGetActionInterface;
-use Magento\Framework\Controller\Result\JsonFactory;
-use Magento\Framework\Controller\ResultFactory;
-use Fortispay\Fortis\Service\QuoteRegenerator;
 use Magento\Framework\App\RequestInterface;
+use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Exception\LocalizedException;
 use Psr\Log\LoggerInterface;
 

@@ -6,6 +6,11 @@
     let spinner = null;
     let ticketIntentionData = null;
 
+    function reEnablePlaceOrderButton() {
+        if (window.FortisTicketIntention?.checkoutContext?.isPlaceOrderActionAllowed) {
+            window.FortisTicketIntention.checkoutContext.isPlaceOrderActionAllowed(true);
+        }
+    }
     function isFortisPaymentSelected() {
         const fortisRadio = document.querySelector('input[name="payment[method]"][value="fortis"]');
         return fortisRadio && fortisRadio.checked;
@@ -28,6 +33,14 @@
             $,
             placeOrderAction
         ) {
+            const currentCurrency = window.checkoutConfig?.quoteData?.quote_currency_code;
+            const supportedCurrencies = window.checkoutConfig?.payment?.fortis?.supportedCurrencies;
+            
+            if (currentCurrency && supportedCurrencies && !supportedCurrencies.includes(currentCurrency)) {
+                displayTicketError(`Currency "${currentCurrency}" is not supported. Please select one of the supported currencies: ${supportedCurrencies.join(', ')}`);
+                return; // Don't create iframe
+            }
+            
             // Remove previous listeners if elements exists
             if (elements && typeof elements.off === 'function') {
                 elements.off('done');
@@ -40,45 +53,53 @@
 
             elements.on('done', async (result) => {
                 lastResult = result;
-                const response = await fetch(ticketIntentionData.calculateSurchargeUrl + '?ticket_id=' + result.data.id, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                });
+                try {
+                    const response = await fetch(ticketIntentionData.calculateSurchargeUrl + '?ticket_id=' + result.data.id, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                    });
 
-                if (response.ok) {
-                    const responseData = await response.json();
-                    const surchargeData = JSON.parse(responseData.surchargeData).data;
-                    const ticketSurchargeDisclaimer = jQuery('#ticket-surcharge-disclaimer');
+                    if (response.ok) {
+                        const responseData = await response.json();
+                        const surchargeData = JSON.parse(responseData.surchargeData).data;
+                        const ticketSurchargeDisclaimer = jQuery('#ticket-surcharge-disclaimer');
 
-                    if (surchargeData !== null && surchargeData.surcharge_amount) {
-                        document.getElementById('fortis_payment420').style.display = 'none';
-                        ticketSurchargeDisclaimer.html(`
-                            <br>
-                            <p>
-                                Subtotal: $${(surchargeData.subtotal_amount / 100).toFixed(2)}<br>
-                                Tax: $${(surchargeData.tax_amount / 100).toFixed(2)}<br>
-                                Surcharge Amount: $${(surchargeData.surcharge_amount / 100).toFixed(2)}<br>
-                                <strong>Total: $${(surchargeData.transaction_amount / 100).toFixed(2)}</strong>
-                            </p>
-                            <p>${ticketIntentionData.surchargeDisclaimer}</p>
-                            <button id="cancel-order-btn" type="button">Cancel</button>
-                            <button id="continue-order-btn" type="button">Continue</button>
-                        `);
+                        if (surchargeData !== null && surchargeData.surcharge_amount) {
+                            document.getElementById('fortis_ticket_payment_form').style.display = 'none';
+                            ticketSurchargeDisclaimer.html(`
+                                <br>
+                                <p>
+                                    Subtotal: $${(surchargeData.subtotal_amount / 100).toFixed(2)}<br>
+                                    Tax: $${(surchargeData.tax_amount / 100).toFixed(2)}<br>
+                                    Surcharge Amount: $${(surchargeData.surcharge_amount / 100).toFixed(2)}<br>
+                                    <strong>Total: $${(surchargeData.transaction_amount / 100).toFixed(2)}</strong>
+                                </p>
+                                <p>${ticketIntentionData.surchargeDisclaimer}</p>
+                                <button id="cancel-order-btn" type="button">Cancel</button>
+                                <button id="continue-order-btn" type="button">Continue</button>
+                            `);
 
-                        document.getElementById('cancel-order-btn').addEventListener('click', function() {
-                            cancelOrder(null);
-                        });
-                        document.getElementById('continue-order-btn').addEventListener('click', (event) => {
-                            event.preventDefault();
-                            continueOrder(lastResult, window.FortisTicketIntention.checkoutContext, surchargeData, placeOrderAction);
-                        });
+                            document.getElementById('cancel-order-btn').addEventListener('click', function() {
+                                cancelOrder(null);
+                            });
+                            document.getElementById('continue-order-btn').addEventListener('click', (event) => {
+                                event.preventDefault();
+                                continueOrder(lastResult, window.FortisTicketIntention.checkoutContext, surchargeData, placeOrderAction);
+                            });
+                        } else {
+                             await continueOrder(lastResult, window.FortisTicketIntention.checkoutContext, null, placeOrderAction);
+                        }
                     } else {
-                         await continueOrder(lastResult, window.FortisTicketIntention.checkoutContext, null, placeOrderAction);
+                        console.error('Request failed with status:', response.status);
+                        reEnablePlaceOrderButton();
+                        displayTicketError('Failed to calculate surcharge. Please try again.');
                     }
-                } else {
-                    console.error('Request failed with status:', response.status);
+                } catch (error) {
+                    console.error('Error in done handler:', error);
+                    reEnablePlaceOrderButton();
+                    displayTicketError('An error occurred processing your payment. Please try again.');
                 }
             });
 
@@ -86,6 +107,7 @@
                 let $frame = jQuery('#fortis-framed-2567');
                 $frame.show();
                 $frame.parent().next().show();
+                reEnablePlaceOrderButton();
             });
 
             elements.on('submitted', async () => {
@@ -103,10 +125,10 @@
 
     function elementsCreate(ticketIntentionToken, Commerce) {
         elements = new Commerce.elements(ticketIntentionToken);
-        let fortisDiv = document.getElementById('fortis_payment420');
+        let fortisDiv = document.getElementById('fortis_ticket_payment_form');
         if (!fortisDiv) {
             fortisDiv = document.createElement('div');
-            fortisDiv.id = 'fortis_payment420';
+            fortisDiv.id = 'fortis_ticket_payment_form';
             fortisDiv.style.display = 'none';
             fortisDiv.style.margin = ticketIntentionData.appearance_options.marginSpacing;
             const container = document.getElementById('fortis-payment-form-container') || document.querySelector('div.main');
@@ -116,7 +138,7 @@
         }
 
         elements.create({
-            container: '#fortis_payment420',
+            container: '#fortis_ticket_payment_form',
             theme: ticketIntentionData.main_options.theme,
             environment: ticketIntentionData.main_options.environment,
             floatingLabels: ticketIntentionData.floatingLabels,
@@ -150,7 +172,7 @@
                                    
             if (isFortisSelected) {
                 const container = document.getElementById('fortis-payment-form-container');
-                const paymentForm = document.getElementById('fortis_payment420');
+                const paymentForm = document.getElementById('fortis_ticket_payment_form');
                 if (paymentForm && container && paymentForm instanceof Node && paymentForm.parentNode !== container) {
                     container.appendChild(paymentForm);
                 }
@@ -169,11 +191,12 @@
 
         const container = document.getElementById('fortis-payment-form-container');
         generateSpinner(container);
+        reEnablePlaceOrderButton();
 
         window.checkoutConfig.selectedPaymentMethod = 'fortis';
 
         jQuery('#ticket-surcharge-disclaimer').html('');
-        const fortisPaymentBlock = document.getElementById('fortis_payment420');
+        const fortisPaymentBlock = document.getElementById('fortis_ticket_payment_form');
         if (fortisPaymentBlock) {
             fortisPaymentBlock.remove();
         }
@@ -241,8 +264,17 @@
                     );
                     if (!ticketTransactionResponse.ok) {
                         console.error('Ticket transaction request failed:', ticketTransactionResponse.status);
-                        continueBtn.disabled = false;
-                        cancelBtn.disabled = false;
+                        let errorMessage = 'Payment processing failed. Please try again.';
+                        try {
+                            const errorData = await ticketTransactionResponse.json();
+                            if (errorData.message) {
+                                errorMessage = errorData.message;
+                            } else if (errorData.error) {
+                                errorMessage = errorData.error;
+                            }
+                        } catch (e) {
+                        }
+                        await cancelOrder(errorMessage);
                         return;
                     }
                     try {
@@ -263,27 +295,27 @@
                     } catch (jsonErr) {
                         const text = await ticketTransactionResponse.text();
                         console.error('Ticket transaction response is not valid JSON. Raw response:', text);
-                        continueBtn.disabled = false;
-                        cancelBtn.disabled = false;
+                        await cancelOrder('Payment processing failed. Invalid response from server.');
                         return;
                     }
                 } catch (err) {
                     console.error('Error running ticketTransaction:', err);
-                    continueBtn.disabled = false;
+                    await cancelOrder('An error occurred processing your payment. Please try again.');
                     cancelBtn.disabled = false;
                     return;
                 }
 
                 const placeOrder = placeOrderAction(self.getData(), false, self.messageContainer);
-                jQuery.when(placeOrder).fail(function () {
+                jQuery.when(placeOrder).fail(async function () {
                     self.isPlaceOrderActionAllowed(true);
                     console.error('Place order failed');
+                    await cancelOrder('Failed to create order. Please try again.');
                 }).done(async function () {
                     const ticketSurchargeDisclaimer = jQuery('#ticket-surcharge-disclaimer');
                     if (ticketSurchargeDisclaimer) {
                         ticketSurchargeDisclaimer.html('');
                     }
-                    document.getElementById('fortis_payment420').style.display = 'none';
+                    document.getElementById('fortis_ticket_payment_form').style.display = 'none';
                     const container = document.getElementById('fortis-payment-form-container');
                     generateSpinner(container);
 
@@ -305,22 +337,38 @@
                             const responseData = await response.json();
                             if (responseData.redirectTo) {
                                 window.location.href = responseData.redirectTo;
+                            } else if (responseData.error) {
+                                if (spinner) spinner.remove();
+                                await cancelOrder(responseData.message || 'Payment verification failed. Please try again.');
                             } else {
-                                console.error('Redirect URL not provided in response');
+                                if (spinner) spinner.remove();
+                                await cancelOrder('An error occurred processing your payment. Please try again.');
                             }
                         } else {
-                            console.error('Request failed with status:', response.status);
+                            if (spinner) spinner.remove();
+                            let errorMessage = 'Payment processing failed. Please try again.';
+                            try {
+                                const errorData = await response.json();
+                                if (errorData.message) {
+                                    errorMessage = errorData.message;
+                                }
+                            } catch (e) {
+                            }
+                            await cancelOrder(errorMessage);
                         }
-                        spinner.remove();
                     } catch (error) {
                         console.error('Error in continueOrder:', error);
+                        if (spinner) spinner.remove();
+                        await cancelOrder('An unexpected error occurred. Please try again.');
                     }
                 });
             } else {
                 console.error('self is missing required methods or properties (afterPlaceOrder, getData, messageContainer)');
+                await cancelOrder('Payment initialization failed. Please refresh and try again.');
             }
         } catch (error) {
             console.error('Error in continueOrder:', error);
+            await cancelOrder('An unexpected error occurred. Please try again.');
         }
     }
 
@@ -334,6 +382,21 @@
         const styleSheet = document.createElement('style');
         styleSheet.innerText = '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }';
         document.head.appendChild(styleSheet);
+    }
+
+    function displayTicketError(errorMessage) {
+        const existingError = document.getElementById('ticketError');
+        if (existingError) existingError.remove();
+
+        const errorDiv = document.createElement('div');
+        errorDiv.id = 'ticketError';
+        errorDiv.style.cssText = 'color: #e02b27; background: #ffebee; border: 1px solid #e02b27; padding: 10px; margin: 10px 0; border-radius: 4px;';
+        errorDiv.innerHTML = '<strong>Error:</strong> ' + errorMessage;
+
+        const fortisRadio = document.querySelector('input[name="payment[method]"][value="fortis"]');
+        if (fortisRadio?.closest('.payment-method')) {
+            fortisRadio.closest('.payment-method').appendChild(errorDiv);
+        }
     }
 
     window.FortisTicketIntention = {

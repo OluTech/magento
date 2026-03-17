@@ -5,7 +5,7 @@
         <element name="FortisContinueShoppingButton" type="button" selector="#fortis-continue-shopping-btn"
                  timeout="30"/>
         <element name="FortisPayNowButton" type="button" selector="#submit-button > div > button" timeout="30"/>
-        <element name="FortisPayIFrame" type="iframe" selector="#fortis_payment327 iframe" timeout="30"/>
+        <element name="FortisPayIFrame" type="iframe" selector="#fortis_iframe_payment_form iframe" timeout="30"/>
         <element name="FortisClassicBillingInfo" type="iframe" selector="#form-main > section.billing-info"
                  timeout="30"/>
         <element name="FortisCreditCardNumberField" type="input" selector="input#cc_account_number.input" timeout="30"/>

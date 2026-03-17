@@ -14,6 +14,7 @@ use Magento\Checkout\Model\Session as CheckoutSession;
 use Psr\Log\LoggerInterface;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Customer\Api\AddressRepositoryInterface;
+use Fortispay\Fortis\Model\Config;
 
 class TicketTransaction implements HttpPostActionInterface, CsrfAwareActionInterface
 {
@@ -25,6 +26,7 @@ class TicketTransaction implements HttpPostActionInterface, CsrfAwareActionInter
     private RequestInterface $request;
     private AddressRepositoryInterface $addressRepository;
     private CheckoutProcessor $checkoutProcessor;
+    private Config $config;
 
     public function __construct(
         JsonFactory $resultJsonFactory,
@@ -34,7 +36,8 @@ class TicketTransaction implements HttpPostActionInterface, CsrfAwareActionInter
         LoggerInterface $logger,
         RequestInterface $request,
         AddressRepositoryInterface $addressRepository,
-        CheckoutProcessor $checkoutProcessor
+        CheckoutProcessor $checkoutProcessor,
+        Config $config
     ) {
         $this->resultJsonFactory   = $resultJsonFactory;
         $this->fortisMethodService = $fortisMethodService;
@@ -44,6 +47,7 @@ class TicketTransaction implements HttpPostActionInterface, CsrfAwareActionInter
         $this->request             = $request;
         $this->addressRepository   = $addressRepository;
         $this->checkoutProcessor   = $checkoutProcessor;
+        $this->config              = $config;
     }
 
     public function execute()
@@ -91,7 +95,7 @@ class TicketTransaction implements HttpPostActionInterface, CsrfAwareActionInter
                         'state'       => $address->getRegion()->getRegionCode(),
                         'postal_code' => $address->getPostcode(),
                         'street'      => $street,
-                        'phone'       => preg_replace('/\D/', '', $telephone)
+                        'phone'       => $telephone ? preg_replace('/\D/', '', $telephone) : null
                     ];
                 } catch (\Exception $e) {
                     $billingInfo = [
@@ -99,7 +103,7 @@ class TicketTransaction implements HttpPostActionInterface, CsrfAwareActionInter
                         'state'       => '',
                         'postal_code' => '',
                         'street'      => '',
-                        'phone'       => ''
+                        'phone'       => null
                     ];
                 }
             } else {
@@ -114,19 +118,31 @@ class TicketTransaction implements HttpPostActionInterface, CsrfAwareActionInter
                     'city'        => $billingAddress ? $billingAddress->getCity() : '',
                     'state'       => $billingAddress ? $billingAddress->getRegion() : '',
                     'postal_code' => $billingAddress ? $billingAddress->getPostcode() : '',
+                    'phone'       => $telephone ? preg_replace('/\D/', '', $telephone) : null,
                     'street'      => $street,
                 ];
-
-                if ($telephone) {
-                    $billingInfo['phone'] = preg_replace('/\D/', '', $telephone);
-                }
             }
+
+            $quoteCurrency = $quote->getQuoteCurrencyCode();
+
+            if (!$this->config->isCurrencySupported($quoteCurrency)) {
+                $supportedCurrencies = implode(', ', $this->config->getSupportedCurrencies());
+                throw new LocalizedException(
+                    __(
+                        'Currency "%1" is not supported. Please select one of the supported currencies: %2',
+                        $quoteCurrency,
+                        $supportedCurrencies
+                    )
+                );
+            }
+
             $totals = $this->checkoutProcessor->getCheckoutTotals();
-            
+
             $totals = [
                 'subtotal_amount'    => (int)bcmul((string)$totals['subtotal'], '100', 0),
                 'tax'                => (int)bcmul((string)$totals['tax_amount'], '100', 0),
-                'transaction_amount' => (int)bcmul((string)$totals['grand_total'], '100', 0)
+                'transaction_amount' => (int)bcmul((string)$totals['grand_total'], '100', 0),
+                'currency'           => $quoteCurrency
             ];
 
             $ticketIntention['order_id'] = $quote->getReservedOrderId() ?? $quote->getId();
@@ -144,6 +160,13 @@ class TicketTransaction implements HttpPostActionInterface, CsrfAwareActionInter
             return $resultJson->setData([
                                             'success' => true,
                                             'data'    => $ticketTransaction->data ?? $ticketTransaction,
+                                        ]);
+        } catch (LocalizedException $e) {
+            $this->logger->error('TicketTransaction error: ' . $e->getMessage());
+
+            return $resultJson->setData([
+                                            'success' => false,
+                                            'error'   => $e->getMessage(),
                                         ]);
         } catch (\Exception $e) {
             $this->logger->error('TicketTransaction error: ' . $e->getMessage());

@@ -5,6 +5,7 @@ namespace Fortispay\Fortis\Controller\Redirect;
 use Exception;
 use Fortispay\Fortis\Model\Config;
 use Fortispay\Fortis\Model\FortisApi;
+use Fortispay\Fortis\Service\FortisMethodService;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\App\Action\HttpGetActionInterface;
 use Magento\Framework\App\Action\HttpPostActionInterface;
@@ -56,6 +57,7 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
     private CheckoutProcessor $checkoutProcessor;
     private UrlInterface $urlBuilder;
     private PaymentTokenManagementInterface $paymentTokenManagement;
+    private FortisMethodService $fortisMethodService;
 
     /**
      * @param PageFactory $pageFactory
@@ -80,6 +82,7 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
         PaymentTokenManagementInterface $paymentTokenManagement,
         FortisApi $fortisApi,
         CheckoutProcessor $checkoutProcessor,
+        FortisMethodService $fortisMethodService
     ) {
         $pre = __METHOD__ . " : ";
 
@@ -96,6 +99,7 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
         $this->checkoutProcessor      = $checkoutProcessor;
         $this->urlBuilder             = $urlBuilder;
         $this->paymentTokenManagement = $paymentTokenManagement;
+        $this->fortisMethodService    = $fortisMethodService;
 
         $this->logger->debug($pre . 'eof');
     }
@@ -145,6 +149,18 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
         }
 
         $vaultHash = $additionalData['fortis-vault-method'] ?? '';
+        $currency  = $this->checkoutProcessor->getCheckoutCurrency();
+
+        if (!$this->config->isCurrencySupported($currency)) {
+            $supportedCurrencies = implode(', ', $this->config->getSupportedCurrencies());
+            throw new LocalizedException(
+                __(
+                    'Currency "%1" is not supported. Please select one of the supported currencies: %2',
+                    $currency,
+                    $supportedCurrencies
+                )
+            );
+        }
         if (strlen($vaultHash) > 10) {
             // Have a vaulted card transaction
             $cardData = $this->paymentTokenManagement->getByPublicHash(
@@ -155,7 +171,7 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
             $tokenType     = json_decode($cardData->getTokenDetails())->type;
             $gatewayToken  = $cardData->getGatewayToken();
             $surchargeData = [];
-            if (isset($additionalData['fortis-surcharge-data']) && !empty($additionalData['fortis-surcharge-data'])) {
+            if (!empty($additionalData['fortis-surcharge-data'])) {
                 $decodedData = json_decode($additionalData['fortis-surcharge-data'], true);
                 if (json_last_error() === JSON_ERROR_NONE) {
                     $surchargeData = $decodedData;
@@ -228,7 +244,8 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
                         $intentData['subtotal_amount']    = $surchargeData['subtotal_amount'];
                     }
 
-                    $productTransactionId = $this->config->ccProductId();
+                    $productTransactionId = $this->config->getProductIdForCurrency($currency);
+                    $this->fortisMethodService->applySecondaryCurrency($intentData, $currency);
                     if ($productTransactionId
                         && preg_match(
                             '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',

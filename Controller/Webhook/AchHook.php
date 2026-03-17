@@ -4,6 +4,7 @@ namespace Fortispay\Fortis\Controller\Webhook;
 
 use Exception;
 use Fortispay\Fortis\Model\Config;
+use Fortispay\Fortis\Service\TransactionVerifier;
 use Magento\Framework\App\Action\HttpGetActionInterface;
 use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\App\CsrfAwareActionInterface;
@@ -88,6 +89,7 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
     private CreditmemoService $creditMemoService;
     private OrderRepositoryInterface $orderRepository;
     private SearchCriteriaBuilder $searchCriteriaBuilder;
+    private TransactionVerifier $transactionVerifier;
 
     /**
      * @param RequestInterface $request
@@ -104,6 +106,7 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
      * @param CreditmemoFactory $creditMemoFactory
      * @param OrderRepositoryInterface $orderRepository
      * @param SearchCriteriaBuilder $searchCriteriaBuilder
+     * @param TransactionVerifier $transactionVerifier
      */
     public function __construct(
         RequestInterface $request,
@@ -119,7 +122,8 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         CreditmemoService $creditMemoService,
         CreditmemoFactory $creditMemoFactory,
         OrderRepositoryInterface $orderRepository,
-        SearchCriteriaBuilder $searchCriteriaBuilder
+        SearchCriteriaBuilder $searchCriteriaBuilder,
+        TransactionVerifier $transactionVerifier
     ) {
         $this->request               = $request;
         $this->resourceConnection    = $resourceConnection;
@@ -135,6 +139,7 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         $this->creditMemoService     = $creditMemoService;
         $this->orderRepository       = $orderRepository;
         $this->searchCriteriaBuilder = $searchCriteriaBuilder;
+        $this->transactionVerifier   = $transactionVerifier;
     }
 
     /**
@@ -196,9 +201,28 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                 return $this->resultFactory->create()->setContents('Transaction not found');
             }
 
-            $transaction           = array_shift($transactionItems);
-            $orderId               = $transaction->getOrderId();
-            $order                 = $this->orderRepository->get($orderId);
+            $transaction = array_shift($transactionItems);
+            $orderId     = $transaction->getOrderId();
+            $order       = $this->orderRepository->get($orderId);
+
+            $orderTotal         = (int)bcmul($order->getGrandTotal(), '100', 0);
+            $verificationResult = $this->transactionVerifier->verifyTransactionById(
+                $transactionId,
+                $order->getIncrementId(),
+                $orderTotal
+            );
+
+            if (!$verificationResult['verified']) {
+                $this->logger->critical('SECURITY: Transaction verification failed', [
+                    'transactionId' => $transactionId,
+                    'order'         => $order->getIncrementId(),
+                    'errors'        => $verificationResult['errors']
+                ]);
+                $response->setHttpResponseCode(403);
+                $response->setContents('Transaction verification failed');
+                return $response;
+            }
+
             $additionalInformation = $transaction->getAdditionalInformation();
             if (empty($additionalInformation['webhook_update_info'])) {
                 $webhookUpdateInformation = [];

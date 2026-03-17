@@ -3,6 +3,7 @@
 namespace Fortispay\Fortis\Service;
 
 use Fortispay\Fortis\Model\Config;
+use Fortispay\Fortis\Model\CurrencyOptions;
 use Fortispay\Fortis\Model\FortisApi;
 use Magento\Framework\Exception\FileSystemException;
 use Magento\Framework\Exception\LocalizedException;
@@ -37,9 +38,11 @@ use Fortispay\Fortis\Service\CheckoutProcessor;
 
 class FortisMethodService
 {
-    public const        SECURE             = ['_secure' => true];
-    public const        FFFFFF             = '#ffffff';
-    public const        AVAILABLE_CC_TYPES = [
+    public const  SECURE                   = ['_secure' => true];
+    public const  FFFFFF                   = '#ffffff';
+    public const  CONFIG_PATH_USER_ID      = 'payment/fortis/user_id';
+    public const  CONFIG_PATH_USER_API_KEY = 'payment/fortis/user_api_key';
+    public const  AVAILABLE_CC_TYPES       = [
         'visa' => 'VI',
         'mc'   => 'MC',
         'disc' => 'DI',
@@ -110,6 +113,8 @@ class FortisMethodService
     private Builder $transactionBuilder;
     private MagentoOrderService $magentoOrderService;
     private CheckoutProcessor $checkoutProcessor;
+    private CurrencyOptions $currencyOptions;
+
 
     /**
      * @param Config $config
@@ -127,6 +132,7 @@ class FortisMethodService
      * @param OrderRepositoryInterface $orderRepository
      * @param FileDriver $driver
      * @param FortisApi $fortisApi
+     * @param CurrencyOptions $currencyOptions
      */
     public function __construct(
         Config $config,
@@ -146,7 +152,8 @@ class FortisMethodService
         FortisApi $fortisApi,
         Builder $transactionBuilder,
         MagentoOrderService $magentoOrderService,
-        CheckoutProcessor $checkoutProcessor
+        CheckoutProcessor $checkoutProcessor,
+        CurrencyOptions $currencyOptions,
     ) {
         $this->config                    = $config;
         $this->logger                    = $logger;
@@ -166,6 +173,7 @@ class FortisMethodService
         $this->transactionBuilder        = $transactionBuilder;
         $this->magentoOrderService       = $magentoOrderService;
         $this->checkoutProcessor         = $checkoutProcessor;
+        $this->currencyOptions           = $currencyOptions;
 
         $this->checkApplePayFile();
     }
@@ -228,12 +236,17 @@ class FortisMethodService
         $achEnabled           = $this->config->achIsActive();
         $achProductId         = $this->config->achProductId();
 
+        $currency = $this->checkoutSession->getLastRealOrder()->getOrderCurrencyCode();
+
+        $productTransactionId = $this->config->getProductIdForCurrency($currency);
+
         $order      = $this->checkoutSession->getLastRealOrder();
         $orderTotal = (int)bcmul((string)$order->getTotalDue(), '100', 0);
         $orderTax   = (int)bcmul((string)$order->getTaxAmount(), '100', 0);
         list($action, $options, $returnUrl) = $this->prepareFields();
-        $returnUrl .= '?gid=' . $order->getId();
-        $cred      = $this->getFortisCredentials();
+        $options['main_options']['hideAgreementCheckbox'] = !$achEnabled;
+        $returnUrl                                        .= '?gid=' . $order->getId();
+        $cred                                             = $this->getFortisCredentials();
 
         $user_id      = $cred['user_id'];
         $user_api_key = $cred['user_api_key'];
@@ -242,6 +255,9 @@ class FortisMethodService
             'amount'       => $orderTotal,
             'save_account' => $saveAccount,
         ];
+
+        $this->applySecondaryCurrency($intentData, $currency);
+
         if ($orderTax > 0) {
             $intentData['tax_amount'] = $orderTax;
         }
@@ -286,8 +302,8 @@ class FortisMethodService
      */
     public function getTicketIntentionToken(): string
     {
-        $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_id'));
-        $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_api_key'));
+        $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue(self::CONFIG_PATH_USER_ID));
+        $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue(self::CONFIG_PATH_USER_API_KEY));
 
         $locationId           = $this->config->achLocationId();
         $productTransactionId = $this->config->ccProductId();
@@ -364,7 +380,7 @@ class FortisMethodService
      */
     public function prepareTicketIntentionData(): array
     {
-        list($action, $options, $returnUrl) = $this->prepareFields();
+        list(, $options, $returnUrl) = $this->prepareFields();
 
         $config = [
             'options'   => $options,
@@ -377,7 +393,7 @@ class FortisMethodService
         $appearance_options      = $config['options']['appearance_options'];
         $guid                    = strtoupper(Uuid::uuid4());
         $guid                    = str_replace('-', '', $guid);
-        list($address, $country, $city, $postalCode, $regionCode) = $this->checkoutProcessor->getAddresses();
+        list($address, , , $postalCode, $regionCode) = $this->checkoutProcessor->getAddresses();
 
         $calculateSurchargeUrl = $this->urlBuilder->getUrl(
             'fortis/api/calculatesurcharge',
@@ -444,7 +460,20 @@ class FortisMethodService
         $user_id      = $this->config->userId();
         $user_api_key = $this->config->userApiKey();
 
-        $productTransactionId = $this->config->ccProductId();
+        $currency = $totals['currency'];
+
+        if (!$this->config->isCurrencySupported($currency)) {
+            $supportedCurrencies = implode(', ', $this->config->getSupportedCurrencies());
+            throw new LocalizedException(
+                __(
+                    'Currency "%1" is not supported for payment processing. Supported currencies: %2',
+                    $currency,
+                    $supportedCurrencies
+                )
+            );
+        }
+
+        $productTransactionId = $this->config->getProductIdForCurrency($currency);
 
         $orderIntention = $this->config->orderAction();
 
@@ -458,6 +487,8 @@ class FortisMethodService
             'tax'                    => $totals['tax'],
             'transaction_amount'     => $totals['transaction_amount'],
         ];
+
+        $this->applySecondaryCurrency($intentData, $currency);
 
         if ($surchargeData && isset($surchargeData['surcharge_amount'])) {
             $intentData['subtotal_amount']    = $surchargeData['subtotal_amount'];
@@ -478,6 +509,17 @@ class FortisMethodService
         }
 
         return $transactionResponse;
+    }
+
+    public function applySecondaryCurrency(array &$intentData, string $currency)
+    {
+        $availableCurrencies = array_keys($this->currencyOptions->toArray());
+
+        if (in_array($currency, $availableCurrencies)) {
+            if ($currency !== 'USD' && $currency !== 'CAD') {
+                $intentData['currency_code'] = $currency;
+            }
+        }
     }
 
     /**
@@ -506,8 +548,8 @@ class FortisMethodService
             }
         }
 
-        $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_id'));
-        $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_api_key'));
+        $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue(self::CONFIG_PATH_USER_ID));
+        $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue(self::CONFIG_PATH_USER_API_KEY));
         $api          = $this->fortisApi;
 
         $paymentMethod         = 'cc';
@@ -521,13 +563,19 @@ class FortisMethodService
             ) ? $rawDetailsInfo->payment_method : $paymentMethod;
         }
 
-        $transactionId = $rawDetailsInfo?->id;
-        $intentData    = [
-            'transaction_amount' => (int)bcmul((string)$amount, '100', 0),
-            'transactionId'      => $transactionId,
-            'description'        => $order->getIncrementId(),
-            'tax'                => 0
+        $transactionId        = $rawDetailsInfo?->id;
+        $orderCurrency        = $order->getOrderCurrencyCode();
+        $productTransactionId = $this->config->getProductIdForCurrency($orderCurrency);
+        $intentData           = [
+            'transaction_amount'     => (int)bcmul((string)$amount, '100', 0),
+            'transactionId'          => $transactionId,
+            'description'            => $order->getIncrementId(),
+            'tax'                    => 0,
+            'product_transaction_id' => $productTransactionId
         ];
+
+        $currency = $order->getOrderCurrencyCode();
+        $this->applySecondaryCurrency($intentData, $currency);
 
         $postalCode = $rawDetailsInfo->billing_address->postal_code ?? $rawDetailsInfo->billing_zip ?? null;
 
@@ -542,12 +590,13 @@ class FortisMethodService
             if ($paymentMethod !== 'ach') {
                 $response = $api->refundTransactionAmount($intentData, $user_id, $user_api_key);
             } else {
-                $intentData = [
+                $achIntentData = [
                     'transaction_amount'      => $intentData['transaction_amount'],
                     'description'             => $order->getIncrementId(),
                     'previous_transaction_id' => $transactionId,
+                    'product_transaction_id'  => $productTransactionId
                 ];
-                $response   = $api->achRefundTransactionAmount($intentData);
+                $response      = $api->achRefundTransactionAmount($achIntentData);
             }
 
             $data = json_decode($response)->data ?? null;
@@ -604,6 +653,9 @@ class FortisMethodService
             'zip'             => $postalCode,
         ];
 
+        if (isset($intentData['product_transaction_id'])) {
+            $surchargeIntentData['product_transaction_id'] = $intentData['product_transaction_id'];
+        }
         $surchargeResponse = $this->fortisApi->calculateSurcharge($surchargeIntentData);
         $surchargeData     = null;
 
@@ -636,8 +688,8 @@ class FortisMethodService
         $rawDetailsInfo = json_decode($payment->getAdditionalInformation()['raw_details_info']);
         $authAmount     = $rawDetailsInfo->auth_amount;
 
-        $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_id'));
-        $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue('payment/fortis/user_api_key'));
+        $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue(self::CONFIG_PATH_USER_ID));
+        $user_api_key = $this->encryptor->decrypt($this->scopeConfig->getValue(self::CONFIG_PATH_USER_API_KEY));
 
         // Do auth transaction
         $intentData = [

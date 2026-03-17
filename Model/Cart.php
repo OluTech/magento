@@ -9,18 +9,18 @@ class Cart extends \Magento\Payment\Model\Cart
     /**
      * @var bool
      */
-    private $_areAmountsValid = false;
+    private bool $areAmountsValid = false;
 
     /**
      * Get shipping, tax, subtotal and discount amounts all together
      *
      * @return array
      */
-    public function getAmounts()
+    public function getAmounts(): array
     {
         $this->_collectItemsAndAmounts();
 
-        if (!$this->_areAmountsValid) {
+        if (!$this->areAmountsValid) {
             $subtotal = $this->getSubtotal() + $this->getTax();
 
             if (empty($this->_transferFlags[self::AMOUNT_SHIPPING])) {
@@ -42,15 +42,14 @@ class Cart extends \Magento\Payment\Model\Cart
      *
      * @return bool
      */
-    public function hasNegativeItemAmount()
+    public function hasNegativeItemAmount(): bool
     {
-        foreach ($this->_customItems as $item) {
-            if ($item->getAmount() < 0) {
-                return true;
-            }
-        }
-
-        return false;
+        return !empty(
+            array_filter(
+                $this->_customItems,
+                fn($item) => $item->getAmount() < 0
+            )
+        );
     }
 
     /**
@@ -58,12 +57,12 @@ class Cart extends \Magento\Payment\Model\Cart
      *
      * @return void
      */
-    protected function _calculateCustomItemsSubtotal()
+    protected function _calculateCustomItemsSubtotal(): void
     {
         parent::_calculateCustomItemsSubtotal();
-        $this->_applyDiscountTaxCompensationWorkaround($this->_salesModel);
+        $this->applyDiscountTaxCompensationWorkaround($this->_salesModel);
 
-        $this->_validate();
+        $this->validateAmounts();
     }
 
     /**
@@ -71,10 +70,10 @@ class Cart extends \Magento\Payment\Model\Cart
      *
      * @return void
      */
-    private function _validate()
+    private function validateAmounts(): void
     {
-        $areItemsValid          = false;
-        $this->_areAmountsValid = false;
+        $areItemsValid         = false;
+        $this->areAmountsValid = false;
 
         $referenceAmount = $this->_salesModel->getDataUsingMethod('base_grand_total');
 
@@ -92,9 +91,9 @@ class Cart extends \Magento\Payment\Model\Cart
         if (empty($this->_transferFlags[self::AMOUNT_DISCOUNT])) {
             $sum -= $this->getDiscount();
             //
-            $this->_areAmountsValid = round($this->getDiscount(), 4) < round($itemsSubtotal, 4);
+            $this->areAmountsValid = round($this->getDiscount(), 4) < round($itemsSubtotal, 4);
         } else {
-            $this->_areAmountsValid = $itemsSubtotal > 0.00001;
+            $this->areAmountsValid = $itemsSubtotal > 0.00001;
         }
 
         /**
@@ -105,7 +104,7 @@ class Cart extends \Magento\Payment\Model\Cart
             $areItemsValid = true;
         }
 
-        $areItemsValid = $areItemsValid && $this->_areAmountsValid;
+        $areItemsValid = $areItemsValid && $this->areAmountsValid;
 
         if (!$areItemsValid) {
             $this->_salesModelItems = [];
@@ -118,7 +117,7 @@ class Cart extends \Magento\Payment\Model\Cart
      *
      * @return void
      */
-    protected function _importItemsFromSalesModel()
+    protected function _importItemsFromSalesModel(): void
     {
         $this->_salesModelItems = [];
 
@@ -180,9 +179,9 @@ class Cart extends \Magento\Payment\Model\Cart
      *
      * @return void
      */
-    private function _applyDiscountTaxCompensationWorkaround(
+    private function applyDiscountTaxCompensationWorkaround(
         SalesModelInterface $salesEntity
-    ) {
+    ): void {
         $dataContainer = $salesEntity->getTaxContainer();
         $this->addTax((double)$dataContainer->getBaseDiscountTaxCompensationAmount());
         $this->addTax((double)$dataContainer->getBaseShippingDiscountTaxCompensationAmnt());

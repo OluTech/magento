@@ -15,7 +15,7 @@ class CardRenderer extends AbstractCardRenderer
      * @return boolean
      * @since 100.1.0
      */
-    public function canRender(PaymentTokenInterface $token)
+    public function canRender(PaymentTokenInterface $token): bool
     {
         return $token->getPaymentMethodCode() === "fortis";
     }
@@ -26,7 +26,7 @@ class CardRenderer extends AbstractCardRenderer
      * @return string
      * @since 100.1.0
      */
-    public function getNumberLast4Digits()
+    public function getNumberLast4Digits(): string
     {
         return $this->getTokenDetails()['maskedCC'];
     }
@@ -37,7 +37,7 @@ class CardRenderer extends AbstractCardRenderer
      * @return string
      * @since 100.1.0
      */
-    public function getExpDate()
+    public function getExpDate(): string
     {
         return $this->getTokenDetails()['expirationDate'];
     }
@@ -48,7 +48,7 @@ class CardRenderer extends AbstractCardRenderer
      * @return string
      * @since 100.1.0
      */
-    public function getIconUrl()
+    public function getIconUrl(): string
     {
         return $this->getIconForType($this->getTokenDetails()['type'])['url'];
     }
@@ -59,7 +59,7 @@ class CardRenderer extends AbstractCardRenderer
      * @return int
      * @since 100.1.0
      */
-    public function getIconHeight()
+    public function getIconHeight(): int
     {
         return $this->getIconForType($this->getTokenDetails()['type'])['height'];
     }
@@ -70,7 +70,7 @@ class CardRenderer extends AbstractCardRenderer
      * @return int
      * @since 100.1.0
      */
-    public function getIconWidth()
+    public function getIconWidth(): int
     {
         return $this->getIconForType($this->getTokenDetails()['type'])['width'];
     }
