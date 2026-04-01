@@ -13,6 +13,7 @@ use Magento\Framework\UrlInterface;
 use Magento\Sales\Model\Order;
 use Magento\Store\Model\StoreManagerInterface;
 use StdClass;
+use Magento\Framework\Session\SessionManagerInterface;
 
 class FortisApi
 {
@@ -28,6 +29,7 @@ class FortisApi
     private ClientInterface $httpClient;
     private UrlInterface $urlBuilder;
     private \Psr\Log\LoggerInterface $logger;
+    private SessionManagerInterface $sessionManager;
 
     /**
      * @param Config $config
@@ -35,19 +37,22 @@ class FortisApi
      * @param ClientInterface $httpClient
      * @param UrlInterface $urlBuilder
      * @param \Psr\Log\LoggerInterface $logger
+     * @param SessionManagerInterface $sessionManager
      */
     public function __construct(
         Config $config,
         DecoderInterface $decoder,
         ClientInterface $httpClient,
         UrlInterface $urlBuilder,
-        \Psr\Log\LoggerInterface $logger
+        \Psr\Log\LoggerInterface $logger,
+        SessionManagerInterface $sessionManager
     ) {
-        $this->config     = $config;
-        $this->decoder    = $decoder;
-        $this->httpClient = $httpClient;
-        $this->urlBuilder = $urlBuilder;
-        $this->logger     = $logger;
+        $this->config         = $config;
+        $this->decoder        = $decoder;
+        $this->httpClient     = $httpClient;
+        $this->urlBuilder     = $urlBuilder;
+        $this->logger         = $logger;
+        $this->sessionManager = $sessionManager;
 
         $this->initializeApiSettings();
     }
@@ -60,6 +65,63 @@ class FortisApi
         } else {
             $this->developerId = self::DEVELOPER_ID_SANDBOX;
             $this->fortisApi   = self::FORTIS_API_SANDBOX;
+        }
+    }
+
+    /**
+     * Preserve session state before making API requests
+     * Prevents session validation errors during long-running operations
+     *
+     * @return void
+     */
+    private function preserveSessionState(): void
+    {
+        try {
+            if ($this->sessionManager->isSessionExists()) {
+                // Regenerate session ID to refresh the session validity window
+                // This prevents "http_user_agent" validation errors that occur
+                // when the session expires during API processing
+                $this->sessionManager->regenerateId();
+
+                // Write session data to storage to ensure state persistence
+                $this->sessionManager->writeClose();
+
+                $this->logger->debug(
+                    'Session state preserved before API request. Session ID: ' .
+                    $this->sessionManager->getSessionId()
+                );
+            }
+        } catch (Exception $e) {
+            $this->logger->warning(
+                'Failed to preserve session state: ' . $e->getMessage() .
+                '. Continuing with request.'
+            );
+        }
+    }
+
+    /**
+     * Validate and refresh session after API requests complete
+     * Ensures session remains valid for subsequent operations
+     *
+     * @return void
+     */
+    private function validateAndRefreshSession(): void
+    {
+        try {
+            if ($this->sessionManager->isSessionExists()) {
+                // Restart session to ensure cookies and data are current
+                $this->sessionManager->start();
+
+                $this->logger->debug(
+                    'Session validation and refresh completed. Session ID: ' .
+                    $this->sessionManager->getSessionId()
+                );
+            }
+        } catch (Exception $e) {
+            $this->logger->warning(
+                'Failed to refresh session: ' . $e->getMessage() .
+                '. Session may be invalid.'
+            );
         }
     }
 
@@ -82,76 +144,95 @@ class FortisApi
         array $data = [],
         string $method = 'POST'
     ): ?string {
-        $url = $this->fortisApi . $endpoint;
+        // Preserve session state before making API request to prevent session
+        // invalidation errors during checkout surcharge calculations
+        $this->preserveSessionState();
 
-        $this->httpClient->setTimeout(30);
+        try {
+            $url = $this->fortisApi . $endpoint;
 
-        $headers = $this->createHeaders($user_id, $user_api_key);
-        $this->httpClient->setHeaders($headers);
+            $this->httpClient->setTimeout(30);
 
-        $this->httpClient->setOption(CURLOPT_RETURNTRANSFER, true);
-        $this->httpClient->setOption(CURLOPT_MAXREDIRS, 10);
-        $this->httpClient->setOption(CURLOPT_FOLLOWLOCATION, true);
-        $this->httpClient->setOption(CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+            $headers = $this->createHeaders($user_id, $user_api_key);
+            $this->httpClient->setHeaders($headers);
 
-        if (isset($data['transactionId'])) {
-            unset($data['transactionId']);
-        }
+            $this->httpClient->setOption(CURLOPT_RETURNTRANSFER, true);
+            $this->httpClient->setOption(CURLOPT_MAXREDIRS, 10);
+            $this->httpClient->setOption(CURLOPT_FOLLOWLOCATION, true);
+            $this->httpClient->setOption(CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
 
-        $retryCount = 0;
-        $maxRetries = 5;
-        $response   = null;
-
-        while ($retryCount < $maxRetries) {
-            try {
-                if ($method === 'POST') {
-                    $this->httpClient->post($url, $data);
-                } elseif ($method === 'GET') {
-                    $this->httpClient->get($url);
-                } elseif ($method === 'DELETE' || $method === 'PUT' || $method === 'PATCH') {
-                    $this->httpClient->setOption(CURLOPT_CUSTOMREQUEST, $method);
-                    $this->httpClient->post($url, $data);
-                }
-
-                $response   = $this->httpClient->getBody();
-                $statusCode = $this->httpClient->getStatus();
-
-                if ($statusCode >= 200 && $statusCode < 300) {
-                    return $response;
-                }
-
-                $retryCount++;
-            } catch (Exception $e) {
-                $retryCount++;
-                if ($retryCount >= $maxRetries) {
-                    throw new LocalizedException(__("API Request failed: " . $e->getMessage()));
-                }
-            }
-        }
-
-        // If we get here, all retries failed
-        $response = json_decode($response);
-        if (isset($response->type) && $response->type === 'Error') {
-            $errorStr = '';
-
-            if (isset($response->meta->errors)) {
-                foreach ($response->meta->errors as $error) {
-                    $errorStr .= "$error[0]\n";
-                }
-            } elseif (isset($response->meta->details)) {
-                foreach ($response->meta->details as $error) {
-                    $errorStr .= "$error->message\n";
-                }
-            } elseif (isset($response->meta)) {
-                $errorStr = $response->meta->message;
-            } elseif (isset($response->detail)) {
-                $errorStr = $response->detail;
+            if (isset($data['transactionId'])) {
+                unset($data['transactionId']);
             }
 
-            throw new LocalizedException(new Phrase($errorStr));
-        }
+            $retryCount = 0;
+            $maxRetries = 5;
+            $response   = null;
 
-        throw new LocalizedException(__("API Request failed after {$maxRetries} attempts. " . json_encode($response)));
+            while ($retryCount < $maxRetries) {
+                try {
+                    if ($method === 'POST') {
+                        $this->httpClient->post($url, $data);
+                    } elseif ($method === 'GET') {
+                        $this->httpClient->get($url);
+                    } elseif ($method === 'DELETE' || $method === 'PUT' || $method === 'PATCH') {
+                        $this->httpClient->setOption(CURLOPT_CUSTOMREQUEST, $method);
+                        $this->httpClient->post($url, $data);
+                    }
+
+                    $response   = $this->httpClient->getBody();
+                    $statusCode = $this->httpClient->getStatus();
+
+                    if ($statusCode >= 200 && $statusCode < 300) {
+                        // Validate and refresh session after successful API call
+                        $this->validateAndRefreshSession();
+                        return $response;
+                    }
+
+                    $retryCount++;
+                } catch (Exception $e) {
+                    $retryCount++;
+                    if ($retryCount >= $maxRetries) {
+                        // Attempt to refresh session even on error
+                        $this->validateAndRefreshSession();
+                        throw new LocalizedException(__("API Request failed: " . $e->getMessage()));
+                    }
+                }
+            }
+
+            // If we get here, all retries failed
+            $response = json_decode($response);
+            if (isset($response->type) && $response->type === 'Error') {
+                $errorStr = '';
+
+                if (isset($response->meta->errors)) {
+                    foreach ($response->meta->errors as $error) {
+                        $errorStr .= "$error[0]\n";
+                    }
+                } elseif (isset($response->meta->details)) {
+                    foreach ($response->meta->details as $error) {
+                        $errorStr .= "$error->message\n";
+                    }
+                } elseif (isset($response->meta)) {
+                    $errorStr = $response->meta->message;
+                } elseif (isset($response->detail)) {
+                    $errorStr = $response->detail;
+                }
+
+                // Refresh session before throwing exception
+                $this->validateAndRefreshSession();
+                throw new LocalizedException(new Phrase($errorStr));
+            }
+
+            // Refresh session before throwing exception
+            $this->validateAndRefreshSession();
+            throw new LocalizedException(
+                __("API Request failed after {$maxRetries} attempts. " . json_encode($response))
+            );
+        } finally {
+            // Ensure session is refreshed regardless of outcome
+            $this->validateAndRefreshSession();
+        }
     }
 
     /**

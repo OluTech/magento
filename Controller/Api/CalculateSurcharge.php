@@ -11,6 +11,7 @@ use Magento\Framework\App\Action\HttpGetActionInterface;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Session\SessionManagerInterface;
 use Magento\Vault\Model\PaymentTokenManagement;
 use Psr\Log\LoggerInterface;
 
@@ -24,6 +25,7 @@ class CalculateSurcharge implements HttpGetActionInterface
     private CheckoutProcessor $checkoutProcessor;
     private CurrentCustomer $currentCustomer;
     private PaymentTokenManagement $paymentTokenManagement;
+    private SessionManagerInterface $sessionManager;
 
     public function __construct(
         JsonFactory $resultJsonFactory,
@@ -33,7 +35,8 @@ class CalculateSurcharge implements HttpGetActionInterface
         CheckoutProcessor $checkoutProcessor,
         CurrentCustomer $currentCustomer,
         PaymentTokenManagement $paymentTokenManagement,
-        Config $config
+        Config $config,
+        SessionManagerInterface $sessionManager
     ) {
         $this->resultJsonFactory      = $resultJsonFactory;
         $this->request                = $request;
@@ -43,6 +46,7 @@ class CalculateSurcharge implements HttpGetActionInterface
         $this->currentCustomer        = $currentCustomer;
         $this->paymentTokenManagement = $paymentTokenManagement;
         $this->config                 = $config;
+        $this->sessionManager         = $sessionManager;
     }
 
     public function execute()
@@ -50,6 +54,11 @@ class CalculateSurcharge implements HttpGetActionInterface
         $result = $this->resultJsonFactory->create();
 
         try {
+            // Preserve session state before processing long-running surcharge calculation
+            // This prevents "http_user_agent" session validation errors that occur when
+            // session expires during the API call to Fortis
+            $this->preserveSessionState();
+
             $requestData = $this->request->getParams();
 
             $this->logger->info("Calculate Surcharge Request Data: " . json_encode($requestData));
@@ -112,8 +121,68 @@ class CalculateSurcharge implements HttpGetActionInterface
             $this->logger->error($e);
             $result->setHttpResponseCode(500);
             $result->setData(['error' => $e->getMessage()]);
+        } finally {
+            // Validate and refresh session after surcharge calculation completes
+            // Ensures session remains valid for subsequent checkout operations
+            $this->validateAndRefreshSession();
         }
 
         return $result;
+    }
+
+    /**
+     * Preserve session state to prevent validation errors during API calls
+     * Regenerates session ID and writes session data to storage
+     *
+     * @return void
+     */
+    private function preserveSessionState(): void
+    {
+        try {
+            if ($this->sessionManager->isSessionExists()) {
+                // Regenerate session ID to refresh the session validity window
+                // This prevents "http_user_agent" validation errors during checkout
+                $this->sessionManager->regenerateId();
+
+                // Write session data to storage to ensure state persistence
+                $this->sessionManager->writeClose();
+
+                $this->logger->debug(
+                    'CalculateSurcharge: Session state preserved. Session ID: ' .
+                    $this->sessionManager->getSessionId()
+                );
+            }
+        } catch (\Exception $e) {
+            $this->logger->warning(
+                'CalculateSurcharge: Failed to preserve session state: ' . $e->getMessage() .
+                '. Continuing with request.'
+            );
+        }
+    }
+
+    /**
+     * Validate and refresh session after API operations complete
+     * Ensures session remains valid for subsequent checkout steps
+     *
+     * @return void
+     */
+    private function validateAndRefreshSession(): void
+    {
+        try {
+            if ($this->sessionManager->isSessionExists()) {
+                // Restart session to ensure cookies and data are current
+                $this->sessionManager->start();
+
+                $this->logger->debug(
+                    'CalculateSurcharge: Session validated and refreshed. Session ID: ' .
+                    $this->sessionManager->getSessionId()
+                );
+            }
+        } catch (\Exception $e) {
+            $this->logger->warning(
+                'CalculateSurcharge: Failed to validate session: ' . $e->getMessage() .
+                '. Session may be invalid.'
+            );
+        }
     }
 }
