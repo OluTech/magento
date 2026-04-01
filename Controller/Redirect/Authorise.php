@@ -321,11 +321,24 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
                 $fortisTransaction = $rawTransaction->data;
             }
 
-            $orderTotal         = (int)bcmul($order->getGrandTotal(), '100', 0);
+            $orderTotal    = (int)bcmul($order->getGrandTotal(), '100', 0);
+            $surchargeInfo = null;
+            if (!empty($additionalData['fortis-surcharge-data'])) {
+                $surchargeDecoded = json_decode($additionalData['fortis-surcharge-data'], true);
+                if (isset($surchargeDecoded['surcharge_amount']) && $surchargeDecoded['surcharge_amount'] > 0) {
+                    $surchargeInfo = ['surchargeAmount' => (int)$surchargeDecoded['surcharge_amount']];
+                }
+            } elseif (isset($data->surcharge_amount) && $data->surcharge_amount > 0) {
+                $surchargeInfo = ['surchargeAmount' => (int)$data->surcharge_amount];
+            } elseif (isset($data->surcharge->surcharge_amount) && $data->surcharge->surcharge_amount > 0) {
+                $surchargeInfo = ['surchargeAmount' => (int)$data->surcharge->surcharge_amount];
+            }
+
             $verificationResult = $this->transactionVerifier->verifyTransactionById(
                 $data->id ?? $fortisTransaction->id,
                 $order->getIncrementId(),
-                $orderTotal
+                $orderTotal,
+                $surchargeInfo
             );
 
             if (!$verificationResult['verified']) {
