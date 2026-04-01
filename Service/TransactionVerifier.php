@@ -65,6 +65,9 @@ class TransactionVerifier
         if (isset($transaction['data']['surcharge_amount']) && $transaction['data']['surcharge_amount'] > 0) {
             $surchargeAmount = (int)$transaction['data']['surcharge_amount'];
             $expectedTotal   += $surchargeAmount;
+        } elseif (isset($transaction['data']['surcharge']['surcharge_amount']) && $transaction['data']['surcharge']['surcharge_amount'] > 0) {
+            $surchargeAmount = (int)$transaction['data']['surcharge']['surcharge_amount'];
+            $expectedTotal   += $surchargeAmount;
         } elseif ($surchargeInfo && isset($surchargeInfo['surchargeAmount']) && $surchargeInfo['surchargeAmount'] > 0) {
             // Fall back to surcharge info passed from client/transaction record
             $surchargeAmount = (int)$surchargeInfo['surchargeAmount'];

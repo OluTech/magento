@@ -457,6 +457,8 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
             }
             $this->logger->error($pre . $e->getMessage());
 
+            $this->checkoutSession->restoreQuote();
+
             if ($tokenised || $isTicketTransaction) {
                 $resultJson = $this->resultJsonFactory->create();
                 return $resultJson->setData([

@@ -368,11 +368,24 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                 $fortisTransaction = $api->getTransaction($data->id, $user_id, $user_api_key)->data;
             }
 
-            $orderTotal         = (int)bcmul($order->getGrandTotal(), '100', 0);
+            $orderTotal    = (int)bcmul($order->getGrandTotal(), '100', 0);
+            $surchargeInfo = null;
+            if (!empty($additionalData['fortis-surcharge-data'])) {
+                $surchargeDecoded = json_decode($additionalData['fortis-surcharge-data'], true);
+                if (isset($surchargeDecoded['surcharge_amount']) && $surchargeDecoded['surcharge_amount'] > 0) {
+                    $surchargeInfo = ['surchargeAmount' => (int)$surchargeDecoded['surcharge_amount']];
+                }
+            } elseif (isset($data->surcharge_amount) && $data->surcharge_amount > 0) {
+                $surchargeInfo = ['surchargeAmount' => (int)$data->surcharge_amount];
+            } elseif (isset($data->surcharge->surcharge_amount) && $data->surcharge->surcharge_amount > 0) {
+                $surchargeInfo = ['surchargeAmount' => (int)$data->surcharge->surcharge_amount];
+            }
+
             $verificationResult = $this->transactionVerifier->verifyTransactionById(
                 $data->id ?? $fortisTransaction->id,
                 $order->getIncrementId(),
-                $orderTotal
+                $orderTotal,
+                $surchargeInfo
             );
 
             if (!$verificationResult['verified']) {
@@ -559,6 +572,8 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                 $this->createTransaction($data);
             }
             $this->logger->error($pre . $e->getMessage());
+
+            $this->checkoutSession->restoreQuote();
 
             if ($tokenised || $isTicketTransaction) {
                 $resultJson = $this->resultJsonFactory->create();
