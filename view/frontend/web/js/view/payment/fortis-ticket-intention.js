@@ -6,6 +6,19 @@
     let spinner = null;
     let ticketIntentionData = null;
 
+    function invalidateCartSection() {
+        try {
+            window.localStorage.removeItem('mage-cache-storage');
+            window.localStorage.removeItem('mage-cache-storage-section-invalidation');
+            window.localStorage.removeItem('mage-cache-sessid');
+            var version = 'V' + Date.now();
+            var expires = new Date(Date.now() + 86400000).toUTCString();
+            document.cookie = 'private_content_version=' + version + '; path=/; expires=' + expires + '; SameSite=Lax';
+        } catch (e) {
+            window.localStorage.clear();
+        }
+    }
+
     function reEnablePlaceOrderButton() {
         if (window.FortisTicketIntention?.checkoutContext?.isPlaceOrderActionAllowed) {
             window.FortisTicketIntention.checkoutContext.isPlaceOrderActionAllowed(true);
@@ -336,6 +349,7 @@
                         if (response.ok) {
                             const responseData = await response.json();
                             if (responseData.redirectTo) {
+                                invalidateCartSection();
                                 window.location.href = responseData.redirectTo;
                             } else if (responseData.error) {
                                 if (spinner) spinner.remove();

@@ -51,7 +51,6 @@ class Config
     private array $supportedCurrencyCodes = [
         'USD',
         'EUR',
-        'GPD',
         'ZAR',
         'ARS',
         'AUD',
@@ -545,11 +544,14 @@ class Config
     /**
      * Check if a currency is supported by the configured Product IDs
      *
-     * @param string $currency
+     * @param string|null $currency
      * @return bool
      */
-    public function isCurrencySupported(string $currency): bool
+    public function isCurrencySupported(?string $currency): bool
     {
+        if ($currency === null) {
+            return false;
+        }
         $supportedCurrencies = array_keys($this->getCurrencyProductIdMap());
         return in_array($currency, $supportedCurrencies, true);
     }

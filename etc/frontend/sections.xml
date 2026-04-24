@@ -5,4 +5,12 @@
         <section name="cart"/>
         <section name="checkout-data"/>
     </action>
+    <action name="fortis/redirect/success">
+        <section name="cart"/>
+        <section name="checkout-data"/>
+    </action>
+    <action name="fortis/redirect/authorise">
+        <section name="cart"/>
+        <section name="checkout-data"/>
+    </action>
 </config>

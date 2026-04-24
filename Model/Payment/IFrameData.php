@@ -40,14 +40,21 @@ class IFrameData
      */
     public function buildIFrameData(): ?array
     {
-        $order          = $this->checkoutSession->getLastRealOrder();
+        $order = $this->checkoutSession->getLastRealOrder();
+
+        if (!$order->getId() || !$order->getPayment()) {
+            $this->logger->error('Could not load order or payment data for iFrame');
+
+            return ['success' => false, 'message' => __('Could not load order data. Please try again.')];
+        }
+
         $orderData      = $order->getPayment()->getData();
         $additionalData = $orderData['additional_information'];
 
         $orderId = $order->getId();
 
         $addressAll = $order->getBillingAddress();
-        list($address, $country, $city, $postalCode, $regionCode) = $this->getAddresses($addressAll);
+        list($address, $country, $city, $postalCode, $regionCode, $telephone) = $this->getAddresses($addressAll);
 
         $enableVaultForOrder = ((int)($additionalData['fortis-vault-method'] ?? 0)) === 1;
 
@@ -60,7 +67,6 @@ class IFrameData
         try {
             $config = $this->fortisMethodService->getFortisOrderToken($enableVaultForOrder);
         } catch (Exception $e) {
-            $this->checkoutSession->restoreQuote();
             $this->logger->error('Something went wrong while fetching the Fortis order token: ' . $e->getMessage());
 
             return ['success' => false, 'message' => $e->getMessage()];
@@ -95,6 +101,7 @@ class IFrameData
             'incrementId'             => $order->getIncrementId(),
             'guid'                    => $guid,
             'digitalWallets'          => $digitalWallets,
+            'billing_phone'           => $telephone ? preg_replace('/\D/', '', $telephone) : null,
             'billingFields'           => array_filter([
                                                           $address ? [
                                                               'name'     => 'address',
@@ -132,8 +139,9 @@ class IFrameData
         $city       = $addressAll->getCity() ?? '';
         $postalCode = $addressAll->getPostcode() ?? '';
         $regionCode = $addressAll->getRegionCode() ?? '';
+        $telephone  = $addressAll->getTelephone() ?? '';
 
-        return [$address, $country, $city, $postalCode, $regionCode];
+        return [$address, $country, $city, $postalCode, $regionCode, $telephone];
     }
 
     /**

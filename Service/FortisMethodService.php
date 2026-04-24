@@ -258,7 +258,7 @@ class FortisMethodService
 
         $this->applySecondaryCurrency($intentData, $currency);
 
-        if ($orderTax > 0) {
+        if ($orderTax > 0 && $orderTax < $orderTotal) {
             $intentData['tax_amount'] = $orderTax;
         }
         if ($productTransactionId

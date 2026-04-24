@@ -10,6 +10,9 @@
   Transaction ID.
 - **Extended currency support** — added ARS, AUD, BRL, CAD, CLP, COP, PYG, INR, MXN, ILS, NZD, PEN, PHP, GBP, SGD,
   KRW, and JPY to the list of accepted payment currencies (in addition to the existing USD, EUR, and ZAR).
+- **Configuration validation for multi-currency setup** — payment configuration now validates primary and secondary
+  Product Transaction ID and currency pairings against the Fortis API when settings are saved, helping merchants catch
+  invalid multicurrency setup before checkout is affected.
 - **Transaction verification** — introduced a `TransactionVerifier` service that validates transaction integrity before
   finalising orders in the Authorise, Success, and ACH webhook controllers. Mismatched or unverifiable transactions are
   rejected and logged as critical security events.
@@ -25,6 +28,12 @@
 - Resolved tokenized payment failures that were triggered by discounted orders.
 - Fixed failed payment error responses for tokenised and ticket-transaction flows — these now return a structured JSON
   error with an HTTP 403 status code instead of silently redirecting.
+- Improved cart and quote recovery after failed or declined payments so checkout state is restored more reliably,
+  including refreshed cart/checkout sections after redirect-based payment flows.
+- Fixed intermittent checkout session validation issues during surcharge calculation and Fortis API requests that could
+  invalidate the customer session mid-checkout.
+- Corrected Level 3 transaction payload formatting for Fortis API requests, including monetary amounts, shipping origin
+  ZIP handling, and default line-item values.
 - Corrected `Transaction::TYPE_ORDER` / `TYPE_CAPTURE` references to use `TransactionInterface` constants for
   compatibility with recent Magento versions.
 
