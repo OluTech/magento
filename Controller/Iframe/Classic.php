@@ -39,17 +39,17 @@ class Classic implements HttpPostActionInterface, HttpGetActionInterface
      */
     public function execute()
     {
-        $pageObject = $this->pageFactory->create();
-
-        $blockContent = $pageObject->getLayout()
-            ->getBlock('fortis_redirect')
-            ->toHtml();
-
         try {
             $this->checkoutProcessor->initOrderState();
         } catch (LocalizedException $e) {
             $this->logger->error('Could not initialize order: ' . $e->getMessage());
         }
+
+        $pageObject = $this->pageFactory->create();
+
+        $blockContent = $pageObject->getLayout()
+            ->getBlock('fortis_redirect')
+            ->toHtml();
 
         $resultRaw = $this->resultFactory->create(ResultFactory::TYPE_RAW);
         $resultRaw->setContents($blockContent);

@@ -8,6 +8,7 @@ use Fortispay\Fortis\Model\FortisApi;
 use Fortispay\Fortis\Service\TransactionVerifier;
 use Fortispay\Fortis\Service\FortisMethodService;
 use Fortispay\Fortis\Service\MagentoOrderService;
+use Magento\Quote\Model\QuoteRepository;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Directory\Model\CountryFactory;
 use Magento\Directory\Model\ResourceModel\Country\CollectionFactory as CountryCollectionFactory;
@@ -165,6 +166,7 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
     private FortisApi $fortisApi;
     private MagentoOrderService $magentoOrderService;
     private TransactionVerifier $transactionVerifier;
+    private QuoteRepository $quoteRepository;
 
     /**
      * @param PageFactory $pageFactory
@@ -187,6 +189,7 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
      * @param FortisApi $fortisApi
      * @param MagentoOrderService $magentoOrderService
      * @param TransactionVerifier $transactionVerifier
+     * @param QuoteRepository $quoteRepository
      */
     public function __construct(
         PageFactory $pageFactory,
@@ -208,7 +211,8 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
         FortisMethodService $fortisMethodService,
         FortisApi $fortisApi,
         MagentoOrderService $magentoOrderService,
-        TransactionVerifier $transactionVerifier
+        TransactionVerifier $transactionVerifier,
+        QuoteRepository $quoteRepository
     ) {
         $pre = __METHOD__ . " : ";
 
@@ -235,6 +239,7 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
         $this->fortisApi                = $fortisApi;
         $this->magentoOrderService      = $magentoOrderService;
         $this->transactionVerifier      = $transactionVerifier;
+        $this->quoteRepository          = $quoteRepository;
 
         $this->logger->debug($pre . 'eof');
     }
@@ -452,6 +457,7 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
                 $this->order->cancel();
                 $this->orderRepository->save($order);
                 $this->checkoutSession->restoreQuote();
+                $this->reactivateQuoteIfNeeded($this->order);
                 $this->createTransaction($data);
                 if (!$tokenised) {
                     $resultJson = $this->resultJsonFactory->create();
@@ -471,6 +477,9 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
             $this->logger->error($pre . $e->getMessage());
 
             $this->checkoutSession->restoreQuote();
+            if (isset($order) && $order->getId()) {
+                $this->reactivateQuoteIfNeeded($order);
+            }
 
             if ($tokenised || $isTicketTransaction) {
                 $resultJson = $this->resultJsonFactory->create();
@@ -542,6 +551,27 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
     }
 
     /**
+     * Reactivate the quote directly if restoreQuote() did not work (e.g. guest checkout with lost session).
+     */
+    private function reactivateQuoteIfNeeded(Order $order): void
+    {
+        try {
+            $quoteId = $order->getQuoteId();
+            if (!$quoteId) {
+                return;
+            }
+            $quote = $this->quoteRepository->get($quoteId);
+            if (!$quote->getIsActive()) {
+                $quote->setIsActive(true);
+                $this->quoteRepository->save($quote);
+            }
+            $this->checkoutSession->replaceQuote($quote);
+        } catch (Exception $e) {
+            $this->logger->error('Failed to reactivate quote: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Set Last Order Details
      *
      * @return OrderInterface
@@ -553,7 +583,7 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
         $this->checkoutSession->setData('last_order_id', $order->getId());
         $this->checkoutSession->setData('last_success_quote_id', $order->getQuoteId());
         $this->checkoutSession->setData('last_quote_id', $order->getQuoteId());
-        $this->checkoutSession->setData('last_real_order_id', $orderId);
+        $this->checkoutSession->setData('last_real_order_id', $order->getIncrementId());
 
         return $order;
     }

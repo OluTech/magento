@@ -1,4 +1,17 @@
 (function() {
+    function invalidateCartSection() {
+        try {
+            window.localStorage.removeItem('mage-cache-storage');
+            window.localStorage.removeItem('mage-cache-storage-section-invalidation');
+            window.localStorage.removeItem('mage-cache-sessid');
+            var version = 'V' + Date.now();
+            var expires = new Date(Date.now() + 86400000).toUTCString();
+            document.cookie = 'private_content_version=' + version + '; path=/; expires=' + expires + '; SameSite=Lax';
+        } catch (e) {
+            window.localStorage.clear();
+        }
+    }
+
     function generateIFrame() {
         const fortisDataElement = document.getElementById('fortis-data');
         if (!fortisDataElement) {
@@ -65,6 +78,7 @@
                             additional: [
                                 {name: 'description', required: true, value: config.incrementId, hidden: true},
                                 {name: 'transaction_api_id', hidden: true, value: config.guid},
+                                {name: 'phone_number', hidden: true, value: config.billing_phone || ''},
                             ],
                             billing: config.billingFields
                         }
@@ -103,6 +117,7 @@
                                     return;
                                 }
                                 setTimeout(() => {
+                                    invalidateCartSection();
                                     window.location.href = redirect.redirectTo;
                                 }, 2000);
                             } else if (response.status === 403) {

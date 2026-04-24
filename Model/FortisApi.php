@@ -13,7 +13,6 @@ use Magento\Framework\UrlInterface;
 use Magento\Sales\Model\Order;
 use Magento\Store\Model\StoreManagerInterface;
 use StdClass;
-use Magento\Framework\Session\SessionManagerInterface;
 
 class FortisApi
 {
@@ -29,7 +28,6 @@ class FortisApi
     private ClientInterface $httpClient;
     private UrlInterface $urlBuilder;
     private \Psr\Log\LoggerInterface $logger;
-    private SessionManagerInterface $sessionManager;
 
     /**
      * @param Config $config
@@ -37,22 +35,19 @@ class FortisApi
      * @param ClientInterface $httpClient
      * @param UrlInterface $urlBuilder
      * @param \Psr\Log\LoggerInterface $logger
-     * @param SessionManagerInterface $sessionManager
      */
     public function __construct(
         Config $config,
         DecoderInterface $decoder,
         ClientInterface $httpClient,
         UrlInterface $urlBuilder,
-        \Psr\Log\LoggerInterface $logger,
-        SessionManagerInterface $sessionManager
+        \Psr\Log\LoggerInterface $logger
     ) {
-        $this->config         = $config;
-        $this->decoder        = $decoder;
-        $this->httpClient     = $httpClient;
-        $this->urlBuilder     = $urlBuilder;
-        $this->logger         = $logger;
-        $this->sessionManager = $sessionManager;
+        $this->config     = $config;
+        $this->decoder    = $decoder;
+        $this->httpClient = $httpClient;
+        $this->urlBuilder = $urlBuilder;
+        $this->logger     = $logger;
 
         $this->initializeApiSettings();
     }
@@ -65,63 +60,6 @@ class FortisApi
         } else {
             $this->developerId = self::DEVELOPER_ID_SANDBOX;
             $this->fortisApi   = self::FORTIS_API_SANDBOX;
-        }
-    }
-
-    /**
-     * Preserve session state before making API requests
-     * Prevents session validation errors during long-running operations
-     *
-     * @return void
-     */
-    private function preserveSessionState(): void
-    {
-        try {
-            if ($this->sessionManager->isSessionExists()) {
-                // Regenerate session ID to refresh the session validity window
-                // This prevents "http_user_agent" validation errors that occur
-                // when the session expires during API processing
-                $this->sessionManager->regenerateId();
-
-                // Write session data to storage to ensure state persistence
-                $this->sessionManager->writeClose();
-
-                $this->logger->debug(
-                    'Session state preserved before API request. Session ID: ' .
-                    $this->sessionManager->getSessionId()
-                );
-            }
-        } catch (Exception $e) {
-            $this->logger->warning(
-                'Failed to preserve session state: ' . $e->getMessage() .
-                '. Continuing with request.'
-            );
-        }
-    }
-
-    /**
-     * Validate and refresh session after API requests complete
-     * Ensures session remains valid for subsequent operations
-     *
-     * @return void
-     */
-    private function validateAndRefreshSession(): void
-    {
-        try {
-            if ($this->sessionManager->isSessionExists()) {
-                // Restart session to ensure cookies and data are current
-                $this->sessionManager->start();
-
-                $this->logger->debug(
-                    'Session validation and refresh completed. Session ID: ' .
-                    $this->sessionManager->getSessionId()
-                );
-            }
-        } catch (Exception $e) {
-            $this->logger->warning(
-                'Failed to refresh session: ' . $e->getMessage() .
-                '. Session may be invalid.'
-            );
         }
     }
 
@@ -144,95 +82,86 @@ class FortisApi
         array $data = [],
         string $method = 'POST'
     ): ?string {
-        // Preserve session state before making API request to prevent session
-        // invalidation errors during checkout surcharge calculations
-        $this->preserveSessionState();
+        $url = $this->fortisApi . $endpoint;
 
-        try {
-            $url = $this->fortisApi . $endpoint;
+        $this->httpClient->setTimeout(30);
 
-            $this->httpClient->setTimeout(30);
+        $headers = $this->createHeaders($user_id, $user_api_key);
+        $this->httpClient->setHeaders($headers);
 
-            $headers = $this->createHeaders($user_id, $user_api_key);
-            $this->httpClient->setHeaders($headers);
+        $this->httpClient->setOption(CURLOPT_RETURNTRANSFER, true);
+        $this->httpClient->setOption(CURLOPT_MAXREDIRS, 10);
+        $this->httpClient->setOption(CURLOPT_FOLLOWLOCATION, true);
+        $this->httpClient->setOption(CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
 
-            $this->httpClient->setOption(CURLOPT_RETURNTRANSFER, true);
-            $this->httpClient->setOption(CURLOPT_MAXREDIRS, 10);
-            $this->httpClient->setOption(CURLOPT_FOLLOWLOCATION, true);
-            $this->httpClient->setOption(CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-
-            if (isset($data['transactionId'])) {
-                unset($data['transactionId']);
-            }
-
-            $retryCount = 0;
-            $maxRetries = 5;
-            $response   = null;
-
-            while ($retryCount < $maxRetries) {
-                try {
-                    if ($method === 'POST') {
-                        $this->httpClient->post($url, $data);
-                    } elseif ($method === 'GET') {
-                        $this->httpClient->get($url);
-                    } elseif ($method === 'DELETE' || $method === 'PUT' || $method === 'PATCH') {
-                        $this->httpClient->setOption(CURLOPT_CUSTOMREQUEST, $method);
-                        $this->httpClient->post($url, $data);
-                    }
-
-                    $response   = $this->httpClient->getBody();
-                    $statusCode = $this->httpClient->getStatus();
-
-                    if ($statusCode >= 200 && $statusCode < 300) {
-                        // Validate and refresh session after successful API call
-                        $this->validateAndRefreshSession();
-                        return $response;
-                    }
-
-                    $retryCount++;
-                } catch (Exception $e) {
-                    $retryCount++;
-                    if ($retryCount >= $maxRetries) {
-                        // Attempt to refresh session even on error
-                        $this->validateAndRefreshSession();
-                        throw new LocalizedException(__("API Request failed: " . $e->getMessage()));
-                    }
-                }
-            }
-
-            // If we get here, all retries failed
-            $response = json_decode($response);
-            if (isset($response->type) && $response->type === 'Error') {
-                $errorStr = '';
-
-                if (isset($response->meta->errors)) {
-                    foreach ($response->meta->errors as $error) {
-                        $errorStr .= "$error[0]\n";
-                    }
-                } elseif (isset($response->meta->details)) {
-                    foreach ($response->meta->details as $error) {
-                        $errorStr .= "$error->message\n";
-                    }
-                } elseif (isset($response->meta)) {
-                    $errorStr = $response->meta->message;
-                } elseif (isset($response->detail)) {
-                    $errorStr = $response->detail;
-                }
-
-                // Refresh session before throwing exception
-                $this->validateAndRefreshSession();
-                throw new LocalizedException(new Phrase($errorStr));
-            }
-
-            // Refresh session before throwing exception
-            $this->validateAndRefreshSession();
-            throw new LocalizedException(
-                __("API Request failed after {$maxRetries} attempts. " . json_encode($response))
-            );
-        } finally {
-            // Ensure session is refreshed regardless of outcome
-            $this->validateAndRefreshSession();
+        if (isset($data['transactionId'])) {
+            unset($data['transactionId']);
         }
+
+        $retryCount = 0;
+        $maxRetries = 5;
+        $response   = null;
+
+        $encodedData = !empty($data) ? json_encode($data) : '';
+
+        while ($retryCount < $maxRetries) {
+            try {
+                if ($method === 'POST') {
+                    $this->httpClient->setOption(CURLOPT_CUSTOMREQUEST, 'POST');
+                    $this->httpClient->post($url, $encodedData);
+                } elseif ($method === 'GET') {
+                    $this->httpClient->setOption(CURLOPT_CUSTOMREQUEST, 'GET');
+                    $this->httpClient->get($url);
+                } elseif ($method === 'DELETE' || $method === 'PUT' || $method === 'PATCH') {
+                    $this->httpClient->setOption(CURLOPT_CUSTOMREQUEST, $method);
+                    $this->httpClient->post($url, $encodedData);
+                }
+
+                $response   = $this->httpClient->getBody();
+                $statusCode = $this->httpClient->getStatus();
+
+                if ($statusCode >= 200 && $statusCode < 300) {
+                    return $response;
+                }
+
+                if ($statusCode >= 400 && $statusCode < 500) {
+                    break;
+                }
+
+                $retryCount++;
+            } catch (Exception $e) {
+                $retryCount++;
+                if ($retryCount >= $maxRetries) {
+                    throw new LocalizedException(__("API Request failed: " . $e->getMessage()));
+                }
+            }
+        }
+
+        // If we get here, all retries failed
+        $response = json_decode($response);
+        if (isset($response->type) && $response->type === 'Error') {
+            $errorStr = '';
+
+            if (isset($response->meta->errors)) {
+                foreach ($response->meta->errors as $error) {
+                    $errorStr .= "$error[0]\n";
+                }
+            } elseif (isset($response->meta->details)) {
+                foreach ($response->meta->details as $error) {
+                    $errorStr .= "$error->message\n";
+                }
+            } elseif (isset($response->meta)) {
+                $errorStr = $response->meta->message;
+            } elseif (isset($response->detail)) {
+                $errorStr = $response->detail;
+            }
+
+            throw new LocalizedException(new Phrase($errorStr));
+        }
+
+        throw new LocalizedException(
+            __("API Request failed after {$maxRetries} attempts. " . json_encode($response))
+        );
     }
 
     /**
@@ -520,28 +449,29 @@ class FortisApi
         $orderDate = $order->getCreatedAt();
         $orderDate = str_replace('-', '', substr($orderDate, 2, 8));
 
-        $endpoint   = "/v1/transactions/$transactionId/level3/visa";
-        $level3Data = [
+        $endpoint    = "/v1/transactions/$transactionId/level3/visa";
+        $shipFromZip = $storeManager->getStore()->getConfig('shipping/origin/postcode') ?? '';
+        $level3Data  = [
             'destination_country_code' => $destination_country_code,
-            'freight_amount'           => $order->getShippingAmount(),
-            'shipfrom_zip_code'        => $storeManager->getStore()->getCode(),
-            'shipto_zip_code'          => $customerAddress->getPostcode(),
-            'tax_amount'               => $order->getTaxAmount(),
+            'freight_amount'           => (int)bcmul((string)($order->getShippingAmount() ?? 0), '100', 0),
+            'shipfrom_zip_code'        => $shipFromZip,
+            'shipto_zip_code'          => $customerAddress->getPostcode() ?? '',
+            'tax_amount'               => (int)bcmul((string)($order->getTaxAmount() ?? 0), '100', 0),
             'order_date'               => $orderDate,
         ];
 
         $lineItems = [];
         foreach ($order->getAllItems() as $item) {
             $product  = $item->getProduct();
-            $unitCost = $product->getPrice();
+            $unitCost = (int)bcmul((string)$product->getPrice(), '100', 0);
             $lineItem = [
                 'description'    => $item->getName(),
-                'commodity_code' => $product->getCustomAttribute('commodity_code')?->getValue() ?? '',
+                'commodity_code' => $product->getCustomAttribute('commodity_code')?->getValue() ?: '0',
                 'product_code'   => $item->getSku(),
-                'unit_code'      => $product->getCustomAttribute('unit_code')?->getValue() ?? '',
+                'unit_code'      => $product->getCustomAttribute('unit_code')?->getValue() ?: 'EA',
                 'unit_cost'      => $unitCost,
-                'quantity'       => $item->getQtyOrdered(),
-                'tax_amount'     => $item->getTaxAmount(),
+                'quantity'       => (int)$item->getQtyOrdered(),
+                'tax_amount'     => (int)bcmul((string)$item->getTaxAmount(), '100', 0),
             ];
 
             $lineItems[] = $lineItem;
@@ -584,26 +514,29 @@ class FortisApi
         $country                  = $countryFactory->create()->loadByCode($countryId);
         $destination_country_code = $country->getData('iso_numeric') ?? '840';
 
-        $endpoint   = "/v1/transactions/$transactionId/level3/master-card";
-        $level3Data = [
+        $endpoint    = "/v1/transactions/$transactionId/level3/master-card";
+        $shipFromZip = $storeManager->getStore()->getConfig('shipping/origin/postcode') ?? '';
+        $level3Data  = [
             'destination_country_code' => $destination_country_code,
-            'freight_amount'           => $order->getShippingAmount(),
-            'shipfrom_zip_code'        => $storeManager->getStore()->getCode(),
+            'freight_amount'           => (int)bcmul((string)$order->getShippingAmount(), '100', 0),
+            'shipfrom_zip_code'        => $shipFromZip,
             'shipto_zip_code'          => $customerAddress->getPostcode(),
-            'tax_amount'               => $order->getTaxAmount(),
+            'tax_amount'               => (int)bcmul((string)$order->getTaxAmount(), '100', 0),
         ];
 
         $lineItems = [];
         foreach ($order->getAllItems() as $item) {
             $product  = $item->getProduct();
-            $unitCost = $product->getPrice();
+            $unitCost = (int)bcmul((string)$product->getPrice(), '100', 0);
             $lineItem = [
-                'description'  => $item->getName(),
-                'product_code' => $item->getSku(),
-                'unit_code'    => $product->getCustomAttribute('unit_code')?->getValue() ?? '',
-                'unit_cost'    => $unitCost,
-                'quantity'     => $item->getQtyOrdered(),
-                'tax_amount'   => $item->getTaxAmount(),
+                'description'      => $item->getName(),
+                'product_code'     => $item->getSku(),
+                'unit_code'        => $product->getCustomAttribute('unit_code')?->getValue() ?: 'EA',
+                'unit_cost'        => $unitCost,
+                'quantity'         => (int)$item->getQtyOrdered(),
+                'tax_amount'       => (int)bcmul((string)$item->getTaxAmount(), '100', 0),
+                'tax_type_id'      => '01',
+                'tax_type_applied' => 'ST',
             ];
 
             $lineItems[] = $lineItem;

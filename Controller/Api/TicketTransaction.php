@@ -65,6 +65,20 @@ class TicketTransaction implements HttpPostActionInterface, CsrfAwareActionInter
             $enableVaultForOrder = $payload['fortisVault'] ?? false;
 
             $quote = $this->checkoutSession->getQuote();
+            // Session may be invalid — fall back to quote lookup via reserved order ID
+            if (!$quote->getId() && !empty($payload['order_id'])) {
+                try {
+                    $criteria = $this->checkoutProcessor->getSearchCriteriaBuilder()
+                        ->addFilter('reserved_order_id', $payload['order_id'])
+                        ->create();
+                    $results  = $this->quoteRepository->getList($criteria)->getItems();
+                    if (!empty($results)) {
+                        $quote = reset($results);
+                    }
+                } catch (\Exception $e) {
+                    $this->logger->error('TicketTransaction: fallback quote lookup failed: ' . $e->getMessage());
+                }
+            }
 
             $billingAddress = $quote->getBillingAddress();
 

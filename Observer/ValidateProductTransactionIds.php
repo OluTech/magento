@@ -117,8 +117,6 @@ class ValidateProductTransactionIds implements ObserverInterface
             return;
         }
 
-        $productId = $this->getActualProductIdValue($productIdField);
-
         if (empty($productId)) {
             return;
         }
@@ -168,12 +166,17 @@ class ValidateProductTransactionIds implements ObserverInterface
      */
     private function extractCredentials(array $fortisConfig): array
     {
-        try {
-            $userId     = $this->fortisConfig->userId();
-            $userApiKey = $this->fortisConfig->userApiKey();
-        } catch (\Exception $e) {
-            $userId     = null;
-            $userApiKey = null;
+        $userId     = $fortisConfig['user_id']['value'] ?? null;
+        $userApiKey = $fortisConfig['user_api_key']['value'] ?? null;
+
+        if (!$userId || !$userApiKey) {
+            try {
+                $userId     = $userId ?: $this->fortisConfig->userId();
+                $userApiKey = $userApiKey ?: $this->fortisConfig->userApiKey();
+            } catch (\Exception $e) {
+                $userId     = $userId ?: null;
+                $userApiKey = $userApiKey ?: null;
+            }
         }
 
         return [
@@ -201,28 +204,5 @@ class ValidateProductTransactionIds implements ObserverInterface
         }
 
         return $environment ?: 'production';
-    }
-
-    /**
-     * Get the actual Product ID value from database using Config class
-     *
-     * @param string $productIdField
-     * @return string|null
-     */
-    private function getActualProductIdValue(string $productIdField): ?string
-    {
-        try {
-            switch ($productIdField) {
-                case 'product_transaction_id':
-                    return $this->fortisConfig->ccProductId();
-                case 'product_transaction_id_secondary':
-                    return $this->fortisConfig->getSecondaryProductId();
-                default:
-                    return null;
-            }
-        } catch (\Exception $e) {
-            $this->logger->warning('Failed to retrieve actual product ID value: ' . $e->getMessage());
-            return null;
-        }
     }
 }
