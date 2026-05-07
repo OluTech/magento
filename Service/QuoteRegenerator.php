@@ -82,6 +82,12 @@ class QuoteRegenerator
         $quote->collectTotals();
         $this->quoteRepository->save($quote);
 
+        $this->checkoutSession->replaceQuote($quote);
+        $this->checkoutSession->setData('last_quote_id', $quote->getId());
+        $this->checkoutSession->setData('last_success_quote_id', $quote->getId());
+        $this->checkoutSession->setData('last_real_order_id', $order->getIncrementId());
+        $this->checkoutSession->setData('last_order_id', $order->getId());
+
         if ($order->canCancel()) {
             $order->cancel();
             $this->orderRepository->save($order);

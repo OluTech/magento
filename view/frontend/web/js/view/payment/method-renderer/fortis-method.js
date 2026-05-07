@@ -183,6 +183,7 @@ define(
         if (!this.isTokenised() && window.FortisTicketIntention && window.FortisTicketIntention.elements) {
           window.FortisTicketIntention.checkoutContext = self;
           this.getData();
+          jQuery('#fortisButton').hide();
           window.FortisTicketIntention.elements.submit();
           return true;
         } else if (this.isTokenised() && window.FortisTicketIntention && window.FortisTicketIntention.elements) {
