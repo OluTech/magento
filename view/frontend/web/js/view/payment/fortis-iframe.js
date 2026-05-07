@@ -205,6 +205,12 @@
                 cancelBtn.style.color = config.appearance_options.colorButtonText;
             };
 
+            cancelBtn.onclick = function (event) {
+                event.preventDefault();
+                invalidateCartSection();
+                window.location.href = cancelBtn.href;
+            };
+
             return cancelBtn;
         }
     }

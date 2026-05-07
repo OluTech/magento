@@ -23,6 +23,8 @@
         if (window.FortisTicketIntention?.checkoutContext?.isPlaceOrderActionAllowed) {
             window.FortisTicketIntention.checkoutContext.isPlaceOrderActionAllowed(true);
         }
+        var btn = document.getElementById('fortisButton');
+        if (btn) btn.style.display = '';
     }
     function isFortisPaymentSelected() {
         const fortisRadio = document.querySelector('input[name="payment[method]"][value="fortis"]');
@@ -81,6 +83,8 @@
 
                         if (surchargeData !== null && surchargeData.surcharge_amount) {
                             document.getElementById('fortis_ticket_payment_form').style.display = 'none';
+                            var fortisBtn = document.getElementById('fortisButton');
+                            if (fortisBtn) fortisBtn.style.display = 'none';
                             ticketSurchargeDisclaimer.html(`
                                 <br>
                                 <p>
@@ -121,12 +125,17 @@
                 $frame.show();
                 $frame.parent().next().show();
                 reEnablePlaceOrderButton();
+                var btn = document.getElementById('fortisButton');
+                if (btn) btn.style.display = '';
             });
 
             elements.on('submitted', async () => {
                 let $frame = jQuery('#fortis-framed-2567');
                 $frame.hide();
                 $frame.parent().next().hide();
+
+                var fortisBtn = document.getElementById('fortisButton');
+                if (fortisBtn) fortisBtn.style.display = 'none';
 
                 const ticketErrorDiv = document.getElementById('ticketError');
                 if (ticketErrorDiv) {

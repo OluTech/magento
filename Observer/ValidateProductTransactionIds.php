@@ -117,6 +117,22 @@ class ValidateProductTransactionIds implements ObserverInterface
             return;
         }
 
+        if ($productId !== null && preg_match('/^\*+$/', $productId)) {
+            $productId = null;
+        }
+
+        if (empty($productId)) {
+            try {
+                if ($productIdField === 'product_transaction_id') {
+                    $productId = $this->fortisConfig->ccProductId() ?: null;
+                } elseif ($productIdField === 'product_transaction_id_secondary') {
+                    $productId = $this->fortisConfig->getSecondaryProductId() ?: null;
+                }
+            } catch (\Exception $e) {
+                $productId = null;
+            }
+        }
+
         if (empty($productId)) {
             return;
         }
@@ -168,6 +184,13 @@ class ValidateProductTransactionIds implements ObserverInterface
     {
         $userId     = $fortisConfig['user_id']['value'] ?? null;
         $userApiKey = $fortisConfig['user_api_key']['value'] ?? null;
+
+        if ($userId !== null && preg_match('/^\*+$/', $userId)) {
+            $userId = null;
+        }
+        if ($userApiKey !== null && preg_match('/^\*+$/', $userApiKey)) {
+            $userApiKey = null;
+        }
 
         if (!$userId || !$userApiKey) {
             try {

@@ -335,6 +335,8 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         $this->order = $order;
 
         if ((!$isTicketTransaction && !$tokenised && ((int)$order->getId() !== $orderId)) || !$data) {
+            $this->checkoutSession->restoreQuote();
+            $this->reactivateQuoteIfNeeded($order);
             $redirect->setUrl($redirectToCartPageString);
 
             return $redirect;
@@ -668,6 +670,10 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                 $this->quoteRepository->save($quote);
             }
             $this->checkoutSession->replaceQuote($quote);
+            $this->checkoutSession->setData('last_quote_id', $quote->getId());
+            $this->checkoutSession->setData('last_success_quote_id', $quote->getId());
+            $this->checkoutSession->setData('last_real_order_id', $order->getIncrementId());
+            $this->checkoutSession->setData('last_order_id', $order->getId());
         } catch (Exception $e) {
             $this->logger->error('Failed to reactivate quote: ' . $e->getMessage());
         }
