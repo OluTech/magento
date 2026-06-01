@@ -1,5 +1,13 @@
 # Changelog
 
+## [[1.7.1]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
+
+### Fixed
+
+- Truncated Fortis Level 3 line-item fields before API submission to meet gateway validation limits:
+    - `level3_data.line_items[*].description` is now capped at 26 characters.
+    - `level3_data.line_items[*].product_code` is now capped at 12 characters.
+
 ## [[1.7.0]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
 
 ### Added

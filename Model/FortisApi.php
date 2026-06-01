@@ -465,9 +465,9 @@ class FortisApi
             $product  = $item->getProduct();
             $unitCost = (int)bcmul((string)$product->getPrice(), '100', 0);
             $lineItem = [
-                'description'    => $item->getName(),
+                'description'    => mb_substr((string)$item->getName(), 0, 26),
                 'commodity_code' => $product->getCustomAttribute('commodity_code')?->getValue() ?: '0',
-                'product_code'   => $item->getSku(),
+                'product_code'   => mb_substr((string)$item->getSku(), 0, 12),
                 'unit_code'      => $product->getCustomAttribute('unit_code')?->getValue() ?: 'EA',
                 'unit_cost'      => $unitCost,
                 'quantity'       => (int)$item->getQtyOrdered(),
@@ -529,8 +529,8 @@ class FortisApi
             $product  = $item->getProduct();
             $unitCost = (int)bcmul((string)$product->getPrice(), '100', 0);
             $lineItem = [
-                'description'      => $item->getName(),
-                'product_code'     => $item->getSku(),
+                'description'      => mb_substr((string)$item->getName(), 0, 26),
+                'product_code'     => mb_substr((string)$item->getSku(), 0, 12),
                 'unit_code'        => $product->getCustomAttribute('unit_code')?->getValue() ?: 'EA',
                 'unit_cost'        => $unitCost,
                 'quantity'         => (int)$item->getQtyOrdered(),
