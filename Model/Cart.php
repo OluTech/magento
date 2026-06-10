@@ -141,7 +141,7 @@ class Cart extends \Magento\Payment\Model\Cart
             // Aggregate item price if item qty * price does not match row total
             $itemBaseRowTotal = $item->getOriginalItem()->getBaseRowTotal();
             if ($amount * $qty != $itemBaseRowTotal) {
-                $amount             = (double)$itemBaseRowTotal;
+                $amount             = (float)$itemBaseRowTotal;
                 $subAggregatedLabel = ' x' . $qty;
                 $qty                = 1;
             }
@@ -183,7 +183,7 @@ class Cart extends \Magento\Payment\Model\Cart
         SalesModelInterface $salesEntity
     ): void {
         $dataContainer = $salesEntity->getTaxContainer();
-        $this->addTax((double)$dataContainer->getBaseDiscountTaxCompensationAmount());
-        $this->addTax((double)$dataContainer->getBaseShippingDiscountTaxCompensationAmnt());
+        $this->addTax((float)$dataContainer->getBaseDiscountTaxCompensationAmount());
+        $this->addTax((float)$dataContainer->getBaseShippingDiscountTaxCompensationAmnt());
     }
 }
