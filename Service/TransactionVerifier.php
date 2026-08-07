@@ -7,9 +7,20 @@ use Fortispay\Fortis\Model\Config;
 
 class TransactionVerifier
 {
+    /**
+     * @var FortisApi
+     */
     private FortisApi $fortisApi;
+
+    /**
+     * @var Config
+     */
     private Config $config;
 
+    /**
+     * @param FortisApi $fortisApi
+     * @param Config $config
+     */
     public function __construct(
         FortisApi $fortisApi,
         Config $config
@@ -65,7 +76,9 @@ class TransactionVerifier
         if (isset($transaction['data']['surcharge_amount']) && $transaction['data']['surcharge_amount'] > 0) {
             $surchargeAmount = (int)$transaction['data']['surcharge_amount'];
             $expectedTotal   += $surchargeAmount;
-        } elseif (isset($transaction['data']['surcharge']['surcharge_amount']) && $transaction['data']['surcharge']['surcharge_amount'] > 0) {
+        } elseif (isset($transaction['data']['surcharge']['surcharge_amount'])
+            && $transaction['data']['surcharge']['surcharge_amount'] > 0
+        ) {
             $surchargeAmount = (int)$transaction['data']['surcharge']['surcharge_amount'];
             $expectedTotal   += $surchargeAmount;
         } elseif ($surchargeInfo && isset($surchargeInfo['surchargeAmount']) && $surchargeInfo['surchargeAmount'] > 0) {

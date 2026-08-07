@@ -10,8 +10,19 @@ use Magento\Framework\Exception\LocalizedException;
 
 class ContinueShopping implements HttpGetActionInterface
 {
+    /**
+     * @var QuoteRegenerator
+     */
     private QuoteRegenerator $quoteRegenerator;
+
+    /**
+     * @var ResultFactory
+     */
     private ResultFactory $resultFactory;
+
+    /**
+     * @var RequestInterface
+     */
     private RequestInterface $request;
 
     /**
@@ -30,6 +41,9 @@ class ContinueShopping implements HttpGetActionInterface
     }
 
     /**
+     * Regenerate quote and redirect customer to cart.
+     *
+     * @return \Magento\Framework\Controller\Result\Redirect
      * @throws LocalizedException
      */
     public function execute()

@@ -34,6 +34,9 @@ class SetupWebhook implements ObserverInterface
      * @var \Magento\Framework\Message\ManagerInterface
      */
     private ManagerInterface $messageManager;
+    /**
+     * @var FortisApi
+     */
     private FortisApi $fortisApi;
 
     /**

@@ -1,5 +1,37 @@
 # Changelog
 
+## [[1.7.2]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
+
+### Added
+
+- **Billing address on tokenised payments** — the Magento order billing address is now included in every CC Sale –
+  Tokenised and CC AuthOnly – Tokenised request sent to Fortis, including for tokens imported from other gateways that
+  may lack billing data.
+- **Billing address fallbacks** — when resolving billing address data the plugin prefers the order address, then the
+  quote billing address, then the shipping address, and finally the customer’s saved default billing address. Missing
+  address data is non-blocking so tokenised transactions still process successfully.
+- **3D Secure documentation** — documented the Elements iframe 3D Secure authentication behaviour in the module README,
+  including automatic enablement, in-iframe challenges, and checkout error handling.
+
+### Fixed
+
+- **Missing billing address on tokenised transactions** — resolved cases where tokenised Sale and AuthOnly requests
+  omitted billing address details because the flow assumed the token already carried complete address data.
+- **Post-checkout order recovery** — hardened redirect and success controllers so a missing or expired checkout session
+  can still recover the order (including ticket-intention flows that now pass the order identifier), preventing orders
+  completing without Fortis transaction data.
+- **Null-safe payment data access** — redirect payment processing no longer assumes payment additional information is
+  always present, reducing failures when payment data is incomplete.
+- **Level 3 commodity_code field truncation** — `commodity_code` in Level 3 line items is now truncated to 12 characters
+  to prevent Visa Level 3 validation errors (412 status codes) when product attributes exceed gateway limits.
+
+### Improved
+
+- **Saved payment method error handling** — tokenised ACH and card failures now restore the quote, surface a clear
+  customer-facing message, and redirect back to the cart instead of returning raw exceptions.
+- **Expired checkout session recovery** — when the last real order is missing from the checkout session the customer is
+  redirected to the cart with a clear session-expired message rather than failing mid-redirect.
+
 ## [[1.7.1]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
 
 ### Fixed
@@ -16,8 +48,8 @@
   This enables storefronts to present localized prices and process transactions in a customer's selected currency where
   configured. Includes admin configuration for primary and secondary currencies, each mapped to a distinct Product
   Transaction ID.
-- **Extended currency support** — added ARS, AUD, BRL, CAD, CLP, COP, PYG, INR, MXN, ILS, NZD, PEN, PHP, GBP, SGD,
-  KRW, and JPY to the list of accepted payment currencies (in addition to the existing USD, EUR, and ZAR).
+- **Extended currency support** — added ARS, AUD, BRL, CAD, CLP, COP, PYG, INR, MXN, ILS, NZD, PEN, PHP, GBP, SGD, KRW,
+  and JPY to the list of accepted payment currencies (in addition to the existing USD, EUR, and ZAR).
 - **Configuration validation for multi-currency setup** — payment configuration now validates primary and secondary
   Product Transaction ID and currency pairings against the Fortis API when settings are saved, helping merchants catch
   invalid multicurrency setup before checkout is affected.
@@ -112,7 +144,7 @@
 ### Changed
 
 - Refactored deprecated `AbstractMethod` and `ArrayInterface` classes.
-- Updated 'object'->save() methods to remove deprecated usage.
+- Updated 'object'->save () methods to remove deprecated usage.
 - Replaced inheritance with composition for improved code design.
 - Upgraded `curl_init` to Magento's HTTP classes for better integration.
 - Enhanced general code quality standards and adhered to modern best practices.

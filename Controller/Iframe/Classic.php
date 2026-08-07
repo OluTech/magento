@@ -12,15 +12,31 @@ use Psr\Log\LoggerInterface;
 
 class Classic implements HttpPostActionInterface, HttpGetActionInterface
 {
+    /**
+     * @var PageFactory
+     */
     private PageFactory $pageFactory;
+
+    /**
+     * @var ResultFactory
+     */
     private ResultFactory $resultFactory;
+
+    /**
+     * @var CheckoutProcessor
+     */
     private CheckoutProcessor $checkoutProcessor;
+
+    /**
+     * @var LoggerInterface
+     */
     private LoggerInterface $logger;
 
     /**
      * @param PageFactory $pageFactory
      * @param ResultFactory $resultFactory
      * @param CheckoutProcessor $checkoutProcessor
+     * @param LoggerInterface $logger
      */
     public function __construct(
         PageFactory $pageFactory,
@@ -35,6 +51,9 @@ class Classic implements HttpPostActionInterface, HttpGetActionInterface
     }
 
     /**
+     * Execute checkout iframe request.
+     *
+     * @return \Magento\Framework\Controller\Result\Raw
      * @throws LocalizedException
      */
     public function execute()

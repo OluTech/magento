@@ -51,6 +51,10 @@ class FortisConfigProvider implements ConfigProviderInterface
      * @var PaymentTokenManagement
      */
     private PaymentTokenManagement $paymentTokenManagement;
+
+    /**
+     * @var FortisMethodService
+     */
     private FortisMethodService $fortisMethodService;
 
     /**
@@ -89,9 +93,9 @@ class FortisConfigProvider implements ConfigProviderInterface
     }
 
     /**
-     * Get Config
+     * Retrieve Fortis checkout configuration.
      *
-     * {@inheritdoc}
+     * @return array
      * @throws LocalizedException
      */
     public function getConfig(): array

@@ -13,22 +13,75 @@ use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Vault\Model\PaymentTokenManagement;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 
 class ProcessTokenizedPayment implements HttpPostActionInterface
 {
+    /**
+     * @var JsonFactory
+     */
     private JsonFactory $resultJsonFactory;
+
+    /**
+     * @var RequestInterface
+     */
     private RequestInterface $request;
+
+    /**
+     * @var LoggerInterface
+     */
     private LoggerInterface $logger;
+
+    /**
+     * @var FortisApi
+     */
     private FortisApi $fortisApi;
+
+    /**
+     * @var Config
+     */
     private Config $config;
+
+    /**
+     * @var CheckoutProcessor
+     */
     private CheckoutProcessor $checkoutProcessor;
+
+    /**
+     * @var CurrentCustomer
+     */
     private CurrentCustomer $currentCustomer;
+
+    /**
+     * @var PaymentTokenManagement
+     */
     private PaymentTokenManagement $paymentTokenManagement;
+
+    /**
+     * @var FortisMethodService
+     */
     private FortisMethodService $fortisMethodService;
 
+    /**
+     * @var OrderRepositoryInterface
+     */
+    private OrderRepositoryInterface $orderRepository;
+
+    /**
+     * @param JsonFactory $resultJsonFactory
+     * @param RequestInterface $request
+     * @param LoggerInterface $logger
+     * @param FortisApi $fortisApi
+     * @param Config $config
+     * @param CheckoutProcessor $checkoutProcessor
+     * @param CurrentCustomer $currentCustomer
+     * @param PaymentTokenManagement $paymentTokenManagement
+     * @param FortisMethodService $fortisMethodService
+     * @param OrderRepositoryInterface $orderRepository
+     */
     public function __construct(
         JsonFactory $resultJsonFactory,
         RequestInterface $request,
@@ -38,7 +91,8 @@ class ProcessTokenizedPayment implements HttpPostActionInterface
         CheckoutProcessor $checkoutProcessor,
         CurrentCustomer $currentCustomer,
         PaymentTokenManagement $paymentTokenManagement,
-        FortisMethodService $fortisMethodService
+        FortisMethodService $fortisMethodService,
+        OrderRepositoryInterface $orderRepository
     ) {
         $this->resultJsonFactory      = $resultJsonFactory;
         $this->request                = $request;
@@ -49,8 +103,14 @@ class ProcessTokenizedPayment implements HttpPostActionInterface
         $this->currentCustomer        = $currentCustomer;
         $this->paymentTokenManagement = $paymentTokenManagement;
         $this->fortisMethodService    = $fortisMethodService;
+        $this->orderRepository        = $orderRepository;
     }
 
+    /**
+     * Process a tokenized card or ACH payment request.
+     *
+     * @return \Magento\Framework\Controller\Result\Json
+     */
     public function execute()
     {
         $result = $this->resultJsonFactory->create();
@@ -83,6 +143,13 @@ class ProcessTokenizedPayment implements HttpPostActionInterface
             $gatewayToken = $cardData->getGatewayToken();
 
             $totals = $this->checkoutProcessor->getCheckoutTotals();
+
+            // Get order if this is a post-checkout operation
+            $order = null;
+            if (isset($data['order_id'])) {
+                $order = $this->orderRepository->get($data['order_id']);
+                $this->logger->debug($pre . "Using order #" . $order->getIncrementId() . " for billing address");
+            }
 
             $surchargeData = [];
             if (!empty($data['surcharge_data'])) {
@@ -119,6 +186,16 @@ class ProcessTokenizedPayment implements HttpPostActionInterface
                         $supportedCurrencies
                     )
                 );
+            }
+
+            // Get billing address - pass order if available (post-order operations)
+            // Falls back to quote/session for initial checkout
+            $billingAddressData = $this->checkoutProcessor->getBillingAddressData($order);
+            if ($billingAddressData) {
+                $intentData['billing_address'] = $billingAddressData;
+                $this->logger->debug($pre . "Billing address added: " . json_encode($billingAddressData));
+            } else {
+                $this->logger->warning($pre . "No billing address data available");
             }
 
             if ($tokenType === 'ach') {

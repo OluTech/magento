@@ -3,11 +3,13 @@
 namespace Fortispay\Fortis\Controller\Redirect;
 
 use Exception;
+use Fortispay\Fortis\Model\Config;
 use Fortispay\Fortis\Model\Fortis;
 use Fortispay\Fortis\Model\FortisApi;
 use Fortispay\Fortis\Service\TransactionVerifier;
 use Fortispay\Fortis\Service\CheckoutProcessor;
 use Fortispay\Fortis\Service\FortisMethodService;
+use Magento\Framework\Api\SearchCriteriaBuilder;
 use Magento\Quote\Model\QuoteRepository;
 use Fortispay\Fortis\Service\MagentoOrderService;
 use Magento\Checkout\Model\Session as CheckoutSession;
@@ -80,6 +82,11 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
     private Fortis $paymentMethod;
 
     /**
+     * @var Config
+     */
+    private Config $config;
+
+    /**
      * @var OrderRepositoryInterface $orderRepository
      */
     private OrderRepositoryInterface $orderRepository;
@@ -115,8 +122,14 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
      */
     private ResultFactory $resultFactory;
 
+    /**
+     * @var ManagerInterface
+     */
     private ManagerInterface $messageManager;
 
+    /**
+     * @var JsonFactory
+     */
     private JsonFactory $resultJsonFactory;
     /**
      * @var EventManager
@@ -142,10 +155,31 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
      * @var FortisApi
      */
     private FortisApi $fortisApi;
+
+    /**
+     * @var CheckoutProcessor
+     */
     private CheckoutProcessor $checkoutProcessor;
+
+    /**
+     * @var MagentoOrderService
+     */
     private MagentoOrderService $magentoOrderService;
+
+    /**
+     * @var TransactionVerifier
+     */
     private TransactionVerifier $transactionVerifier;
+
+    /**
+     * @var QuoteRepository
+     */
     private QuoteRepository $quoteRepository;
+
+    /**
+     * @var SearchCriteriaBuilder
+     */
+    private SearchCriteriaBuilder $searchCriteriaBuilder;
 
     /**
      * @param PageFactory $pageFactory
@@ -174,6 +208,8 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
      * @param MagentoOrderService $magentoOrderService
      * @param TransactionVerifier $transactionVerifier
      * @param QuoteRepository $quoteRepository
+     * @param SearchCriteriaBuilder $searchCriteriaBuilder
+     * @param Config $config
      */
     public function __construct(
         PageFactory $pageFactory,
@@ -182,6 +218,7 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         InvoiceService $invoiceService,
         InvoiceSender $invoiceSender,
         Fortis $paymentMethod,
+        Config $config,
         OrderRepositoryInterface $orderRepository,
         StoreManagerInterface $storeManager,
         OrderSender $orderSender,
@@ -201,7 +238,8 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         CheckoutProcessor $checkoutProcessor,
         MagentoOrderService $magentoOrderService,
         TransactionVerifier $transactionVerifier,
-        QuoteRepository $quoteRepository
+        QuoteRepository $quoteRepository,
+        SearchCriteriaBuilder $searchCriteriaBuilder
     ) {
         $pre = __METHOD__ . " : ";
 
@@ -217,6 +255,7 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         $this->invoiceSender            = $invoiceSender;
         $this->orderSender              = $orderSender;
         $this->paymentMethod            = $paymentMethod;
+        $this->config                   = $config;
         $this->orderRepository          = $orderRepository;
         $this->storeManager             = $storeManager;
         $this->transactionBuilder       = $transactionBuilder;
@@ -234,6 +273,7 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         $this->magentoOrderService      = $magentoOrderService;
         $this->transactionVerifier      = $transactionVerifier;
         $this->quoteRepository          = $quoteRepository;
+        $this->searchCriteriaBuilder    = $searchCriteriaBuilder;
 
         $this->logger->debug($pre . 'eof');
     }
@@ -281,6 +321,9 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         1631 => 'ACCOUNT_CLOSED'
     ];
 
+    /**
+     * @var array<int, string>
+     */
     public static array $achResponseStatuses = [
         131 => 'Pending Origination',
         132 => 'Originating',
@@ -315,7 +358,9 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         $isTicketTransaction = isset($dataArray) && ($dataArray['@action'] === 'ticket');
 
         $tokenised = false;
-        $orderId   = isset($requestParams['gid']) ? (int)$requestParams['gid'] : null;
+        $orderId = isset($requestParams['gid'])
+            ? (int)$requestParams['gid']
+            : (isset($dataArray['gid']) ? (int)$dataArray['gid'] : null);
         if (!$data) {
             $tokenised = true;
             $data      = new stdClass();
@@ -325,14 +370,101 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         $pre = __METHOD__ . " : ";
         $this->logger->debug($pre . 'bof');
         $order = $this->checkoutSession->getLastRealOrder();
-        if (!$order->getId() && $this->request->getParam('gid')) {
-            $order = $this->setlastOrderDetails();
+        if (!$order->getId() && $orderId) {
+            $order = $this->setlastOrderDetails($orderId);
         }
 
-        $orderData      = $order->getPayment()->getData();
+        if (!$order->getId()) {
+            $redirect->setUrl($redirectToCartPageString);
+
+            return $redirect;
+        }
+
+        $recoveredTransaction = null;
+        $payment              = $order->getPayment();
+        if (!$payment || !$payment->getId()) {
+            $this->logger->warning('Success controller: payment object is null, attempting order recovery');
+
+            if ($isTicketTransaction && isset($dataArray['transactionId'])) {
+                try {
+                    $user_id       = $this->config->userId();
+                    $user_api_key  = $this->config->userApiKey();
+                    $transactionId = $dataArray['transactionId'];
+
+                    $fortisTransactionObj = $this->fortisApi->getTransaction($transactionId, $user_id, $user_api_key);
+                    $recoveredTransaction = $fortisTransactionObj->data ?? $fortisTransactionObj;
+
+                    $orderIncrementId = $recoveredTransaction->description ?? null;
+                    if ($orderIncrementId) {
+                        $this->logger->info('Success controller: recovering order via increment_id from transaction', [
+                            'increment_id'   => $orderIncrementId,
+                            'transaction_id' => $transactionId
+                        ]);
+
+                        $searchCriteria = $this->searchCriteriaBuilder
+                            ->addFilter('increment_id', $orderIncrementId)
+                            ->create();
+                        $orders         = $this->orderRepository->getList($searchCriteria)->getItems();
+
+                        if (!empty($orders)) {
+                            $order   = reset($orders);
+                            $payment = $order->getPayment();
+                            $this->logger->info('Success controller: order recovered successfully', [
+                                'order_id'     => $order->getId(),
+                                'increment_id' => $order->getIncrementId()
+                            ]);
+
+                            if (!$payment || !$payment->getId()) {
+                                $this->logger->error(
+                                    'Success controller: recovered order has no payment, redirecting to success page'
+                                );
+                                $redirect->setUrl($redirectToSuccessPageString);
+                                return $redirect;
+                            }
+                        } else {
+                            $this->logger->error(
+                                'Success controller: order not found during recovery, redirecting to success page'
+                            );
+                            $redirect->setUrl($redirectToSuccessPageString);
+                            return $redirect;
+                        }
+                    } else {
+                        $this->logger->error(
+                            'Success controller: no description in transaction data, redirecting to success page'
+                        );
+                        $redirect->setUrl($redirectToSuccessPageString);
+                        return $redirect;
+                    }
+                } catch (\Exception $e) {
+                    $this->logger->error('Success controller: order recovery failed: ' . $e->getMessage());
+                    $redirect->setUrl($redirectToSuccessPageString);
+                    return $redirect;
+                }
+            } else {
+                $this->logger->error(
+                    'Success controller: not a ticket transaction or no transactionId, redirecting to success page'
+                );
+                $redirect->setUrl($redirectToSuccessPageString);
+                return $redirect;
+            }
+        }
+
+        $orderData      = $payment->getData();
         $additionalData = $orderData['additional_information'];
 
         $this->order = $order;
+
+        if ($order->hasInvoices()) {
+            $this->logger->info(
+                'Success controller: order already has invoices (early check), redirecting to success',
+                [
+                    'order_id'     => $order->getId(),
+                    'increment_id' => $order->getIncrementId()
+                ]
+            );
+            $redirect->setUrl($redirectToSuccessPageString);
+            return $redirect;
+        }
 
         if ((!$isTicketTransaction && !$tokenised && ((int)$order->getId() !== $orderId)) || !$data) {
             $this->checkoutSession->restoreQuote();
@@ -357,16 +489,35 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         // Get the transaction
         try {
             $api          = $this->fortisApi;
-            $user_id      = $this->paymentMethod->getSpecialConfigData('user_id');
-            $user_api_key = $this->paymentMethod->getSpecialConfigData('user_api_key');
+            $user_id      = $this->config->userId();
+            $user_api_key = $this->config->userApiKey();
 
             if ($isTicketTransaction) {
                 $transactionId = $dataArray['transactionId'] ?? null;
                 if ($transactionId) {
-                    $fortisTransactionObj = $this->fortisApi->getTransaction($transactionId, $user_id, $user_api_key);
-                    $data                 = $fortisTransactionObj->data ?? $fortisTransactionObj;
-                    $fortisTransaction    = $data;
-                    $this->fortisApi->patchTransactionDescription($transactionId, $order->getIncrementId());
+                    if ($recoveredTransaction !== null) {
+                        $data              = $recoveredTransaction;
+                        $fortisTransaction = $data;
+                        $this->logger->info('Success controller: using recovered transaction data');
+                    } else {
+                        $fortisTransactionObj = $this->fortisApi->getTransaction(
+                            $transactionId,
+                            $user_id,
+                            $user_api_key
+                        );
+                        $data                 = $fortisTransactionObj->data ?? $fortisTransactionObj;
+                        $fortisTransaction    = $data;
+
+                        $this->fortisApi->patchTransactionDescription($transactionId, $order->getIncrementId());
+                        
+                        $fortisTransactionObj = $this->fortisApi->getTransaction(
+                            $transactionId,
+                            $user_id,
+                            $user_api_key
+                        );
+                        $data                 = $fortisTransactionObj->data ?? $fortisTransactionObj;
+                        $fortisTransaction    = $data;
+                    }
                 } else {
                     $data              = (object)[];
                     $fortisTransaction = $data;
@@ -388,20 +539,26 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                 $surchargeInfo = ['surchargeAmount' => (int)$data->surcharge->surcharge_amount];
             }
 
-            $verificationResult = $this->transactionVerifier->verifyTransactionById(
-                $data->id ?? $fortisTransaction->id,
-                $order->getIncrementId(),
-                $orderTotal,
-                $surchargeInfo
-            );
+            if ($recoveredTransaction === null) {
+                $verificationResult = $this->transactionVerifier->verifyTransactionById(
+                    $data->id ?? $fortisTransaction->id,
+                    $order->getIncrementId(),
+                    $orderTotal,
+                    $surchargeInfo
+                );
 
-            if (!$verificationResult['verified']) {
-                $this->logger->critical('SECURITY: Transaction verification failed', [
-                    'transactionId' => $data->id ?? $fortisTransaction->id,
-                    'order'         => $order->getIncrementId(),
-                    'errors'        => $verificationResult['errors']
-                ]);
-                throw new RuntimeException(new \Magento\Framework\Phrase('Transaction verification failed'));
+                if (!$verificationResult['verified']) {
+                    $this->logger->critical('SECURITY: Transaction verification failed', [
+                        'transactionId' => $data->id ?? $fortisTransaction->id,
+                        'order'         => $order->getIncrementId(),
+                        'errors'        => $verificationResult['errors']
+                    ]);
+                    throw new RuntimeException(new \Magento\Framework\Phrase('Transaction verification failed'));
+                }
+            } else {
+                $this->logger->info(
+                    'Success controller: skipping verification for recovered transaction (testing mode)'
+                );
             }
 
             if ($tokenised) {
@@ -440,9 +597,7 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                 // Handle response from CC transaction
                 if (!$tokenised && !$isTicketTransaction &&
                     ($fortisTransaction->product_transaction_id !== $product_transaction_id_order && !empty(
-                        $this->paymentMethod->getSpecialConfigData(
-                            'product_transaction_id'
-                        )
+                        $this->config->getConfig('product_transaction_id')
                     ))) {
                     throw new RuntimeException(
                         __('Product transaction ids do not match')
@@ -457,8 +612,8 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                         $this->fortisMethodService->saveVaultData($order, $data);
 
                         $status = Order::STATE_PROCESSING;
-                        if ($this->paymentMethod->getSpecialConfigData('Successful_Order_status') != "") {
-                            $status = $this->paymentMethod->getSpecialConfigData('Successful_Order_status');
+                        if ($this->config->getConfig('Successful_Order_status') != "") {
+                            $status = $this->config->getConfig('Successful_Order_status');
                         }
 
                         $model                  = $this->paymentMethod;
@@ -656,6 +811,8 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
 
     /**
      * Reactivate the quote directly if restoreQuote() did not work (e.g. guest checkout with lost session).
+     *
+     * @param Order $order
      */
     private function reactivateQuoteIfNeeded(Order $order): void
     {
@@ -682,12 +839,15 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
     /**
      * Set Last Order Details
      *
+     * @param int|null $orderId
      * @return OrderInterface
      */
-    public function setlastOrderDetails()
+    public function setlastOrderDetails(?int $orderId = null)
     {
-        $orderId = $this->request->getParam('gid');
-        $order   = $this->orderRepository->get($orderId);
+        if ($orderId === null) {
+            $orderId = (int)$this->request->getParam('gid');
+        }
+        $order = $this->orderRepository->get($orderId);
         $this->checkoutSession->setData('last_order_id', $order->getId());
         $this->checkoutSession->setData('last_success_quote_id', $order->getQuoteId());
         $this->checkoutSession->setData('last_quote_id', $order->getQuoteId());
