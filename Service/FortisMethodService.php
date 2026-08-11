@@ -700,7 +700,7 @@ class FortisMethodService
                     'transaction_amount'      => $intentData['transaction_amount'],
                     'description'             => $order->getIncrementId(),
                     'previous_transaction_id' => $transactionId,
-                    'product_transaction_id'  => $productTransactionId
+                    'product_transaction_id'  => $this->config->achProductId()
                 ];
                 $response      = $api->achRefundTransactionAmount($achIntentData);
             }
