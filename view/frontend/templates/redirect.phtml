@@ -6,9 +6,9 @@
 ?>
 <div id="fortis-data" data-config='<?=$escaper->escapeHtmlAttr(json_encode($block->getJSConfig()))?>'></div>
 <?php
-if ($block->getData('error_html')): ?>
+if ($block->getData('error_message')): ?>
     <div class="error-container">
-        <?=$escaper->escapeHtml($block->getData('error_html'));?>
+        <div class="error-message error"><?= $escaper->escapeHtml($block->getData('error_message')) ?></div>
     </div>
     <?php
 endif; ?>

@@ -363,6 +363,10 @@ class FortisMethodService
                 $intentData['methods'] = [];
             }
             $intentData['methods'][] = ['type' => 'ach', 'product_transaction_id' => $achProductId];
+            $locationId = $this->config->achLocationId();
+            if ($locationId !== '') {
+                $intentData['location_id'] = $locationId;
+            }
         }
 
         // Initiate Fortis - transaction intention
