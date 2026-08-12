@@ -141,6 +141,8 @@ class Config
     }
 
     /**
+     * Return environment setting (production or sandbox).
+     *
      * @return string
      */
     public function environment(): ?string
@@ -309,6 +311,13 @@ class Config
         return $this->scopeConfig->getValue($path, $storeScope);
     }
 
+    /**
+     * Persist a payment config value.
+     *
+     * @param string $key
+     * @param string $value
+     * @return void
+     */
     public function setConfig(string $key, string $value): void
     {
         $path = 'payment/' . Config::METHOD_CODE . '/' . $key;
@@ -325,6 +334,8 @@ class Config
     }
 
     /**
+     * Return whether checkout iframe is enabled.
+     *
      * @return bool
      */
     public function isCheckoutIframe(): bool
@@ -333,6 +344,8 @@ class Config
     }
 
     /**
+     * Return whether single-view checkout is enabled.
+     *
      * @return bool
      */
     public function isSingleView(): bool
@@ -391,6 +404,11 @@ class Config
         return $t;
     }
 
+    /**
+     * Return ACH location ID.
+     *
+     * @return string
+     */
     public function achLocationId(): string
     {
         $t = $this->getConfig('fortis_ach_location_id') ?? '';
@@ -402,6 +420,8 @@ class Config
     }
 
     /**
+     * Return ACH webhook ID.
+     *
      * @return string
      */
     public function achWebhookId(): string
@@ -410,6 +430,8 @@ class Config
     }
 
     /**
+     * Return ACH icon dimensions.
+     *
      * @return array
      */
     public function getACHIcon(): array
@@ -418,8 +440,7 @@ class Config
     }
 
     /**
-     *
-     * CC product ID (optional)
+     * CC product ID (optional).
      *
      * @return string
      */
@@ -607,6 +628,8 @@ class Config
     }
 
     /**
+     * Return the current order action (sale or auth-only).
+     *
      * @return string
      */
     public function orderAction(): ?string
@@ -615,6 +638,8 @@ class Config
     }
 
     /**
+     * Return the configured intention flow (ticket-intention or transaction-intention).
+     *
      * @return string|null
      */
     public function getIntentionFlow(): ?string
@@ -623,6 +648,8 @@ class Config
     }
 
     /**
+     * Return whether a success order email is configured.
+     *
      * @return bool
      */
     public function orderSuccessfulEmail(): bool
@@ -633,6 +660,8 @@ class Config
     }
 
     /**
+     * Return whether invoice email is configured.
+     *
      * @return bool
      */
     public function emailInvoice(): bool

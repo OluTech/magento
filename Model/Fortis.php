@@ -51,8 +51,16 @@ class Fortis implements MethodInterface
      */
     private OrderRepositoryInterface $orderRepository;
 
+    /**
+     * @var ScopeConfigInterface
+     */
     private ScopeConfigInterface $scopeConfig;
+
+    /**
+     * @var InfoInterface
+     */
     private InfoInterface $infoInstance;
+
     /**
      * @var string
      */
@@ -67,10 +75,30 @@ class Fortis implements MethodInterface
      * @var ManagerInterface
      */
     private ManagerInterface $eventManager;
+
+    /**
+     * @var FortisMethodService
+     */
     private FortisMethodService $fortisMethodService;
+
+    /**
+     * @var Config
+     */
     private Config $config;
+
+    /**
+     * @var DirectoryHelper
+     */
     private DirectoryHelper $directoryHelper;
+
+    /**
+     * @var FortisApi
+     */
     private FortisApi $fortisApi;
+
+    /**
+     * @var array<string>
+     */
     private static array $encryptedConfigKeys = [
         'user_id',
         'user_api_key',
@@ -207,6 +235,11 @@ class Fortis implements MethodInterface
         return $this;
     }
 
+    /**
+     * Whether refund action is available.
+     *
+     * @return bool
+     */
     public function canRefund()
     {
         return true;
@@ -265,36 +298,71 @@ class Fortis implements MethodInterface
         );
     }
 
+    /**
+     * Get payment method code.
+     *
+     * @return string
+     */
     public function getCode()
     {
         return Config::METHOD_CODE;
     }
 
+    /**
+     * Get form block type.
+     *
+     * @return string
+     */
     public function getFormBlockType()
     {
         return $this->formBlockType;
     }
 
+    /**
+     * Get payment method title.
+     *
+     * @return string
+     */
     public function getTitle()
     {
         return $this->getConfigData('title');
     }
 
+    /**
+     * Get configured store ID.
+     *
+     * @return int
+     */
     public function getStore()
     {
         return $this->config->getStoreId();
     }
 
+    /**
+     * Whether order action is available.
+     *
+     * @return bool
+     */
     public function canOrder()
     {
         return true;
     }
 
+    /**
+     * Whether authorize action is available.
+     *
+     * @return bool
+     */
     public function canAuthorize()
     {
         return true;
     }
 
+    /**
+     * Whether capture action is available.
+     *
+     * @return bool
+     */
     public function canCapture()
     {
         $payment = $this->getPaymentInfo();
@@ -308,56 +376,112 @@ class Fortis implements MethodInterface
         return true;
     }
 
+    /**
+     * Whether partial capture per invoice is available.
+     *
+     * @return bool
+     */
     public function canCapturePartial()
     {
         return false;
     }
 
+    /**
+     * Whether single-capture-only mode is active.
+     *
+     * @return bool
+     */
     public function canCaptureOnce()
     {
         return false;
     }
 
+    /**
+     * Whether void action is available.
+     *
+     * @return bool
+     */
     public function canVoid()
     {
         return true;
     }
 
+    /**
+     * Whether method can be used for internal (admin) orders.
+     *
+     * @return bool
+     */
     public function canUseInternal()
     {
         return true;
     }
 
+    /**
+     * Whether method can be used at checkout.
+     *
+     * @return bool
+     */
     public function canUseCheckout()
     {
         return true;
     }
 
+    /**
+     * Whether method can be edited after order placement.
+     *
+     * @return bool
+     */
     public function canEdit()
     {
         return true;
     }
 
+    /**
+     * Whether fetching transaction info is supported.
+     *
+     * @return bool
+     */
     public function canFetchTransactionInfo()
     {
         return false;
     }
 
+    /**
+     * Whether this is a gateway method.
+     *
+     * @return bool
+     */
     public function isGateway()
     {
         return false;
     }
 
+    /**
+     * Whether this is an offline payment method.
+     *
+     * @return bool
+     */
     public function isOffline()
     {
         return false;
     }
 
+    /**
+     * Whether initialization is needed before placing order.
+     *
+     * @return bool
+     */
     public function isInitializeNeeded()
     {
         return true;
     }
 
+    /**
+     * Whether method can be used for the given country.
+     *
+     * @param string $country
+     * @return bool
+     */
     public function canUseForCountry($country)
     {
         /*
@@ -373,6 +497,11 @@ class Fortis implements MethodInterface
         return true;
     }
 
+    /**
+     * Get info block type class name.
+     *
+     * @return string
+     */
     public function getInfoBlockType()
     {
         return $this->infoBlockType;
@@ -380,6 +509,7 @@ class Fortis implements MethodInterface
 
     /**
      * Get payment info instance
+     *
      * @return InfoInterface
      */
     public function getPaymentInfo()
@@ -388,8 +518,11 @@ class Fortis implements MethodInterface
     }
 
     /**
-     * @inheritdoc
-     * @deprecated Use getPaymentInfo() instead
+     * Return current payment info instance.
+     *
+     * @deprecated Use getPaymentInfo() instead.
+     * @see getPaymentInfo()
+     * @return InfoInterface
      */
     public function getInfoInstance()
     {
@@ -405,6 +538,8 @@ class Fortis implements MethodInterface
     }
 
     /**
+     * Validate payment method for the current quote/order.
+     *
      * @return $this|Fortis
      * @throws LocalizedException
      */
@@ -431,9 +566,10 @@ class Fortis implements MethodInterface
     }
 
     /**
-     * @param InfoInterface $payment
-     * @param $amount
+     * Place an order action.
      *
+     * @param InfoInterface $payment
+     * @param float $amount
      * @return $this|Fortis
      * @throws LocalizedException
      */
@@ -447,9 +583,10 @@ class Fortis implements MethodInterface
     }
 
     /**
-     * @param InfoInterface $payment
-     * @param $amount
+     * Authorize a payment.
      *
+     * @param InfoInterface $payment
+     * @param float $amount
      * @return $this|Fortis
      * @throws LocalizedException
      */
@@ -463,9 +600,10 @@ class Fortis implements MethodInterface
     }
 
     /**
-     * @param InfoInterface $payment
-     * @param $amount
+     * Capture an authorized payment.
      *
+     * @param InfoInterface $payment
+     * @param float $amount
      * @return $this|Fortis
      * @throws LocalizedException
      */
@@ -523,8 +661,9 @@ class Fortis implements MethodInterface
     }
 
     /**
-     * @param InfoInterface $payment
+     * Cancel a payment.
      *
+     * @param InfoInterface $payment
      * @return $this|Fortis
      * @throws LocalizedException
      */
@@ -536,8 +675,9 @@ class Fortis implements MethodInterface
     }
 
     /**
-     * @param InfoInterface $payment
+     * Void an authorized payment.
      *
+     * @param InfoInterface $payment
      * @return $this|Fortis
      * @throws LocalizedException
      */
@@ -553,6 +693,8 @@ class Fortis implements MethodInterface
     }
 
     /**
+     * Return whether payment review is available.
+     *
      * @return bool
      */
     public function canReviewPayment()
@@ -561,8 +703,9 @@ class Fortis implements MethodInterface
     }
 
     /**
-     * @param InfoInterface $payment
+     * Accept a payment under review.
      *
+     * @param InfoInterface $payment
      * @return false
      * @throws LocalizedException
      */
@@ -576,8 +719,9 @@ class Fortis implements MethodInterface
     }
 
     /**
-     * @param InfoInterface $payment
+     * Deny a payment under review.
      *
+     * @param InfoInterface $payment
      * @return false
      * @throws LocalizedException
      */
@@ -591,9 +735,10 @@ class Fortis implements MethodInterface
     }
 
     /**
-     * @param $field
-     * @param $storeId
+     * Return a config field value for this payment method.
      *
+     * @param string $field
+     * @param int|null $storeId
      * @return mixed|string
      */
     public function getConfigData($field, $storeId = null)
@@ -610,28 +755,9 @@ class Fortis implements MethodInterface
     }
 
     /**
-     * Custom getter for payment configuration
-     *
-     * @param string $field i.e fortis_id, test_mode
-     *
-     * @return mixed
-     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
-     */
-    public function getSpecialConfigData(string $field): mixed
-    {
-        $configValue = $this->getConfigData($field);
-        if (in_array($field, self::$encryptedConfigKeys)) {
-            $configValue = $this->encryptor->decrypt($configValue);
-        }
-
-        return $configValue;
-    }
-
-    /**
      * @inheritdoc
      *
      * @param DataObject $data
-     *
      * @return $this
      * @throws LocalizedException
      */
@@ -659,8 +785,9 @@ class Fortis implements MethodInterface
     }
 
     /**
-     * @param $storeId
+     * Return whether the method is currently active.
      *
+     * @param int|null $storeId
      * @return bool
      */
     public function isActive($storeId = null)

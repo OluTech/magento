@@ -18,16 +18,62 @@ use Fortispay\Fortis\Model\Config;
 
 class TicketTransaction implements HttpPostActionInterface, CsrfAwareActionInterface
 {
+    /**
+     * @var JsonFactory
+     */
     private JsonFactory $resultJsonFactory;
+
+    /**
+     * @var FortisMethodService
+     */
     private FortisMethodService $fortisMethodService;
+
+    /**
+     * @var QuoteRepository
+     */
     private QuoteRepository $quoteRepository;
+
+    /**
+     * @var CheckoutSession
+     */
     private CheckoutSession $checkoutSession;
+
+    /**
+     * @var LoggerInterface
+     */
     private LoggerInterface $logger;
+
+    /**
+     * @var RequestInterface
+     */
     private RequestInterface $request;
+
+    /**
+     * @var AddressRepositoryInterface
+     */
     private AddressRepositoryInterface $addressRepository;
+
+    /**
+     * @var CheckoutProcessor
+     */
     private CheckoutProcessor $checkoutProcessor;
+
+    /**
+     * @var Config
+     */
     private Config $config;
 
+    /**
+     * @param JsonFactory $resultJsonFactory
+     * @param FortisMethodService $fortisMethodService
+     * @param QuoteRepository $quoteRepository
+     * @param CheckoutSession $checkoutSession
+     * @param LoggerInterface $logger
+     * @param RequestInterface $request
+     * @param AddressRepositoryInterface $addressRepository
+     * @param CheckoutProcessor $checkoutProcessor
+     * @param Config $config
+     */
     public function __construct(
         JsonFactory $resultJsonFactory,
         FortisMethodService $fortisMethodService,
@@ -50,6 +96,11 @@ class TicketTransaction implements HttpPostActionInterface, CsrfAwareActionInter
         $this->config              = $config;
     }
 
+    /**
+     * Create transaction from a Fortis ticket intention.
+     *
+     * @return \Magento\Framework\Controller\Result\Json
+     */
     public function execute()
     {
         $resultJson = $this->resultJsonFactory->create();

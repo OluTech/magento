@@ -13,6 +13,7 @@ use Magento\Framework\UrlInterface;
 use Magento\Sales\Model\Order;
 use Magento\Store\Model\StoreManagerInterface;
 use StdClass;
+use Psr\Log\LoggerInterface;
 
 class FortisApi
 {
@@ -21,27 +22,54 @@ class FortisApi
     public const FORTIS_API_SANDBOX   = "https://api.sandbox.fortis.tech";
     public const FORTIS_API           = "https://api.fortis.tech";
 
+    /**
+     * @var string
+     */
     private string $developerId;
+
+    /**
+     * @var string
+     */
     private string $fortisApi;
+
+    /**
+     * @var Config
+     */
     private Config $config;
+
+    /**
+     * @var DecoderInterface
+     */
     private DecoderInterface $decoder;
+
+    /**
+     * @var ClientInterface
+     */
     private ClientInterface $httpClient;
+
+    /**
+     * @var UrlInterface
+     */
     private UrlInterface $urlBuilder;
-    private \Psr\Log\LoggerInterface $logger;
+
+    /**
+     * @var LoggerInterface
+     */
+    private LoggerInterface $logger;
 
     /**
      * @param Config $config
      * @param DecoderInterface $decoder
      * @param ClientInterface $httpClient
      * @param UrlInterface $urlBuilder
-     * @param \Psr\Log\LoggerInterface $logger
+     * @param LoggerInterface $logger
      */
     public function __construct(
         Config $config,
         DecoderInterface $decoder,
         ClientInterface $httpClient,
         UrlInterface $urlBuilder,
-        \Psr\Log\LoggerInterface $logger
+        LoggerInterface $logger
     ) {
         $this->config     = $config;
         $this->decoder    = $decoder;
@@ -52,6 +80,11 @@ class FortisApi
         $this->initializeApiSettings();
     }
 
+    /**
+     * Initialize API endpoint and developer ID based on environment.
+     *
+     * @return void
+     */
     private function initializeApiSettings(): void
     {
         if ($this->config->environment() === 'production') {
@@ -183,6 +216,13 @@ class FortisApi
     }
 
     /**
+     * Get client token from Fortis transaction or ticket intention endpoint.
+     *
+     * @param array $intentData
+     * @param string $user_id
+     * @param string $user_api_key
+     * @param bool $isTicketIntention
+     * @return string
      * @throws LocalizedException
      */
     public function getClientToken(
@@ -209,6 +249,12 @@ class FortisApi
     }
 
     /**
+     * Execute a CC sale from ticket intention.
+     *
+     * @param array $intentData
+     * @param string $user_id
+     * @param string $user_api_key
+     * @return string
      * @throws LocalizedException
      */
     public function ccSaleTicket(array $intentData, string $user_id, string $user_api_key): string
@@ -217,6 +263,12 @@ class FortisApi
     }
 
     /**
+     * Execute a CC auth-only from ticket intention.
+     *
+     * @param array $intentData
+     * @param string $user_id
+     * @param string $user_api_key
+     * @return string
      * @throws LocalizedException
      */
     public function ccAuthOnlyTicket(array $intentData, string $user_id, string $user_api_key): string
@@ -224,6 +276,15 @@ class FortisApi
         return $this->makeApiRequest('/v1/transactions/cc/auth-only/ticket', $user_id, $user_api_key, $intentData);
     }
 
+    /**
+     * Retrieve a Fortis transaction by ID.
+     *
+     * @param string $transactionId
+     * @param string $user_id
+     * @param string $user_api_key
+     * @return stdClass
+     * @throws LocalizedException
+     */
     public function getTransaction(string $transactionId, string $user_id, string $user_api_key): stdClass
     {
         $response = $this->makeApiRequest(
@@ -238,7 +299,12 @@ class FortisApi
     }
 
     /**
-     * Update the transaction with a new description
+     * Update the transaction description via PATCH.
+     *
+     * @param string $transactionId
+     * @param string $newDescription
+     * @return string|null
+     * @throws LocalizedException
      */
     public function patchTransactionDescription(string $transactionId, string $newDescription): ?string
     {
@@ -250,11 +316,27 @@ class FortisApi
         return $this->makeApiRequest($endpoint, $user_id, $user_api_key, $payload, 'PATCH');
     }
 
+    /**
+     * Execute a tokenised CC sale transaction.
+     *
+     * @param array $intentData
+     * @param string $user_id
+     * @param string $user_api_key
+     * @return string
+     * @throws LocalizedException
+     */
     public function doTokenisedTransaction(array $intentData, string $user_id, string $user_api_key): string
     {
         return $this->makeApiRequest('/v1/transactions/cc/sale/token', $user_id, $user_api_key, $intentData);
     }
 
+    /**
+     * Execute a tokenised ACH debit transaction.
+     *
+     * @param array $intentData
+     * @return string
+     * @throws LocalizedException
+     */
     public function doAchTokenisedTransaction(array $intentData): string
     {
         $user_id      = $this->config->userId();
@@ -263,6 +345,15 @@ class FortisApi
         return $this->makeApiRequest('/v1/transactions/ach/debit/token', $user_id, $user_api_key, $intentData);
     }
 
+    /**
+     * Refund a partial or full CC transaction amount.
+     *
+     * @param array $intentData
+     * @param string $user_id
+     * @param string $user_api_key
+     * @return bool|string|null
+     * @throws LocalizedException
+     */
     public function refundTransactionAmount(array $intentData, string $user_id, string $user_api_key): bool|string|null
     {
         return $this->makeApiRequest(
@@ -274,6 +365,13 @@ class FortisApi
         );
     }
 
+    /**
+     * Refund a previous ACH transaction.
+     *
+     * @param array $intentData
+     * @return bool|string|null
+     * @throws LocalizedException
+     */
     public function achRefundTransactionAmount(array $intentData): bool|string|null
     {
         $user_id      = $this->config->userId();
@@ -283,6 +381,10 @@ class FortisApi
     }
 
     /**
+     * Calculate surcharge for a given transaction.
+     *
+     * @param array $intentData
+     * @return string
      * @throws LocalizedException
      */
     public function calculateSurcharge(array $intentData): string
@@ -356,6 +458,15 @@ class FortisApi
         );
     }
 
+    /**
+     * Delete a stored CC token.
+     *
+     * @param array $intentData
+     * @param string $user_id
+     * @param string $user_api_key
+     * @return string
+     * @throws LocalizedException
+     */
     public function doTokenCCDelete(array $intentData, string $user_id, string $user_api_key): string
     {
         return $this->makeApiRequest(
@@ -367,6 +478,12 @@ class FortisApi
         );
     }
 
+    /**
+     * Register a transaction webhook for ACH updates.
+     *
+     * @return string|null
+     * @throws LocalizedException
+     */
     public function createTransactionWebhook(): string|null
     {
         $userId               = $this->config->userId();
@@ -406,6 +523,13 @@ class FortisApi
         return $decodedResponse->data->id ?? null;
     }
 
+    /**
+     * Delete a registered transaction webhook.
+     *
+     * @param string $achWebhookId
+     * @return void
+     * @throws LocalizedException
+     */
     public function deleteTransactionWebhook(string $achWebhookId): void
     {
         $userId     = $this->config->userId();
@@ -420,6 +544,8 @@ class FortisApi
     }
 
     /**
+     * Create Visa Level 3 transaction entry.
+     *
      * @param Order $order
      * @param StoreManagerInterface $storeManager
      * @param CountryFactory $countryFactory
@@ -466,7 +592,11 @@ class FortisApi
             $unitCost = (int)bcmul((string)$product->getPrice(), '100', 0);
             $lineItem = [
                 'description'    => mb_substr((string)$item->getName(), 0, 26),
-                'commodity_code' => $product->getCustomAttribute('commodity_code')?->getValue() ?: '0',
+                'commodity_code' => mb_substr(
+                    (string)($product->getCustomAttribute('commodity_code')?->getValue() ?: '0'),
+                    0,
+                    12
+                ),
                 'product_code'   => mb_substr((string)$item->getSku(), 0, 12),
                 'unit_code'      => $product->getCustomAttribute('unit_code')?->getValue() ?: 'EA',
                 'unit_cost'      => $unitCost,
@@ -488,6 +618,8 @@ class FortisApi
     }
 
     /**
+     * Create Mastercard Level 3 transaction entry.
+     *
      * @param Order $order
      * @param StoreManagerInterface $storeManager
      * @param CountryFactory $countryFactory
@@ -567,8 +699,9 @@ class FortisApi
     }
 
     /**
-     * Validate Product Transaction ID with currency against Fortis API
-     * Uses transaction intention endpoint only
+     * Validate Product Transaction ID with currency against Fortis API.
+     *
+     * Uses transaction intention endpoint only.
      *
      * @param string $productId
      * @param string $currency
@@ -615,7 +748,9 @@ class FortisApi
             if (str_contains($errorMessage, 'methods[0].currency') && str_contains($errorMessage, 'not allowed')) {
                 throw new LocalizedException(
                     __(
-                        'API request structure error for Product Transaction ID %1. The currency field should not be inside the methods array. This indicates a configuration issue with the Fortis API integration.',
+                        'API request structure error for Product Transaction ID %1. '
+                        . 'The currency field should not be inside the methods array. '
+                        . 'This indicates a configuration issue with the Fortis API integration.',
                         $productId
                     )
                 );
@@ -624,7 +759,10 @@ class FortisApi
             if (str_contains($errorMessage, 'product_transaction_id') && str_contains($errorMessage, 'not found')) {
                 throw new LocalizedException(
                     __(
-                        'Product Transaction ID %1 was not found in your Fortis %2 account during currency validation. Please verify: 1) The Product Transaction ID exists in your Fortis dashboard, 2) It is configured for credit card processing, 3) It supports currency %3, 4) You are using the correct environment. Current API endpoint: %4',
+                        'Product Transaction ID %1 was not found in your Fortis %2 account during currency '
+                        . 'validation. Please verify: 1) The Product Transaction ID exists in your Fortis '
+                        . 'dashboard, 2) It is configured for credit card processing, 3) It supports currency '
+                        . '%3, 4) You are using the correct environment. Current API endpoint: %4',
                         $productId,
                         $this->config->environment(),
                         $currency,
@@ -636,7 +774,9 @@ class FortisApi
             if (str_contains($errorMessage, 'currency') && str_contains($errorMessage, 'not allowed')) {
                 throw new LocalizedException(
                     __(
-                        'Currency %1 is not supported for Product Transaction ID %2. Please contact Fortis to enable multicurrency support or verify the Product ID configuration.',
+                        'Currency %1 is not supported for Product Transaction ID %2. '
+                        . 'Please contact Fortis to enable multicurrency support or verify the Product ID '
+                        . 'configuration.',
                         $currency,
                         $productId
                     )
@@ -648,18 +788,22 @@ class FortisApi
                 str_contains($errorMessage, 'not enabled on Product Transaction ID')) {
                 throw new LocalizedException(
                     __(
-                        'Multi-currency is not enabled for Product Transaction ID %1. Please contact Fortis to enable multicurrency support for currency %2. (Error 412)',
+                        'Multi-currency is not enabled for Product Transaction ID %1. '
+                        . 'Please contact Fortis to enable multicurrency support for currency %2. (Error 412)',
                         $productId,
                         $currency
                     )
                 );
             }
 
-            if (strpos($errorMessage, '400') !== false &&
-                (strpos($errorMessage, 'currency') !== false || strpos($errorMessage, 'Missing currency') !== false)) {
+            if (strpos($errorMessage, '400') !== false
+                && (strpos($errorMessage, 'currency') !== false
+                    || strpos($errorMessage, 'Missing currency') !== false)
+            ) {
                 throw new LocalizedException(
                     __(
-                        'Currency field is required for Product Transaction ID %1 when using %2. Please ensure multicurrency is properly configured.',
+                        'Currency field is required for Product Transaction ID %1 when using %2. '
+                        . 'Please ensure multicurrency is properly configured.',
                         $productId,
                         $currency
                     )
@@ -669,7 +813,8 @@ class FortisApi
             if (str_contains($errorMessage, 'Unsupported card type')) {
                 throw new LocalizedException(
                     __(
-                        'Some card types (e.g., Amex) may not be supported for currency %1. Please check with Fortis about card type restrictions.',
+                        'Some card types (e.g., Amex) may not be supported for currency %1. '
+                        . 'Please check with Fortis about card type restrictions.',
                         $currency
                     )
                 );
@@ -689,8 +834,9 @@ class FortisApi
     }
 
     /**
-     * Get test amount in minor units based on currency decimal rules
-     * Per Fortis Multicurrency Developer Guide
+     * Get test amount in minor units based on currency decimal rules.
+     *
+     * Per Fortis Multicurrency Developer Guide.
      *
      * @param string $currency
      * @return int
@@ -706,8 +852,6 @@ class FortisApi
         if ($currency === 'KWD') {
             return 1000;
         }
-
-
         return 100;
     }
 }

@@ -12,9 +12,24 @@ use Ramsey\Uuid\Uuid;
 
 class IFrameData
 {
+    /**
+     * @var Session
+     */
     private Session $checkoutSession;
+
+    /**
+     * @var ManagerInterface
+     */
     private ManagerInterface $messageManager;
+
+    /**
+     * @var LoggerInterface
+     */
     private LoggerInterface $logger;
+
+    /**
+     * @var FortisMethodService
+     */
     private FortisMethodService $fortisMethodService;
 
     /**
@@ -36,6 +51,8 @@ class IFrameData
     }
 
     /**
+     * Build iframe payload for the Fortis embedded checkout.
+     *
      * @return array|null
      */
     public function buildIFrameData(): ?array
@@ -132,6 +149,12 @@ class IFrameData
         ];
     }
 
+    /**
+     * Extract normalized billing address values from order address.
+     *
+     * @param Address $addressAll
+     * @return array
+     */
     private function getAddresses(Address $addressAll): array
     {
         $address    = implode(', ', $addressAll->getStreet());

@@ -49,7 +49,9 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
      * @var \Magento\Framework\Controller\Result\RawFactory
      */
     private RawFactory $resultFactory;
-
+    /**
+     * @var array|string[]
+     */
     public static array $achResponseStatuses = [
         131 => 'Pending Origination',
         132 => 'Originating',
@@ -87,8 +89,17 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
      * @var \Magento\Sales\Model\Service\CreditmemoService
      */
     private CreditmemoService $creditMemoService;
+    /**
+     * @var OrderRepositoryInterface
+     */
     private OrderRepositoryInterface $orderRepository;
+    /**
+     * @var SearchCriteriaBuilder
+     */
     private SearchCriteriaBuilder $searchCriteriaBuilder;
+    /**
+     * @var TransactionVerifier
+     */
     private TransactionVerifier $transactionVerifier;
 
     /**

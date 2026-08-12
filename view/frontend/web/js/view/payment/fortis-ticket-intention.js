@@ -332,7 +332,7 @@
                     self.isPlaceOrderActionAllowed(true);
                     console.error('Place order failed');
                     await cancelOrder('Failed to create order. Please try again.');
-                }).done(async function () {
+                }).done(async function (orderId) {
                     const ticketSurchargeDisclaimer = jQuery('#ticket-surcharge-disclaimer');
                     if (ticketSurchargeDisclaimer) {
                         ticketSurchargeDisclaimer.html('');
@@ -345,7 +345,8 @@
                         const payload = {
                             transactionId: transactionId,
                             surchargeData: surchargeData,
-                            '@action': 'ticket'
+                            '@action': 'ticket',
+                            'gid': orderId
                         };
                         const response = await fetch(ticketIntentionData.returnUrl, {
                             method: 'POST',

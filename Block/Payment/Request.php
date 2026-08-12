@@ -9,8 +9,19 @@ use Magento\Framework\View\Element\Template\Context;
 
 class Request extends Template
 {
+    /**
+     * @var IFrameData
+     */
     private IFrameData $iFrame;
+
+    /**
+     * @var array|null
+     */
     private ?array $jsConfig;
+
+    /**
+     * @var mixed
+     */
     private mixed $cspNonceProvider = null;
 
     /**
@@ -28,13 +39,16 @@ class Request extends Template
         parent::__construct($context, $data);
         $this->jsConfig = null;
         $this->iFrame   = $iFrame;
-        if (class_exists('Magento\\Csp\\Helper\\CspNonceProvider')) {
+        if (class_exists(\Magento\Csp\Helper\CspNonceProvider::class)) {
             $objectManager          = \Magento\Framework\App\ObjectManager::getInstance();
-            $this->cspNonceProvider = $objectManager->get('Magento\\Csp\\Helper\\CspNonceProvider');
+            $this->cspNonceProvider = $objectManager->get(\Magento\Csp\Helper\CspNonceProvider::class);
         }
     }
 
     /**
+     * Prepare payment request layout data and JS asset.
+     *
+     * @return $this
      * @throws LocalizedException
      */
     public function _prepareLayout()
@@ -42,7 +56,7 @@ class Request extends Template
         $this->jsConfig = $this->iFrame->buildIFrameData();
 
         if ($this->jsConfig['success'] === false) {
-            $this->setData('error_html', '<div class="error-message error">' . $this->jsConfig['message'] . '</div>');
+            $this->setData('error_message', (string)$this->jsConfig['message']);
             return parent::_prepareLayout();
         }
 
@@ -59,6 +73,8 @@ class Request extends Template
     }
 
     /**
+     * Get frontend JS configuration payload.
+     *
      * @return array|null
      */
     public function getJSConfig(): ?array

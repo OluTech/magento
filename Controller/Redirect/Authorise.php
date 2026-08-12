@@ -3,6 +3,7 @@
 namespace Fortispay\Fortis\Controller\Redirect;
 
 use Exception;
+use Fortispay\Fortis\Model\Config;
 use Fortispay\Fortis\Model\Fortis;
 use Fortispay\Fortis\Model\FortisApi;
 use Fortispay\Fortis\Service\TransactionVerifier;
@@ -18,12 +19,14 @@ use Magento\Framework\App\CsrfAwareActionInterface;
 use Magento\Framework\App\Request\InvalidRequestException;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\JsonFactory;
+use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\ResultFactory;
 use Magento\Framework\Event\ManagerInterface as EventManager;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\Exception\RuntimeException;
 use Magento\Framework\Message\ManagerInterface;
 use Magento\Framework\Phrase;
+use Magento\Framework\App\ResponseInterface;
 use Magento\Framework\View\Result\PageFactory;
 use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Sales\Api\Data\TransactionInterface;
@@ -118,6 +121,11 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
     private Fortis $paymentMethod;
 
     /**
+     * @var Config
+     */
+    private Config $config;
+
+    /**
      * @var OrderRepositoryInterface $orderRepository
      */
     private OrderRepositoryInterface $orderRepository;
@@ -141,8 +149,14 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
      */
     private ResultFactory $resultFactory;
 
+    /**
+     * @var ManagerInterface
+     */
     private ManagerInterface $messageManager;
 
+    /**
+     * @var JsonFactory
+     */
     private JsonFactory $resultJsonFactory;
     /**
      * @var EventManager
@@ -164,8 +178,20 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
      * @var FortisApi
      */
     private FortisApi $fortisApi;
+
+    /**
+     * @var MagentoOrderService
+     */
     private MagentoOrderService $magentoOrderService;
+
+    /**
+     * @var TransactionVerifier
+     */
     private TransactionVerifier $transactionVerifier;
+
+    /**
+     * @var QuoteRepository
+     */
     private QuoteRepository $quoteRepository;
 
     /**
@@ -196,6 +222,7 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
         CheckoutSession $checkoutSession,
         LoggerInterface $logger,
         Fortis $paymentMethod,
+        Config $config,
         OrderRepositoryInterface $orderRepository,
         StoreManagerInterface $storeManager,
         OrderSender $orderSender,
@@ -225,6 +252,7 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
         $this->pageFactory              = $pageFactory;
         $this->orderSender              = $orderSender;
         $this->paymentMethod            = $paymentMethod;
+        $this->config                   = $config;
         $this->orderRepository          = $orderRepository;
         $this->storeManager             = $storeManager;
         $this->transactionBuilder       = $transactionBuilder;
@@ -246,9 +274,11 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
 
     /**
      * Execute on fortis/redirect/authorise
+     *
+     * @return Json|\Magento\Framework\Controller\ResultInterface|ResponseInterface
      * @throws NoSuchEntityException
      */
-    public function execute(): \Magento\Framework\Controller\Result\Json|\Magento\Framework\Controller\ResultInterface|\Magento\Framework\App\ResponseInterface
+    public function execute(): Json|\Magento\Framework\Controller\ResultInterface|ResponseInterface
     {
         $json          = $this->request->getContent();
         $requestParams = $this->request->getParams();
@@ -307,14 +337,14 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
 
         try {
             $api          = $this->fortisApi;
-            $user_id      = $this->paymentMethod->getSpecialConfigData('user_id');
-            $user_api_key = $this->paymentMethod->getSpecialConfigData('user_api_key');
+            $user_id      = $this->config->userId();
+            $user_api_key = $this->config->userApiKey();
 
             if ($isTicketTransaction) {
                 $transactionId = $dataArray['transactionId'] ?? null;
                 if ($transactionId) {
-                    $user_id              = $this->paymentMethod->getSpecialConfigData('user_id');
-                    $user_api_key         = $this->paymentMethod->getSpecialConfigData('user_api_key');
+                    $user_id              = $this->config->userId();
+                    $user_api_key         = $this->config->userApiKey();
                     $fortisTransactionObj = $this->fortisApi->getTransaction($transactionId, $user_id, $user_api_key);
                     $data                 = $fortisTransactionObj->data ?? $fortisTransactionObj;
                     $fortisTransaction    = $data;
@@ -362,9 +392,10 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
             }
 
             $status = $fortisTransaction->reason_code_id;
-            if ($isTicketTransaction) {
-                // For ticket, skip product_transaction_id check
-            } elseif (!$tokenised && ($fortisTransaction->product_transaction_id !== $product_transaction_id_order)) {
+            if (!$isTicketTransaction
+                && !$tokenised
+                && ($fortisTransaction->product_transaction_id !== $product_transaction_id_order)
+            ) {
                 throw new RuntimeException(new Phrase('Product transaction ids do not match'));
             }
             if ($status === 1000) {  // Success
@@ -376,8 +407,8 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
                 $additionalData = $orderData['additional_information'];
 
                 $status = Order::STATE_PROCESSING;
-                if ($this->paymentMethod->getSpecialConfigData('Successful_Order_status') != "") {
-                    $status = $this->paymentMethod->getSpecialConfigData('Successful_Order_status');
+                if ($this->config->getConfig('Successful_Order_status') != "") {
+                    $status = $this->config->getConfig('Successful_Order_status');
                 }
 
                 $order_successful_email = $model->getConfigData('order_email');
@@ -554,6 +585,8 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
 
     /**
      * Reactivate the quote directly if restoreQuote() did not work (e.g. guest checkout with lost session).
+     *
+     * @param Order $order
      */
     private function reactivateQuoteIfNeeded(Order $order): void
     {

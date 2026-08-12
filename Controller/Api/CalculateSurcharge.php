@@ -17,16 +17,62 @@ use Magento\Checkout\Model\Session as CheckoutSession;
 
 class CalculateSurcharge implements HttpGetActionInterface
 {
+    /**
+     * @var JsonFactory
+     */
     private JsonFactory $resultJsonFactory;
+
+    /**
+     * @var RequestInterface
+     */
     private RequestInterface $request;
+
+    /**
+     * @var LoggerInterface
+     */
     private LoggerInterface $logger;
+
+    /**
+     * @var FortisApi
+     */
     private FortisApi $fortisApi;
+
+    /**
+     * @var Config
+     */
     private Config $config;
+
+    /**
+     * @var CheckoutProcessor
+     */
     private CheckoutProcessor $checkoutProcessor;
+
+    /**
+     * @var CurrentCustomer
+     */
     private CurrentCustomer $currentCustomer;
+
+    /**
+     * @var PaymentTokenManagement
+     */
     private PaymentTokenManagement $paymentTokenManagement;
+
+    /**
+     * @var CheckoutSession
+     */
     private CheckoutSession $checkoutSession;
 
+    /**
+     * @param JsonFactory $resultJsonFactory
+     * @param RequestInterface $request
+     * @param LoggerInterface $logger
+     * @param FortisApi $fortisApi
+     * @param CheckoutProcessor $checkoutProcessor
+     * @param CurrentCustomer $currentCustomer
+     * @param PaymentTokenManagement $paymentTokenManagement
+     * @param CheckoutSession $checkoutSession
+     * @param Config $config
+     */
     public function __construct(
         JsonFactory $resultJsonFactory,
         RequestInterface $request,
@@ -49,6 +95,11 @@ class CalculateSurcharge implements HttpGetActionInterface
         $this->config                 = $config;
     }
 
+    /**
+     * Calculate surcharge for tokenized or ticket-based payment.
+     *
+     * @return \Magento\Framework\Controller\Result\Json
+     */
     public function execute()
     {
         $result = $this->resultJsonFactory->create();
@@ -61,7 +112,7 @@ class CalculateSurcharge implements HttpGetActionInterface
             $this->logger->info("Calculate Surcharge Request Data: " . json_encode($requestData));
 
             if (!isset($requestData['public_hash']) && !isset($requestData['ticket_id'])) {
-                throw new InvalidArgumentException("Missing required parameters.");
+                throw new LocalizedException(__('Missing required parameters.'));
             }
 
             $totals     = $this->checkoutProcessor->getCheckoutTotals();
@@ -94,29 +145,25 @@ class CalculateSurcharge implements HttpGetActionInterface
             } elseif (isset($requestData['ticket_id'])) {
                 $intentData['ticket_id'] = $requestData['ticket_id'];
             } else {
-                throw new InvalidArgumentException("Invalid parameters provided.");
+                throw new LocalizedException(__('Invalid parameters provided.'));
             }
 
             $surchargeData = $this->fortisApi->calculateSurcharge($intentData);
 
             if (empty($surchargeData)) {
-                throw new \Exception("Failed to calculate surcharge: Empty response from API");
+                throw new LocalizedException(__('Failed to calculate surcharge: empty response from API.'));
             }
 
             $this->logger->info("Calculated Data: " . $surchargeData);
 
             $surchargeDataArray = json_decode($surchargeData, true);
             if (!is_array($surchargeDataArray) || !isset($surchargeDataArray['data'])) {
-                throw new \Exception("Invalid surcharge data format");
+                throw new LocalizedException(__('Invalid surcharge data format.'));
             }
             $result->setData(['surchargeData' => $surchargeData]);
         } catch (LocalizedException $e) {
             $this->logger->error($e->getMessage());
             $result->setHttpResponseCode(400);
-            $result->setData(['error' => $e->getMessage()]);
-        } catch (\Exception $e) {
-            $this->logger->error($e);
-            $result->setHttpResponseCode(500);
             $result->setData(['error' => $e->getMessage()]);
         }
 

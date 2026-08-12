@@ -11,9 +11,24 @@ use Psr\Log\LoggerInterface;
 
 class TicketIntentionToken implements HttpGetActionInterface
 {
+    /**
+     * @var RequestInterface
+     */
     private RequestInterface $request;
+
+    /**
+     * @var FortisMethodService
+     */
     private FortisMethodService $fortisMethodService;
+
+    /**
+     * @var JsonFactory
+     */
     private JsonFactory $resultJsonFactory;
+
+    /**
+     * @var LoggerInterface
+     */
     private LoggerInterface $logger;
 
     /**
@@ -34,6 +49,11 @@ class TicketIntentionToken implements HttpGetActionInterface
         $this->fortisMethodService = $fortisMethodService;
     }
 
+    /**
+     * Return intention token JSON payload.
+     *
+     * @return \Magento\Framework\Controller\Result\Json
+     */
     public function execute()
     {
         $result = $this->resultJsonFactory->create();

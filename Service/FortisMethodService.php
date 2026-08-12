@@ -48,6 +48,9 @@ class FortisMethodService
         'disc' => 'DI',
         'amex' => 'AE'
     ];
+    /**
+     * @var array<string>
+     */
     private static array $configKeys = [
         'active',
         'title',
@@ -92,30 +95,104 @@ class FortisMethodService
         'user_api_key',
     ];
 
-    public const FORTIS_SURCHARGE_DISCLAIMER = 'The Merchant assesses a surcharge of 3.00% on credit card purchases only.
-     This surcharge is no greater than the cost to Merchant of accepting the credit card. We do not surcharge debit cards.';
+    public const FORTIS_SURCHARGE_DISCLAIMER = 'The Merchant assesses a surcharge of 3.00% on credit card '
+        . 'purchases only. This surcharge is no greater than the cost to Merchant of accepting the credit card. '
+        . 'We do not surcharge debit cards.';
 
+    /**
+     * @var Config
+     */
     private Config $config;
+
+    /**
+     * @var LoggerInterface
+     */
     private LoggerInterface $logger;
+
+    /**
+     * @var File
+     */
     private File $fileIo;
+
+    /**
+     * @var DirectoryList
+     */
     private DirectoryList $directoryList;
+
+    /**
+     * @var CheckoutSession
+     */
     private CheckoutSession $checkoutSession;
+
+    /**
+     * @var UrlInterface
+     */
     private UrlInterface $urlBuilder;
+
+    /**
+     * @var EncryptorInterface
+     */
     private EncryptorInterface $encryptor;
+
+    /**
+     * @var ScopeConfigInterface
+     */
     private ScopeConfigInterface $scopeConfig;
+
+    /**
+     * @var PaymentTokenRepositoryInterface
+     */
     private PaymentTokenRepositoryInterface $paymentTokenRepository;
+
+    /**
+     * @var PaymentTokenManagementInterface
+     */
     private PaymentTokenManagementInterface $paymentTokenManagement;
+
+    /**
+     * @var PaymentTokenFactory
+     */
     private PaymentTokenFactory $paymentTokenFactory;
+
+    /**
+     * @var PaymentTokenResourceModel
+     */
     private PaymentTokenResourceModel $paymentTokenResourceModel;
+
+    /**
+     * @var OrderRepositoryInterface
+     */
     private OrderRepositoryInterface $orderRepository;
+
+    /**
+     * @var FileDriver
+     */
     private FileDriver $driver;
+
+    /**
+     * @var FortisApi
+     */
     private FortisApi $fortisApi;
+
+    /**
+     * @var Builder
+     */
     private Builder $transactionBuilder;
+
+    /**
+     * @var MagentoOrderService
+     */
     private MagentoOrderService $magentoOrderService;
+
+    /**
+     * @var CheckoutProcessor
+     */
     private CheckoutProcessor $checkoutProcessor;
+
+    /**
+     * @var CurrencyOptions
+     */
     private CurrencyOptions $currencyOptions;
-
-
     /**
      * @param Config $config
      * @param LoggerInterface $logger
@@ -132,6 +209,9 @@ class FortisMethodService
      * @param OrderRepositoryInterface $orderRepository
      * @param FileDriver $driver
      * @param FortisApi $fortisApi
+     * @param Builder $transactionBuilder
+     * @param MagentoOrderService $magentoOrderService
+     * @param CheckoutProcessor $checkoutProcessor
      * @param CurrencyOptions $currencyOptions
      */
     public function __construct(
@@ -178,6 +258,11 @@ class FortisMethodService
         $this->checkApplePayFile();
     }
 
+    /**
+     * Copy the Apple Pay domain association file to pub/.well-known/ if enabled.
+     *
+     * @return void
+     */
     public function checkApplePayFile()
     {
         try {
@@ -278,6 +363,10 @@ class FortisMethodService
                 $intentData['methods'] = [];
             }
             $intentData['methods'][] = ['type' => 'ach', 'product_transaction_id' => $achProductId];
+            $locationId = $this->config->achLocationId();
+            if ($locationId !== '') {
+                $intentData['location_id'] = $locationId;
+            }
         }
 
         // Initiate Fortis - transaction intention
@@ -298,6 +387,9 @@ class FortisMethodService
     }
 
     /**
+     * Get ticket intention client token from Fortis.
+     *
+     * @return string
      * @throws LocalizedException
      */
     public function getTicketIntentionToken(): string
@@ -376,6 +468,8 @@ class FortisMethodService
     }
 
     /**
+     * Prepare ticket intention config data for frontend.
+     *
      * @return array
      */
     public function prepareTicketIntentionData(): array
@@ -445,9 +539,14 @@ class FortisMethodService
     }
 
     /**
-     * Create a ticket transaction
+     * Create a ticket transaction via CC sale or auth-only.
      *
-     * @return mixed
+     * @param array $ticketIntention
+     * @param array $totals
+     * @param array $billingInfo
+     * @param bool $enableVaultForOrder
+     * @param array|null $surchargeData
+     * @return stdClass
      * @throws LocalizedException
      */
     public function createTicketTransaction(
@@ -511,6 +610,13 @@ class FortisMethodService
         return $transactionResponse;
     }
 
+    /**
+     * Apply secondary currency code to the intent payload if applicable.
+     *
+     * @param array $intentData
+     * @param string $currency
+     * @return void
+     */
     public function applySecondaryCurrency(array &$intentData, string $currency)
     {
         $availableCurrencies = array_keys($this->currencyOptions->toArray());
@@ -594,7 +700,7 @@ class FortisMethodService
                     'transaction_amount'      => $intentData['transaction_amount'],
                     'description'             => $order->getIncrementId(),
                     'previous_transaction_id' => $transactionId,
-                    'product_transaction_id'  => $productTransactionId
+                    'product_transaction_id'  => $this->config->achProductId()
                 ];
                 $response      = $api->achRefundTransactionAmount($achIntentData);
             }
@@ -642,6 +748,13 @@ class FortisMethodService
     }
 
     /**
+     * Populate transaction intent data with surcharge info.
+     *
+     * @param mixed $firstSix
+     * @param mixed $postalCode
+     * @param mixed $amount
+     * @param array $intentData
+     * @return void
      * @throws LocalizedException
      */
     public function populateTransactionIntent($firstSix, $postalCode, $amount, &$intentData): void
@@ -675,8 +788,9 @@ class FortisMethodService
     }
 
     /**
-     * @param InfoInterface $payment
+     * Void an authorised payment online.
      *
+     * @param InfoInterface $payment
      * @return void
      * @throws LocalizedException
      */
@@ -815,6 +929,11 @@ class FortisMethodService
         return $this->paymentTokenResourceModel->addLinkToOrderPayment($paymentTokenId, $orderPaymentId);
     }
 
+    /**
+     * Create an expiry date one year from now.
+     *
+     * @return string
+     */
     public function createExpiryDate(): string
     {
         $one_year_from_now_timestamp = strtotime('+1 year');
@@ -856,8 +975,10 @@ class FortisMethodService
         }
         $paymentToken->getTokenDetails();
 
-        $hashKey .= $paymentToken->getPaymentMethodCode() . $paymentToken->getType() . $paymentToken->getGatewayToken(
-        ) . $paymentToken->getTokenDetails();
+        $hashKey .= $paymentToken->getPaymentMethodCode()
+            . $paymentToken->getType()
+            . $paymentToken->getGatewayToken()
+            . $paymentToken->getTokenDetails();
 
         return $this->encryptor->getHash($hashKey);
     }

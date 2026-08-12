@@ -154,7 +154,8 @@ class ValidateProductTransactionIds implements ObserverInterface
             if (!$isValid) {
                 throw new LocalizedException(
                     __(
-                        'Product Transaction ID %1 is not valid for currency %2. Please verify the Product ID supports the selected currency in your Fortis dashboard.',
+                        'Product Transaction ID %1 is not valid for currency %2. '
+                        . 'Please verify the Product ID supports the selected currency in your Fortis dashboard.',
                         $productId,
                         $currency
                     )

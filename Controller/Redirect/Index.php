@@ -10,6 +10,7 @@ use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\App\Action\HttpGetActionInterface;
 use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\Controller\ResultFactory;
+use Magento\Framework\Controller\ResultInterface;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Message\ManagerInterface;
 use Magento\Framework\UrlInterface;
@@ -48,15 +49,39 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
      */
     private ResultFactory $resultFactory;
 
+    /**
+     * @var ManagerInterface
+     */
     private ManagerInterface $messageManager;
+
     /**
      * @var FortisApi
      */
     private FortisApi $fortisApi;
+
+    /**
+     * @var Config
+     */
     private Config $config;
+
+    /**
+     * @var CheckoutProcessor
+     */
     private CheckoutProcessor $checkoutProcessor;
+
+    /**
+     * @var UrlInterface
+     */
     private UrlInterface $urlBuilder;
+
+    /**
+     * @var PaymentTokenManagementInterface
+     */
     private PaymentTokenManagementInterface $paymentTokenManagement;
+
+    /**
+     * @var FortisMethodService
+     */
     private FortisMethodService $fortisMethodService;
 
     /**
@@ -70,6 +95,7 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
      * @param PaymentTokenManagementInterface $paymentTokenManagement
      * @param FortisApi $fortisApi
      * @param CheckoutProcessor $checkoutProcessor
+     * @param FortisMethodService $fortisMethodService
      */
     public function __construct(
         PageFactory $pageFactory,
@@ -107,11 +133,19 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
     /**
      * Execute
      */
-    public function execute()
+    public function execute(): ResultInterface
     {
         $pre = __METHOD__ . " : ";
 
         $page_object = $this->pageFactory->create();
+
+        $order = $this->checkoutSession->getLastRealOrder();
+        if (!$order || !$order->getId()) {
+            $this->logger->warning($pre . 'Missing last real order in checkout session. Redirecting to cart.');
+            $this->messageManager->addErrorMessage(__('Your checkout session has expired. Please try again.'));
+
+            return $this->checkoutProcessor->getRedirectToCartObject();
+        }
 
         try {
             $this->checkoutProcessor->initCheckout();
@@ -127,9 +161,12 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
             return $this->checkoutProcessor->getRedirectToCartObject();
         }
 
-        $order          = $this->checkoutSession->getLastRealOrder();
-        $orderData      = $order->getPayment()->getData();
-        $additionalData = $orderData['additional_information'];
+        $orderData      = $order->getPayment() ? $order->getPayment()->getData() : [];
+        $hasAdditionalData = isset($orderData['additional_information'])
+            && is_array($orderData['additional_information']);
+        $additionalData = $hasAdditionalData
+            ? $orderData['additional_information']
+            : [];
 
         $incrementId = $order->getIncrementId();
 
@@ -197,6 +234,11 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
                 'subtotal_amount'    => $subtotalAmount,
                 'tax'                => (int)bcmul((string)$order->getTaxAmount(), '100', 0),
             ];
+
+            $billingAddressData = $this->checkoutProcessor->getBillingAddressData($order);
+            if ($billingAddressData) {
+                $intentData['billing_address'] = $billingAddressData;
+            }
             if ($tokenType === 'ach') {
                 // Do the tokenised ach debit
                 try {
@@ -230,9 +272,16 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
                     $this->messageManager->addExceptionMessage($e, $e->getMessage());
                     $this->checkoutSession->restoreQuote();
 
-                    return $e;
+                    return $this->checkoutProcessor->getRedirectToCartObject();
                 } catch (Exception $exception) {
-                    return $exception;
+                    $this->logger->error($exception->getMessage());
+                    $this->messageManager->addExceptionMessage(
+                        $exception,
+                        __('We can\'t process the saved payment method right now.')
+                    );
+                    $this->checkoutSession->restoreQuote();
+
+                    return $this->checkoutProcessor->getRedirectToCartObject();
                 }
             } else {
                 // Do the tokenised card transaction
@@ -279,9 +328,16 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
                     $this->messageManager->addExceptionMessage($e, $e->getMessage());
                     $this->checkoutSession->restoreQuote();
 
-                    return $e;
+                    return $this->checkoutProcessor->getRedirectToCartObject();
                 } catch (Exception $exception) {
-                    return $exception;
+                    $this->logger->error($exception->getMessage());
+                    $this->messageManager->addExceptionMessage(
+                        $exception,
+                        __('We can\'t process the saved payment method right now.')
+                    );
+                    $this->checkoutSession->restoreQuote();
+
+                    return $this->checkoutProcessor->getRedirectToCartObject();
                 }
             }
         }

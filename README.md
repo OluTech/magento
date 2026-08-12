@@ -5,8 +5,8 @@
 This payment plugin requires the composer package ```ramsey/uuid.```This is usually installed as a dependency of the
 Magento Framework and does not have to be installed separately.
 
-If for some reason it is not installed run the following command from the project
-root: ```composer require ramsey/uuid```
+If for some reason it is not installed run the following command from the project root:
+```composer require ramsey/uuid```
 
 ## Installation
 
@@ -37,3 +37,15 @@ If your Fortis account has Level 3 Data enabled additional custom attributes hav
 - The ``unit_code`` value is a string 3 characters long that describes *"Units of measurement as used in international
   trade."* Further information on this may be found
   at https://docs.fortispay.com/developers/api/endpoints/level3data#codesforunitsofmeasurement.
+
+## 3D Secure Authentication
+
+The plugin supports 3D Secure (3DS) authentication for Elements iframe payments to enhance security and reduce fraud
+liability.
+
+### Key Features
+
+- **Automatic**: 3DS is enabled automatically when required by your payment processor. No admin configuration needed.
+- **Seamless Integration**: Authentication challenges appear within the payment iframe without redirecting customers.
+- **Applies To**: New card payments via the Elements iframe.
+- **Error Handling**: Failed authentications return customers to checkout with clear error messages.

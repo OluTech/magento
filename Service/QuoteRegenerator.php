@@ -13,10 +13,29 @@ use Magento\Quote\Model\QuoteRepository;
 
 class QuoteRegenerator
 {
+    /**
+     * @var OrderRepositoryInterface
+     */
     private OrderRepositoryInterface $orderRepository;
+
+    /**
+     * @var QuoteFactory
+     */
     private QuoteFactory $quoteFactory;
+
+    /**
+     * @var LoggerInterface
+     */
     private LoggerInterface $logger;
+
+    /**
+     * @var CheckoutSession
+     */
     private CheckoutSession $checkoutSession;
+
+    /**
+     * @var QuoteRepository
+     */
     private QuoteRepository $quoteRepository;
 
     /**
@@ -41,8 +60,9 @@ class QuoteRegenerator
     }
 
     /**
-     * @param int|null $orderId
+     * Regenerate a quote from the latest order context.
      *
+     * @param int|null $orderId
      * @return Quote
      * @throws LocalizedException
      */

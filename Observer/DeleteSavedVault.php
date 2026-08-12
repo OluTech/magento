@@ -15,7 +15,13 @@ class DeleteSavedVault implements ObserverInterface
      * @var ScopeConfigInterface
      */
     private ScopeConfigInterface $scopeConfig;
+    /**
+     * @var EncryptorInterface
+     */
     private EncryptorInterface $encryptor;
+    /**
+     * @var FortisApi
+     */
     private FortisApi $fortisApi;
 
     /**
@@ -33,6 +39,12 @@ class DeleteSavedVault implements ObserverInterface
         $this->fortisApi   = $fortisApi;
     }
 
+    /**
+     * Delete a stored vault token when it is hidden from the customer.
+     *
+     * @param Observer $observer
+     * @return void
+     */
     public function execute(Observer $observer)
     {
         $dataObject = $observer->getEvent()->getData()["object"];
