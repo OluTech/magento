@@ -67,7 +67,7 @@ class FortisConfigProvider implements ConfigProviderInterface
      * @param UrlInterface $urlBuilder
      * @param RequestInterface $request
      * @param PaymentTokenManagement $paymentTokenManagement
-     * @param FortisMethodService $fortisMethodService
+        * @param FortisMethodService $fortisMethodService
      */
     public function __construct(
         LoggerInterface $logger,

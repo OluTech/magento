@@ -545,7 +545,6 @@ class FortisMethodService
      * @param array $totals
      * @param array $billingInfo
      * @param bool $enableVaultForOrder
-     * @param array|null $surchargeData
      * @return stdClass
      * @throws LocalizedException
      */
@@ -553,8 +552,7 @@ class FortisMethodService
         array $ticketIntention,
         array $totals,
         array $billingInfo,
-        bool $enableVaultForOrder,
-        ?array $surchargeData
+        bool $enableVaultForOrder
     ): stdClass {
         $user_id      = $this->config->userId();
         $user_api_key = $this->config->userApiKey();
@@ -587,13 +585,11 @@ class FortisMethodService
             'transaction_amount'     => $totals['transaction_amount'],
         ];
 
-        $this->applySecondaryCurrency($intentData, $currency);
-
-        if ($surchargeData && isset($surchargeData['surcharge_amount'])) {
-            $intentData['subtotal_amount']    = $surchargeData['subtotal_amount'];
-            $intentData['surcharge_amount']   = $surchargeData['surcharge_amount'];
-            $intentData['transaction_amount'] = $surchargeData['transaction_amount'];
+        if (isset($totals['surcharge_amount']) && (int)$totals['surcharge_amount'] > 0) {
+            $intentData['surcharge_amount'] = (int)$totals['surcharge_amount'];
         }
+
+        $this->applySecondaryCurrency($intentData, $currency);
 
         if ($enableVaultForOrder) {
             $intentData['save_account'] = true;
