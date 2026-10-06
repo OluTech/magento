@@ -5,6 +5,7 @@ namespace Fortispay\Fortis\Controller\Api;
 use Fortispay\Fortis\Model\Config;
 use Fortispay\Fortis\Model\FortisApi;
 use Fortispay\Fortis\Service\CheckoutProcessor;
+use Fortispay\Fortis\Service\RateLimiter;
 use InvalidArgumentException;
 use Magento\Customer\Helper\Session\CurrentCustomer;
 use Magento\Framework\App\Action\HttpGetActionInterface;
@@ -17,6 +18,18 @@ use Magento\Checkout\Model\Session as CheckoutSession;
 
 class CalculateSurcharge implements HttpGetActionInterface
 {
+    private const RATE_LIMIT_ACTION = 'calculatesurcharge';
+
+    private const RATE_LIMIT_MAX_ATTEMPTS = 30;
+
+    private const RATE_LIMIT_WINDOW_SECONDS = 60;
+
+    /**
+     * Session key under which the server-computed surcharge is cached, keyed by ticket_id,
+     * so TicketTransaction can trust it instead of a client-supplied copy.
+     */
+    public const VERIFIED_SURCHARGE_SESSION_KEY = 'fortis_verified_surcharge';
+
     /**
      * @var JsonFactory
      */
@@ -63,6 +76,11 @@ class CalculateSurcharge implements HttpGetActionInterface
     private CheckoutSession $checkoutSession;
 
     /**
+     * @var RateLimiter
+     */
+    private RateLimiter $rateLimiter;
+
+    /**
      * @param JsonFactory $resultJsonFactory
      * @param RequestInterface $request
      * @param LoggerInterface $logger
@@ -72,6 +90,7 @@ class CalculateSurcharge implements HttpGetActionInterface
      * @param PaymentTokenManagement $paymentTokenManagement
      * @param CheckoutSession $checkoutSession
      * @param Config $config
+     * @param RateLimiter $rateLimiter
      */
     public function __construct(
         JsonFactory $resultJsonFactory,
@@ -82,7 +101,8 @@ class CalculateSurcharge implements HttpGetActionInterface
         CurrentCustomer $currentCustomer,
         PaymentTokenManagement $paymentTokenManagement,
         CheckoutSession $checkoutSession,
-        Config $config
+        Config $config,
+        RateLimiter $rateLimiter
     ) {
         $this->resultJsonFactory      = $resultJsonFactory;
         $this->request                = $request;
@@ -93,6 +113,7 @@ class CalculateSurcharge implements HttpGetActionInterface
         $this->paymentTokenManagement = $paymentTokenManagement;
         $this->checkoutSession        = $checkoutSession;
         $this->config                 = $config;
+        $this->rateLimiter            = $rateLimiter;
     }
 
     /**
@@ -103,6 +124,16 @@ class CalculateSurcharge implements HttpGetActionInterface
     public function execute()
     {
         $result = $this->resultJsonFactory->create();
+
+        if (!$this->rateLimiter->isAllowed(
+            self::RATE_LIMIT_ACTION,
+            self::RATE_LIMIT_MAX_ATTEMPTS,
+            self::RATE_LIMIT_WINDOW_SECONDS
+        )) {
+            $result->setHttpResponseCode(429);
+            return $result->setData(['error' => __('Too many requests. Please wait a moment and try again.')]);
+        }
+
         // Release session lock before blocking Fortis API call.
         // Prevents concurrent checkout AJAX requests from being blocked.
         $this->checkoutSession->writeClose();
@@ -160,6 +191,20 @@ class CalculateSurcharge implements HttpGetActionInterface
             if (!is_array($surchargeDataArray) || !isset($surchargeDataArray['data'])) {
                 throw new LocalizedException(__('Invalid surcharge data format.'));
             }
+
+            if (isset($intentData['ticket_id'])) {
+                // Cache this server-computed surcharge against its ticket_id so TicketTransaction
+                // can use it as the source of truth instead of trusting a client-supplied copy.
+                $this->checkoutSession->start();
+                $this->checkoutSession->setData(self::VERIFIED_SURCHARGE_SESSION_KEY, [
+                    'ticket_id' => $intentData['ticket_id'],
+                    'currency'  => $currency,
+                    'data'      => $surchargeDataArray['data'],
+                    'computed_at' => time(),
+                ]);
+                $this->checkoutSession->writeClose();
+            }
+
             $result->setData(['surchargeData' => $surchargeData]);
         } catch (LocalizedException $e) {
             $this->logger->error($e->getMessage());

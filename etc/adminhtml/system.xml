@@ -25,6 +25,15 @@
                     <label>Test Mode</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
+                <field id="fortis_rate_limiting_enabled" translate="label" type="select" sortOrder="3"
+                       showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Rate Limiting</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>API requests from your application are blocked when they exceed limits per IP
+                        address. Disable only if you have a custom integration that shares a single IP address
+                        (e.g., server-to-server setup). Not recommended&#8212;disabling reduces fraud protection.
+                    </comment>
+                </field>
                 <field id="fortis_cc_vault_active" translate="label" type="select" sortOrder="3" showInDefault="1"
                        showInWebsite="1"
                        showInStore="1">

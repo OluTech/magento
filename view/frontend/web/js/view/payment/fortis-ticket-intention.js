@@ -61,6 +61,7 @@
                 elements.off('done');
                 elements.off('error');
                 elements.off('submitted');
+                elements.off('validationError');
             }
             elementsCreate(ticketIntentionData.ticketIntentionToken, Commerce);
 
@@ -127,6 +128,27 @@
                 reEnablePlaceOrderButton();
                 var btn = document.getElementById('fortisButton');
                 if (btn) btn.style.display = '';
+            });
+
+            elements.on('validationError', function (event) {
+                let $frame = jQuery('#fortis-framed-2567');
+                $frame.show();
+                $frame.parent().next().show();
+                reEnablePlaceOrderButton();
+
+                var message = 'Please correct the highlighted field(s) and try again.';
+                var data = event && event.data;
+                if (typeof data === 'string' && data) {
+                    message = data;
+                } else if (Array.isArray(data) && data.length) {
+                    message = data.map(function (item) {
+                        return (item && (item.message || item.field)) ? (item.message || item.field) : item;
+                    }).join(' ');
+                } else if (data && data.message) {
+                    message = data.message;
+                }
+
+                displayTicketError(message);
             });
 
             elements.on('submitted', async () => {
@@ -274,8 +296,11 @@
                         surchargeData: surchargeData,
                         fortisVault: window.fortisVault
                     };
+                    const formKey = window.FORM_KEY || window.checkoutConfig.formKey;
+                    const transactionUrl = window.checkoutConfig.payment.fortis.ticketTransactionUrl
+                        + '?form_key=' + encodeURIComponent(formKey);
                     const ticketTransactionResponse = await fetch(
-                        window.checkoutConfig.payment.fortis.ticketTransactionUrl,
+                        transactionUrl,
                         {
                             method: 'POST',
                             headers: {

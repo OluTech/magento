@@ -628,6 +628,20 @@ class Config
     }
 
     /**
+     * Whether per-IP rate limiting on the ticket/surcharge endpoints is enabled for this store.
+     *
+     * Enabled by default. Intended to be disabled only for merchants whose own integration (e.g. a
+     * headless/server-to-server setup calling from a shared internal IP) legitimately exceeds the
+     * default limits.
+     *
+     * @return bool
+     */
+    public function isRateLimitingEnabled(): bool
+    {
+        return $this->getConfig('fortis_rate_limiting_enabled') !== '0';
+    }
+
+    /**
      * Return the current order action (sale or auth-only).
      *
      * @return string

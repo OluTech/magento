@@ -1,5 +1,16 @@
 # Changelog
 
+## [[1.7.3]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
+
+### Improved
+
+- **Expired checkout session handling** — ticket transactions with a missing quote now fail with a session-expired
+  message instead of attempting an unauthenticated quote recovery.
+
+### Security
+
+- Security updates and vulnerability fixes.
+
 ## [[1.7.2]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
 
 ### Added
