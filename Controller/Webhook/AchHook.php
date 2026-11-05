@@ -162,13 +162,10 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         $response = $this->resultFactory->create();
 
         $data = json_decode($this->request->getContent(), true);
-        if (!$data) {
+        if (!is_array($data)) {
             $data = $this->request->getParams();
         }
 
-        $this->logger->info('ACH Hook has been reached');
-
-        $this->logger->info('Data: ' . json_encode($data));
         if (($data['type'] ?? '') !== 'UPDATE') {
             $this->logger->error('Webhook type is not UPDATE');
             $response->setHttpResponseCode(422);
@@ -178,12 +175,29 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         }
 
         try {
-            if (is_string($data['data'])) {
-                $transactionData = json_decode($data['data'], true);
-            } else {
-                $transactionData = $data['data'];
+            $transactionData = $data['data'] ?? null;
+            if (is_string($transactionData)) {
+                $transactionData = json_decode($transactionData, true);
             }
-            if ($transactionData['payment_method'] !== 'ach') {
+
+            if (!is_array($transactionData)) {
+                $this->logger->error('ACH Hook: webhook data is not a JSON object');
+                $response->setHttpResponseCode(422);
+                $response->setContents('Webhook data is not a JSON object');
+
+                return $response;
+            }
+
+            // Never log or store the raw body: it carries payment method and billing details (PCI)
+            $webhookSummary = [
+                'type'           => $data['type'],
+                'id'             => (string)($transactionData['id'] ?? ''),
+                'status_code'    => (int)($transactionData['status_code'] ?? $transactionData['status_id'] ?? 0),
+                'reason_code_id' => (int)($transactionData['reason_code_id'] ?? 0),
+            ];
+            $this->logger->info('ACH Hook has been reached', $webhookSummary);
+
+            if (($transactionData['payment_method'] ?? '') !== 'ach') {
                 $this->logger->error('Webhook type is not ACH');
                 $response->setHttpResponseCode(422);
                 $response->setContents('Webhook type is not ACH');
@@ -191,13 +205,8 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                 return $response;
             }
 
-            $transactionStatus = 0;
-            if (isset($transactionData['status_code'])) {
-                $transactionStatus = $transactionData['status_code'];
-            } elseif (isset($transactionData['status_id'])) {
-                $transactionStatus = $transactionData['status_id'];
-            }
-            $transactionId = $transactionData['id'] ?? '';
+            $transactionStatus = $webhookSummary['status_code'];
+            $transactionId = $webhookSummary['id'];
 
             // Query sales_payment_transaction to find transaction using repository pattern
             $searchCriteria = $this->searchCriteriaBuilder
@@ -240,35 +249,36 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
             } else {
                 $webhookUpdateInformation = $additionalInformation['webhook_update_info'];
             }
+            $transactionChanged = true;
             switch ($transactionStatus) {
                 case 131:
                 case 132:
                 case 133:
                     // Still payment pending, update transaction only
-                    $webhookUpdateInformation[] = json_encode($data);
+                    $webhookUpdateInformation[] = json_encode($webhookSummary);
                     $transaction->setAdditionalInformation('webhook_update_info', $webhookUpdateInformation);
                     break;
                 case 201:
                 case 301:
                     // Payment failed
-                    $webhookUpdateInformation[] = json_encode($data);
+                    $webhookUpdateInformation[] = json_encode($webhookSummary);
                     $transaction->setAdditionalInformation('webhook_update_info', $webhookUpdateInformation);
                     $error = "Payment failed. Status code: $transactionStatus ";
                     $error .= self::$achResponseStatuses[$transactionStatus];
-                    $order->addStatusToHistory($error);
                     $orderState = Order::STATE_CANCELED;
                     $order->setState($orderState)->setStatus($orderState);
+                    $order->addCommentToStatusHistory($error);
                     break;
                 case 331:
                     // Charge back i.e refunded
-                    $webhookUpdateInformation[] = json_encode($data);
+                    $webhookUpdateInformation[] = json_encode($webhookSummary);
                     $transaction->setAdditionalInformation('webhook_update_info', $webhookUpdateInformation);
                     $transaction->setTxnType(TransactionInterface::TYPE_REFUND);
                     $error = "Payment refunded. Status code: $transactionStatus ";
                     $error .= self::$achResponseStatuses[$transactionStatus];
-                    $order->addStatusToHistory($error);
                     $orderState = Order::STATE_CANCELED;
                     $order->setState($orderState)->setStatus($orderState);
+                    $order->addCommentToStatusHistory($error);
 
                     // Get invoices for order
                     $invoices = $order->getInvoiceCollection();
@@ -280,14 +290,14 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                     break;
                 case 134:
                     // Settled
-                    $webhookUpdateInformation[] = json_encode($data);
+                    $webhookUpdateInformation[] = json_encode($webhookSummary);
                     $transaction->setAdditionalInformation('webhook_update_info', $webhookUpdateInformation);
                     $transaction->setTxnType(TransactionInterface::TYPE_CAPTURE);
 
                     // Send email if configured
                     if ($this->config->orderSuccessfulEmail()) {
                         $this->orderSender->send($order);
-                        $order->addStatusToHistory(
+                        $order->addCommentToStatusHistory(
                             __('Notified customer about order')
                         )->setIsCustomerNotified(true);
                     }
@@ -305,20 +315,24 @@ class AchHook implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                     // Email invoice if required
                     if ($this->config->emailInvoice()) {
                         $this->invoiceSender->send($invoice);
-                        $order->addStatusToHistory('Invoice emailed to customer');
+                        $order->addCommentToStatusHistory('Invoice emailed to customer');
                         $order->setIsCustomerNotified(true);
                     }
                     $invoice->setTransactionId($transaction->getTransactionId());
 
                     $message = "Payment succeeded. Status code: $transactionStatus ";
                     $message .= self::$achResponseStatuses[$transactionStatus];
-                    $order->addStatusToHistory($message);
                     $orderState = Order::STATE_PROCESSING;
                     $order->setState($orderState)->setStatus($orderState);
+                    $order->addCommentToStatusHistory($message);
                     break;
                 default:
                     $this->logger->error("Response code received was $transactionStatus");
+                    $transactionChanged = false;
                     break;
+            }
+            if ($transactionChanged) {
+                $this->transactionRepository->save($transaction);
             }
             $this->orderRepository->save($order);
 

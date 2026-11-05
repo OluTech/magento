@@ -67,7 +67,7 @@ class ValidateProductTransactionIds implements ObserverInterface
      * @param Observer $observer
      * @throws LocalizedException
      */
-    public function execute(Observer $observer)
+    public function execute(Observer $observer): void
     {
         $configData   = $this->request->getParam('groups', []);
         $fortisConfig = $configData['fortis']['fields'] ?? [];

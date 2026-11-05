@@ -1,4 +1,4 @@
-# FortisPay for Magento 2.4.8 and higher
+# FortisPay for Magento 2.4.9 and higher
 
 ## Composer Requirement
 

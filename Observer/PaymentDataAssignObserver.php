@@ -19,7 +19,7 @@ class PaymentDataAssignObserver extends AbstractDataAssignObserver
      *
      * @return void
      */
-    public function execute(Observer $observer)
+    public function execute(Observer $observer): void
     {
         $data           = $this->readDataArgument($observer);
         $additionalData = $data->getData(PaymentInterface::KEY_ADDITIONAL_DATA);

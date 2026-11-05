@@ -40,12 +40,12 @@ class DeleteSavedVault implements ObserverInterface
     }
 
     /**
-     * Delete a stored vault token when it is hidden from the customer.
+     * Delete saved vault token when card is hidden.
      *
      * @param Observer $observer
      * @return void
      */
-    public function execute(Observer $observer)
+    public function execute(Observer $observer): void
     {
         $dataObject = $observer->getEvent()->getData()["object"];
         $cardData   = $dataObject->getData();

@@ -117,11 +117,11 @@ class CalculateSurcharge implements HttpGetActionInterface
     }
 
     /**
-     * Calculate surcharge for tokenized or ticket-based payment.
+     * Calculate surcharge for provided payment input.
      *
-     * @return \Magento\Framework\Controller\Result\Json
+     * @return \Magento\Framework\Controller\ResultInterface
      */
-    public function execute()
+    public function execute(): \Magento\Framework\Controller\ResultInterface
     {
         $result = $this->resultJsonFactory->create();
 

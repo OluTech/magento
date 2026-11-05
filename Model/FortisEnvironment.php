@@ -15,7 +15,7 @@ class FortisEnvironment implements OptionSourceInterface
      *
      * @return array
      */
-    public function toOptionArray()
+    public function toOptionArray(): array
     {
         return [
             ['value' => 'sandbox', 'label' => __('Sandbox')],

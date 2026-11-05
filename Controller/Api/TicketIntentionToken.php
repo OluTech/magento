@@ -4,6 +4,7 @@ namespace Fortispay\Fortis\Controller\Api;
 
 use Fortispay\Fortis\Service\FortisMethodService;
 use Fortispay\Fortis\Service\RateLimiter;
+use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\App\Action\HttpGetActionInterface;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\JsonFactory;
@@ -44,32 +45,40 @@ class TicketIntentionToken implements HttpGetActionInterface
     private RateLimiter $rateLimiter;
 
     /**
+     * @var CheckoutSession
+     */
+    private CheckoutSession $checkoutSession;
+
+    /**
      * @param JsonFactory $resultJsonFactory
      * @param RequestInterface $request
      * @param LoggerInterface $logger
      * @param FortisMethodService $fortisMethodService
-        * @param RateLimiter $rateLimiter
+     * @param RateLimiter $rateLimiter
+     * @param CheckoutSession $checkoutSession
      */
     public function __construct(
         JsonFactory $resultJsonFactory,
         RequestInterface $request,
         LoggerInterface $logger,
         FortisMethodService $fortisMethodService,
-        RateLimiter $rateLimiter
+        RateLimiter $rateLimiter,
+        CheckoutSession $checkoutSession
     ) {
         $this->resultJsonFactory   = $resultJsonFactory;
         $this->logger              = $logger;
         $this->request             = $request;
+        $this->checkoutSession     = $checkoutSession;
         $this->fortisMethodService = $fortisMethodService;
         $this->rateLimiter         = $rateLimiter;
     }
 
     /**
-     * Return intention token JSON payload.
+     * Return ticket intention token response.
      *
-     * @return \Magento\Framework\Controller\Result\Json
+     * @return \Magento\Framework\Controller\ResultInterface
      */
-    public function execute()
+    public function execute(): \Magento\Framework\Controller\ResultInterface
     {
         $result = $this->resultJsonFactory->create();
 
@@ -83,6 +92,14 @@ class TicketIntentionToken implements HttpGetActionInterface
         }
 
         try {
+            $quote = $this->checkoutSession->getQuote();
+
+            if (!$quote->getId()) {
+                throw new LocalizedException(
+                    __('Your session has expired. Please refresh the page and try again.')
+                );
+            }
+
             $ticketIntentionToken = $this->fortisMethodService->getTicketIntentionToken();
             $result->setData(['ticketIntentionToken' => $ticketIntentionToken]);
         } catch (LocalizedException $e) {

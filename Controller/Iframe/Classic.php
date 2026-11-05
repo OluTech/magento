@@ -56,7 +56,7 @@ class Classic implements HttpPostActionInterface, HttpGetActionInterface
      * @return \Magento\Framework\Controller\Result\Raw
      * @throws LocalizedException
      */
-    public function execute()
+    public function execute(): \Magento\Framework\Controller\ResultInterface
     {
         try {
             $this->checkoutProcessor->initOrderState();

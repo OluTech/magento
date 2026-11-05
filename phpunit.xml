@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.5/phpunit.xsd"
+         bootstrap="./Test/Unit/bootstrap.php"
+         colors="true">
+    <testsuites>
+        <testsuite name="Fortis Payment Gateway Unit Tests">
+            <directory>./Test/Unit</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory suffix=".php">./Model</directory>
+            <directory suffix=".php">./Service</directory>
+            <directory suffix=".php">./Observer</directory>
+            <directory suffix=".php">./Controller</directory>
+        </include>
+        <exclude>
+            <directory>./Test</directory>
+            <directory>./view</directory>
+        </exclude>
+    </source>
+    <php>
+        <ini name="date.timezone" value="UTC"/>
+        <ini name="memory_limit" value="512M"/>
+    </php>
+</phpunit>

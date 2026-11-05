@@ -71,6 +71,44 @@
                         <field id="intention_flow">transaction-intention</field>
                     </depends>
                 </field>
+                <field id="fortis_apm_active" translate="label" type="select" sortOrder="3" showInDefault="1"
+                       showInWebsite="1"
+                       showInStore="1">
+                    <label>Enable APM (PayPal/Venmo)</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Select Yes to enable Alternative Payment Methods (PayPal/Venmo)</comment>
+                    <depends>
+                        <field id="intention_flow">transaction-intention</field>
+                    </depends>
+                </field>
+                <field id="fortis_apm_product_id" translate="label" type="obscure" sortOrder="3" showInDefault="1"
+                       showInWebsite="1"
+                       showInStore="1">
+                    <validate>required-entry</validate>
+                    <label>APM Product ID</label>
+                    <comment>Enter the APM product ID provisioned by Fortis for PayPal/Venmo. Required for APM payments to work. Contact Fortis to provision this on your merchant account.</comment>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                    <depends>
+                        <field id="fortis_apm_active">1</field>
+                        <field id="intention_flow">transaction-intention</field>
+                    </depends>
+                </field>
+                <field id="fortis_apm_webhook_url" translate="label" type="text" sortOrder="3" showInDefault="1"
+                       showInWebsite="1"
+                       showInStore="1">
+                    <label>APM Webhook URL</label>
+                    <depends>
+                        <field id="fortis_apm_active">1</field>
+                        <field id="intention_flow">transaction-intention</field>
+                    </depends>
+                </field>
+                <field id="fortis_apm_webhook_id" translate="label" type="hidden" sortOrder="3" showInDefault="0"
+                       showInWebsite="1"
+                       showInStore="0">
+                    <depends>
+                        <field id="fortis_apm_active">1</field>
+                    </depends>
+                </field>
                 <field id="fortis_ach_location_id" translate="label" type="obscure" sortOrder="3" showInDefault="1"
                        showInWebsite="1"
                        showInStore="1">

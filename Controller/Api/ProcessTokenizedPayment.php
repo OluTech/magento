@@ -120,9 +120,17 @@ class ProcessTokenizedPayment implements HttpPostActionInterface
             $requestData = $this->request->getContent();
             $data        = json_decode($requestData, true);
 
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new InvalidArgumentException("Invalid JSON data: " . json_last_error_msg());
+            }
+
+            if (!is_array($data)) {
+                throw new InvalidArgumentException("Invalid request format");
+            }
+
             $this->logger->debug($pre . "Tokenized Payment Request Data: " . json_encode($data));
 
-            if (!isset($data['public_hash'])) {
+            if (!isset($data['public_hash']) || empty($data['public_hash'])) {
                 throw new InvalidArgumentException("Missing required parameter: public_hash");
             }
 
@@ -163,9 +171,17 @@ class ProcessTokenizedPayment implements HttpPostActionInterface
             $guid = strtoupper(Uuid::uuid4());
             $guid = str_replace('-', '', $guid);
 
-            $subtotalAmount = (int)bcmul((string)($totals['subtotal']), '100', 0);
-            $totalAmount    = (int)bcmul((string)$totals['grand_total'], '100', 0);
-            $taxAmount      = (int)bcmul((string)$totals['tax_amount'], '100', 0);
+            $subtotal   = $totals['subtotal'] ?? 0;
+            $grandTotal = $totals['grand_total'] ?? 0;
+            $tax        = $totals['tax_amount'] ?? 0;
+
+            if (!is_numeric($subtotal) || !is_numeric($grandTotal) || !is_numeric($tax)) {
+                throw new LocalizedException(__('Invalid total amounts'));
+            }
+
+            $subtotalAmount = (int)bcmul((string)$subtotal, '100', 0);
+            $totalAmount    = (int)bcmul((string)$grandTotal, '100', 0);
+            $taxAmount      = (int)bcmul((string)$tax, '100', 0);
 
             $intentData = [
                 'transaction_amount' => $totalAmount,

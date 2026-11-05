@@ -3,6 +3,7 @@
 namespace Fortispay\Fortis\Block\Payment;
 
 use Fortispay\Fortis\Model\Payment\IFrameData;
+use Magento\Csp\Helper\CspNonceProvider;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\Element\Template\Context;
@@ -20,29 +21,28 @@ class Request extends Template
     private ?array $jsConfig;
 
     /**
-     * @var mixed
+     * @var CspNonceProvider|null
      */
-    private mixed $cspNonceProvider = null;
+    private ?CspNonceProvider $cspNonceProvider;
 
     /**
      * Construct
      *
      * @param Context $context
      * @param IFrameData $iFrame
+     * @param CspNonceProvider|null $cspNonceProvider
      * @param array $data
      */
     public function __construct(
         Context $context,
         IFrameData $iFrame,
+        ?CspNonceProvider $cspNonceProvider = null,
         array $data = []
     ) {
         parent::__construct($context, $data);
-        $this->jsConfig = null;
-        $this->iFrame   = $iFrame;
-        if (class_exists(\Magento\Csp\Helper\CspNonceProvider::class)) {
-            $objectManager          = \Magento\Framework\App\ObjectManager::getInstance();
-            $this->cspNonceProvider = $objectManager->get(\Magento\Csp\Helper\CspNonceProvider::class);
-        }
+        $this->jsConfig         = null;
+        $this->iFrame           = $iFrame;
+        $this->cspNonceProvider = $cspNonceProvider;
     }
 
     /**
@@ -51,7 +51,7 @@ class Request extends Template
      * @return $this
      * @throws LocalizedException
      */
-    public function _prepareLayout()
+    public function _prepareLayout(): self
     {
         $this->jsConfig = $this->iFrame->buildIFrameData();
 
