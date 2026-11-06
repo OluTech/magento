@@ -15,7 +15,7 @@ class FortisTheme implements OptionSourceInterface
      *
      * @return array
      */
-    public function toOptionArray()
+    public function toOptionArray(): array
     {
         return [
             ['value' => 'default', 'label' => __('Default')],

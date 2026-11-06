@@ -9,7 +9,7 @@ use Magento\Framework\Event\ObserverInterface;
 class CreateThirdLevelData implements ObserverInterface
 {
     /**
-     * @var \Magento\Store\Model\StoreManagerInterface
+     * @var FortisApi
      */
     private FortisApi $fortisApi;
 
@@ -35,11 +35,16 @@ class CreateThirdLevelData implements ObserverInterface
     {
         $d              = $observer->getData();
         $order          = $observer->getEvent()->getOrder();
-        $storeManager   = $d['storeManager'];
-        $accountType    = $d['type'];
-        $countryFactory = $d['countryFactory'];
-        $api            = $this->fortisApi;
-        $transactionId  = $d['transactionId'];
+        $storeManager   = $d['storeManager'] ?? null;
+        $accountType    = $d['type'] ?? null;
+        $countryFactory = $d['countryFactory'] ?? null;
+        $transactionId  = $d['transactionId'] ?? null;
+
+        if (!$order || !$storeManager || !$accountType || !$countryFactory || !$transactionId) {
+            return;
+        }
+
+        $api = $this->fortisApi;
 
         if ($accountType === 'visa') {
             $api->createVisaLevel3Entry($order, $storeManager, $countryFactory, $transactionId);

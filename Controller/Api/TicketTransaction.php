@@ -6,7 +6,10 @@ use Fortispay\Fortis\Service\FortisMethodService;
 use Fortispay\Fortis\Service\CheckoutProcessor;
 use Fortispay\Fortis\Service\RateLimiter;
 use Magento\Framework\App\Action\HttpPostActionInterface;
+use Magento\Framework\App\CsrfAwareActionInterface;
 use Magento\Framework\App\RequestInterface;
+use Magento\Framework\App\Request\InvalidRequestException;
+use Magento\Framework\Data\Form\FormKey\Validator as FormKeyValidator;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Psr\Log\LoggerInterface;
@@ -14,7 +17,7 @@ use Magento\Framework\Exception\LocalizedException;
 use Magento\Customer\Api\AddressRepositoryInterface;
 use Fortispay\Fortis\Model\Config;
 
-class TicketTransaction implements HttpPostActionInterface
+class TicketTransaction implements HttpPostActionInterface, CsrfAwareActionInterface
 {
     private const RATE_LIMIT_ACTION = 'tickettransaction';
 
@@ -85,6 +88,11 @@ class TicketTransaction implements HttpPostActionInterface
     private RateLimiter $rateLimiter;
 
     /**
+     * @var FormKeyValidator
+     */
+    private FormKeyValidator $formKeyValidator;
+
+    /**
      * @param JsonFactory $resultJsonFactory
      * @param FortisMethodService $fortisMethodService
      * @param CheckoutSession $checkoutSession
@@ -94,6 +102,7 @@ class TicketTransaction implements HttpPostActionInterface
      * @param CheckoutProcessor $checkoutProcessor
      * @param Config $config
      * @param RateLimiter $rateLimiter
+     * @param FormKeyValidator $formKeyValidator
      */
     public function __construct(
         JsonFactory $resultJsonFactory,
@@ -104,7 +113,8 @@ class TicketTransaction implements HttpPostActionInterface
         AddressRepositoryInterface $addressRepository,
         CheckoutProcessor $checkoutProcessor,
         Config $config,
-        RateLimiter $rateLimiter
+        RateLimiter $rateLimiter,
+        FormKeyValidator $formKeyValidator
     ) {
         $this->resultJsonFactory   = $resultJsonFactory;
         $this->fortisMethodService = $fortisMethodService;
@@ -115,14 +125,48 @@ class TicketTransaction implements HttpPostActionInterface
         $this->checkoutProcessor   = $checkoutProcessor;
         $this->config              = $config;
         $this->rateLimiter         = $rateLimiter;
+        $this->formKeyValidator    = $formKeyValidator;
     }
 
     /**
-     * Create transaction from a Fortis ticket intention.
-     *
-     * @return \Magento\Framework\Controller\Result\Json
+     * @inheritDoc
      */
-    public function execute()
+    public function createCsrfValidationException(
+        RequestInterface $request
+    ): ?InvalidRequestException {
+        $resultJson = $this->resultJsonFactory->create();
+        $resultJson->setHttpResponseCode(403);
+        $resultJson->setData([
+                                 'success' => false,
+                                 'error'   => __('Invalid Form Key. Please refresh the page.')
+                             ]);
+
+        return new InvalidRequestException(
+            $resultJson,
+            [__('Invalid Form Key.')]
+        );
+    }
+
+    /**
+     * Strictly enforce form key validation.
+     *
+     * Returning the boolean result prevents Magento's default CSRF validator
+     * from bypassing the check via XMLHttpRequest headers.
+     *
+     * @param RequestInterface $request
+     * @return bool|null
+     */
+    public function validateForCsrf(RequestInterface $request): ?bool
+    {
+        return $this->formKeyValidator->validate($request);
+    }
+
+    /**
+     * Execute ticket transaction request.
+     *
+     * @return \Magento\Framework\Controller\ResultInterface
+     */
+    public function execute(): \Magento\Framework\Controller\ResultInterface
     {
         $resultJson = $this->resultJsonFactory->create();
 
@@ -133,9 +177,9 @@ class TicketTransaction implements HttpPostActionInterface
         )) {
             $resultJson->setHttpResponseCode(429);
             return $resultJson->setData([
-                'success' => false,
-                'error'   => __('Too many requests. Please wait a moment and try again.'),
-            ]);
+                                            'success' => false,
+                                            'error'   => __('Too many requests. Please wait a moment and try again.'),
+                                        ]);
         }
 
         try {
@@ -171,10 +215,11 @@ class TicketTransaction implements HttpPostActionInterface
                 && (time() - (int)($attemptState['updated_at'] ?? 0)) < self::ATTEMPT_COUNT_TTL_SECONDS;
             $attemptCount = $attemptStateIsCurrent ? (int)($attemptState['count'] ?? 0) : 0;
             $declineCount = $attemptStateIsCurrent && is_array($declineState)
-                && (int)($declineState['quote_id'] ?? 0) === (int)$quote->getId()
+            && (int)($declineState['quote_id'] ?? 0) === (int)$quote->getId()
                 ? (int)($declineState['count'] ?? 0) : 0;
             if ($attemptCount >= self::MAX_ATTEMPTS || $declineCount >= self::MAX_CONSECUTIVE_DECLINES) {
-                $message = 'Too many payment attempts. Please refresh checkout and try again in ' . ceil(self::ATTEMPT_COUNT_TTL_SECONDS / 60) . ' minutes.';
+                $message = 'Too many payment attempts. Please refresh checkout and try again in '
+                    . ceil(self::ATTEMPT_COUNT_TTL_SECONDS / 60) . ' minutes.';
                 throw new LocalizedException(__($message));
             }
 
@@ -196,8 +241,10 @@ class TicketTransaction implements HttpPostActionInterface
                 $billingAddress = $quote->getShippingAddress();
             }
 
-            if ((!$billingAddress || !$billingAddress->getStreet() || !$billingAddress->getCity(
-            ) || !$billingAddress->getPostcode())
+            if ((!$billingAddress
+                    || !$billingAddress->getStreet()
+                    || !$billingAddress->getCity()
+                    || !$billingAddress->getPostcode())
                 && $quote->getCustomer() && $quote->getCustomer()->getDefaultBilling()
             ) {
                 $customer  = $quote->getCustomer();
@@ -355,6 +402,12 @@ class TicketTransaction implements HttpPostActionInterface
         return $cached['data'];
     }
 
+    /**
+     * Check whether the transaction response indicates success.
+     *
+     * @param object $transaction
+     * @return bool
+     */
     private function isSuccessfulTransaction(object $transaction): bool
     {
         $response = $transaction->data ?? $transaction;

@@ -14,7 +14,7 @@ class Form extends \Magento\Payment\Block\Form
     private string $methodCode = Config::METHOD_CODE;
 
     /**
-     * @var Config
+     * @var LoggerInterface
      */
     private LoggerInterface $logger;
 
@@ -53,7 +53,7 @@ class Form extends \Magento\Payment\Block\Form
      *
      * @return void
      */
-    protected function _construct()
+    protected function _construct(): void
     {
         $pre = __METHOD__ . " : ";
         $this->logger->debug($pre . 'bof');

@@ -40,7 +40,7 @@ class VaultAccountRenderer extends AbstractTokenRenderer
      * @return string
      * @since 100.1.0
      */
-    public function getNumberLast4Digits()
+    public function getNumberLast4Digits(): string
     {
         return $this->getTokenDetails()['maskedCC'];
     }
@@ -51,7 +51,7 @@ class VaultAccountRenderer extends AbstractTokenRenderer
      * @return string
      * @since 100.1.0
      */
-    public function getExpDate()
+    public function getExpDate(): string
     {
         return $this->getTokenDetails()['expirationDate'];
     }
@@ -59,7 +59,7 @@ class VaultAccountRenderer extends AbstractTokenRenderer
     /**
      * @inheritdoc
      */
-    public function getIconUrl()
+    public function getIconUrl(): string
     {
         return $this->config->getFortisIconImageUrl();
     }
@@ -67,7 +67,7 @@ class VaultAccountRenderer extends AbstractTokenRenderer
     /**
      * @inheritdoc
      */
-    public function getIconHeight()
+    public function getIconHeight(): int
     {
         return $this->config->getACHIcon()['height'];
     }
@@ -75,7 +75,7 @@ class VaultAccountRenderer extends AbstractTokenRenderer
     /**
      * @inheritdoc
      */
-    public function getIconWidth()
+    public function getIconWidth(): int
     {
         return $this->config->getACHIcon()['width'];
     }

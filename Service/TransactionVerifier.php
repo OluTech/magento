@@ -96,8 +96,10 @@ class TransactionVerifier
 
         $actualDescription = $transaction['data']['description'] ?? null;
 
-        // Verify transaction description matches transaction ID
-        if (((int)$actualDescription !== (int)$expectedOrderId)) {
+        // Verify transaction description matches transaction ID.
+        // Description may be absent for APM (PayPal) transactions that go through a redirect,
+        // so only fail if the description is present and explicitly wrong.
+        if (!empty($actualDescription) && ((int)$actualDescription !== (int)$expectedOrderId)) {
             $verified = false;
             $errors[] = [
                 'type'           => 'description_mismatch',
@@ -126,6 +128,26 @@ class TransactionVerifier
             'errors'      => $errors,
             'transaction' => $transaction
         ];
+    }
+
+    /**
+     * Fetch a transaction from the Fortis API and return its data.
+     *
+     * @param string $fortisTransactionId The Fortis transaction ID to fetch
+     *
+     * @return array|null The transaction data, or null when it cannot be fetched
+     */
+    public function fetchTransactionData(string $fortisTransactionId): ?array
+    {
+        $transactionObj = $this->fortisApi->getTransaction(
+            $fortisTransactionId,
+            $this->config->userId(),
+            $this->config->userApiKey()
+        );
+
+        $transaction = json_decode(json_encode($transactionObj), true);
+
+        return is_array($transaction['data'] ?? null) ? $transaction['data'] : null;
     }
 
     /**

@@ -1,5 +1,23 @@
 # Changelog
 
+## [[1.8.0]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
+
+### Added
+
+- PayPal and Venmo (APM) at checkout, with a configurable APM Product ID.
+- PayPal and Venmo updates from Fortis, including partial and full refunds, are now applied to the order.
+- Compatibility with Magento 2.4.9 and PHP 8.5.
+
+### Fixed
+
+- Guest checkout still recovers the order when the session has expired.
+- Payment Then Order no longer throws a console error after a successful payment.
+- Empty location IDs are no longer sent on intention requests.
+
+### Improved
+
+- Unit tests for capture, void, refund, currency minor units and API errors.
+
 ## [[1.7.3]](https://commercemarketplace.adobe.com/fortispay-magento-2-payment-gateway.html#product.info.details.release_notes)
 
 ### Improved

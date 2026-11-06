@@ -15,7 +15,7 @@ class PaymentPortalLocation implements OptionSourceInterface
      *
      * @return array
      */
-    public function toOptionArray()
+    public function toOptionArray(): array
     {
         return [
             ['value' => 'iframe', 'label' => __('On Checkout')],

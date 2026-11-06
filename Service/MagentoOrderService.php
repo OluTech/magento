@@ -56,12 +56,16 @@ class MagentoOrderService
      */
     public function applySurcharge(Order $order, float $surchargeAmount, ?Invoice $invoice = null): void
     {
-        if (!$surchargeAmount || $surchargeAmount <= 0) {
+        if (!is_numeric($surchargeAmount) || $surchargeAmount <= 0) {
             return;
         }
 
-        // Convert from cents to currency units
-        $surchargeAmount = $surchargeAmount / 100;
+        // Convert from cents to currency units with precision
+        $surchargeAmount = round($surchargeAmount / 100, 2);
+
+        if ($surchargeAmount <= 0) {
+            return;
+        }
         $order->setData('custom_surcharge', $surchargeAmount);
 
         $this->updateOrderTotals($order, $surchargeAmount);

@@ -15,7 +15,7 @@ class IntentionFlow implements OptionSourceInterface
      *
      * @return array
      */
-    public function toOptionArray()
+    public function toOptionArray(): array
     {
         return [
             ['value' => 'transaction-intention', 'label' => __('Order Then Payment (Default)')],

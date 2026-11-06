@@ -105,7 +105,7 @@ class FortisApi
      * @param array $data
      * @param string $method
      *
-     * @return string|null
+     * @return string
      * @throws LocalizedException
      */
     private function makeApiRequest(
@@ -114,7 +114,7 @@ class FortisApi
         string $user_api_key,
         array $data = [],
         string $method = 'POST'
-    ): ?string {
+    ): string {
         $url = $this->fortisApi . $endpoint;
 
         $this->httpClient->setTimeout(30);
@@ -486,28 +486,64 @@ class FortisApi
      */
     public function createTransactionWebhook(): string|null
     {
-        $userId               = $this->config->userId();
-        $userApiKey           = $this->config->userApiKey();
-        $locationId           = $this->config->achLocationId();
-        $achEnabled           = $this->config->achIsActive();
-        $productTransactionId = $this->config->achProductId();
-
-        if (!$achEnabled) {
+        if (!$this->config->achIsActive()) {
             return null;
         }
 
+        return $this->registerTransactionWebhook(
+            $this->config->achProductId(),
+            'fortis/webhook/achhook'
+        );
+    }
+
+    /**
+     * Register a transaction webhook for APM (PayPal/Venmo) updates.
+     *
+     * @return string|null
+     * @throws LocalizedException
+     */
+    public function createApmTransactionWebhook(): string|null
+    {
+        $productTransactionId = $this->config->apmProductId();
+        if (!$this->config->apmIsActive() || $productTransactionId === '') {
+            return null;
+        }
+
+        // PayPal/Venmo sales and refunds arrive at Fortis as new transactions, so APM needs create events
+        return $this->registerTransactionWebhook($productTransactionId, 'fortis/webhook/apmhook', true);
+    }
+
+    /**
+     * Register a transaction webhook for one product, pointing at the given controller path.
+     *
+     * @param string $productId
+     * @param string $path
+     * @param bool $onCreate Also notify when a transaction is created, not only updated
+     * @return string|null
+     * @throws LocalizedException
+     */
+    private function registerTransactionWebhook(string $productId, string $path, bool $onCreate = false): string|null
+    {
+        $userId     = $this->config->userId();
+        $userApiKey = $this->config->userApiKey();
+        $locationId = $this->config->achLocationId();
+
         $url        = '/v1/webhooks/transaction';
-        $webhookUrl = $this->urlBuilder->getBaseUrl() . 'fortis/webhook/achhook';
+        $webhookUrl = $this->urlBuilder->getBaseUrl() . $path;
         $intentData = [
             'is_active'              => true,
             'location_id'            => $locationId,
-            'on_create'              => 0,
+            'on_create'              => $onCreate ? 1 : 0,
             'on_update'              => 1,
             'on_delete'              => 1,
-            'product_transaction_id' => $productTransactionId,
+            'product_transaction_id' => $productId,
             'number_of_attempts'     => 1,
             'url'                    => $webhookUrl,
         ];
+
+        if ($locationId === '') {
+            unset($intentData['location_id']);
+        }
 
         $response        = $this->makeApiRequest($url, $userId, $userApiKey, $intentData, 'POST');
         $decodedResponse = json_decode($response);
@@ -526,20 +562,20 @@ class FortisApi
     /**
      * Delete a registered transaction webhook.
      *
-     * @param string $achWebhookId
+     * @param string $webhookId
      * @return void
      * @throws LocalizedException
      */
-    public function deleteTransactionWebhook(string $achWebhookId): void
+    public function deleteTransactionWebhook(string $webhookId): void
     {
         $userId     = $this->config->userId();
         $userApiKey = $this->config->userApiKey();
 
-        $url      = "/v1/webhooks/$achWebhookId";
+        $url      = "/v1/webhooks/$webhookId";
         $response = $this->makeApiRequest($url, $userId, $userApiKey, [], 'DELETE');
 
         if ($response && json_decode($response)->type === 'Error') {
-            throw new LocalizedException(json_decode($response)->title);
+            throw new LocalizedException(new Phrase(json_decode($response)->title));
         }
     }
 

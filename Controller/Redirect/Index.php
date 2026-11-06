@@ -15,6 +15,8 @@ use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Message\ManagerInterface;
 use Magento\Framework\UrlInterface;
 use Magento\Framework\View\Result\PageFactory;
+use Magento\Sales\Model\Order;
+use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Vault\Api\PaymentTokenManagementInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -85,6 +87,11 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
     private FortisMethodService $fortisMethodService;
 
     /**
+     * @var OrderRepositoryInterface
+     */
+    private OrderRepositoryInterface $orderRepository;
+
+    /**
      * @param PageFactory $pageFactory
      * @param CheckoutSession $checkoutSession
      * @param LoggerInterface $logger
@@ -96,6 +103,7 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
      * @param FortisApi $fortisApi
      * @param CheckoutProcessor $checkoutProcessor
      * @param FortisMethodService $fortisMethodService
+     * @param OrderRepositoryInterface $orderRepository
      */
     public function __construct(
         PageFactory $pageFactory,
@@ -108,7 +116,8 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
         PaymentTokenManagementInterface $paymentTokenManagement,
         FortisApi $fortisApi,
         CheckoutProcessor $checkoutProcessor,
-        FortisMethodService $fortisMethodService
+        FortisMethodService $fortisMethodService,
+        OrderRepositoryInterface $orderRepository
     ) {
         $pre = __METHOD__ . " : ";
 
@@ -126,6 +135,7 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
         $this->urlBuilder             = $urlBuilder;
         $this->paymentTokenManagement = $paymentTokenManagement;
         $this->fortisMethodService    = $fortisMethodService;
+        $this->orderRepository        = $orderRepository;
 
         $this->logger->debug($pre . 'eof');
     }
@@ -270,18 +280,14 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
                 } catch (LocalizedException $e) {
                     $this->logger->error($e->getMessage());
                     $this->messageManager->addExceptionMessage($e, $e->getMessage());
-                    $this->checkoutSession->restoreQuote();
-
-                    return $this->checkoutProcessor->getRedirectToCartObject();
+                    return $this->abandonOrderAndReturnToCart($order);
                 } catch (Exception $exception) {
                     $this->logger->error($exception->getMessage());
                     $this->messageManager->addExceptionMessage(
                         $exception,
                         __('We can\'t process the saved payment method right now.')
                     );
-                    $this->checkoutSession->restoreQuote();
-
-                    return $this->checkoutProcessor->getRedirectToCartObject();
+                    return $this->abandonOrderAndReturnToCart($order);
                 }
             } else {
                 // Do the tokenised card transaction
@@ -326,18 +332,14 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
                 } catch (LocalizedException $e) {
                     $this->logger->error($e->getMessage());
                     $this->messageManager->addExceptionMessage($e, $e->getMessage());
-                    $this->checkoutSession->restoreQuote();
-
-                    return $this->checkoutProcessor->getRedirectToCartObject();
+                    return $this->abandonOrderAndReturnToCart($order);
                 } catch (Exception $exception) {
                     $this->logger->error($exception->getMessage());
                     $this->messageManager->addExceptionMessage(
                         $exception,
                         __('We can\'t process the saved payment method right now.')
                     );
-                    $this->checkoutSession->restoreQuote();
-
-                    return $this->checkoutProcessor->getRedirectToCartObject();
+                    return $this->abandonOrderAndReturnToCart($order);
                 }
             }
         }
@@ -346,5 +348,29 @@ class Index implements HttpPostActionInterface, HttpGetActionInterface
             ->getBlock('fortis_redirect');
 
         return $page_object;
+    }
+
+    /**
+     * Cancel the order placed before the saved payment method was tried and return to the cart
+     *
+     * The customer gets their items back. Without the cancel the order stays in Pending Payment for ever.
+     *
+     * @param Order $order
+     * @return ResultInterface
+     */
+    private function abandonOrderAndReturnToCart(Order $order): ResultInterface
+    {
+        try {
+            if ($order->canCancel()) {
+                $order->cancel();
+                $order->addCommentToStatusHistory(__('Failed: the saved payment method could not be charged.'));
+                $this->orderRepository->save($order);
+            }
+        } catch (Exception $e) {
+            $this->logger->error(__METHOD__ . ' : could not cancel the order: ' . $e->getMessage());
+        }
+        $this->checkoutSession->restoreQuote();
+
+        return $this->checkoutProcessor->getRedirectToCartObject();
     }
 }

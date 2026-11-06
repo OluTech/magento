@@ -328,9 +328,9 @@ class Config
     /**
      * Check isVault condition
      **/
-    public function isVault()
+    public function isVault(): bool
     {
-        return $this->getConfig('fortis_cc_vault_active');
+        return (bool)$this->getConfig('fortis_cc_vault_active');
     }
 
     /**
@@ -387,6 +387,43 @@ class Config
         $r = $this->getConfig('fortis_applepay_active');
 
         return $r === '1';
+    }
+
+    /**
+     * Returns true if APM (PayPal/Venmo) is configured active in store settings
+     *
+     * @return bool
+     */
+    public function apmIsActive(): bool
+    {
+        $r = $this->getConfig('fortis_apm_active');
+
+        return $r === '1';
+    }
+
+    /**
+     * APM (PayPal/Venmo) product ID
+     *
+     * @return string
+     */
+    public function apmProductId(): string
+    {
+        $t = $this->getConfig('fortis_apm_product_id') ?? '';
+        if ($t !== '') {
+            $t = $this->encryptor->decrypt($t);
+        }
+
+        return $t;
+    }
+
+    /**
+     * Return APM (PayPal/Venmo) webhook ID.
+     *
+     * @return string
+     */
+    public function apmWebhookId(): string
+    {
+        return $this->getConfig('fortis_apm_webhook_id') ?? '';
     }
 
     /**

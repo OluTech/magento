@@ -14,7 +14,7 @@ class CurrencyOptions implements OptionSourceInterface
      *
      * @return array
      */
-    public function toOptionArray()
+    public function toOptionArray(): array
     {
         return [
             ['value' => 'USD', 'label' => __('USD - US Dollar')],
@@ -44,7 +44,7 @@ class CurrencyOptions implements OptionSourceInterface
      *
      * @return array
      */
-    public function toArray()
+    public function toArray(): array
     {
         return [
             'USD' => __('USD - US Dollar'),

@@ -2,6 +2,7 @@
 
 namespace Fortispay\Fortis\Service;
 
+use Exception;
 use Fortispay\Fortis\Model\Config;
 use Fortispay\Fortis\Model\CurrencyOptions;
 use Fortispay\Fortis\Model\FortisApi;
@@ -311,7 +312,7 @@ class FortisMethodService
      * @param bool $saveAccount
      *
      * @return array
-     * @throws Exception|LocalizedException
+     * @throws \Exception|LocalizedException
      */
     public function getFortisOrderToken(bool $saveAccount)
     {
@@ -354,7 +355,12 @@ class FortisMethodService
             $intentData['methods']   = [];
             $intentData['methods'][] = ['type' => 'cc', 'product_transaction_id' => $productTransactionId];
         }
-        if ($achEnabled && $achProductId
+        // ACH and PayPal/Venmo products are in the primary currency; Fortis will not draw one form for methods in
+        // different currencies ("All methods must have the same currency"), so an order in the secondary currency is
+        // offered the card product alone.
+        $primaryCurrencyOrder = !$this->config->isMultiCurrencyEnabled()
+            || $currency === $this->config->getPrimaryCurrency();
+        if ($primaryCurrencyOrder && $achEnabled && $achProductId
             && preg_match(
                 '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',
                 $achProductId
@@ -367,6 +373,19 @@ class FortisMethodService
             if ($locationId !== '') {
                 $intentData['location_id'] = $locationId;
             }
+        }
+
+        $apmEnabled = $this->config->apmIsActive();
+        $apmProductId = $this->config->apmProductId();
+        if ($primaryCurrencyOrder && $apmEnabled && $apmProductId
+            && preg_match(
+                '/^(([0-9a-fA-F]{24})|(([0-9a-fA-F]{8})(([0-9a-fA-F]{4}){3})([0-9a-fA-F]{12})))$/',
+                $apmProductId
+            ) === 1) {
+            if (empty($intentData['methods'])) {
+                $intentData['methods'] = [];
+            }
+            $intentData['methods'][] = ['type' => 'apm', 'product_transaction_id' => $apmProductId];
         }
 
         // Initiate Fortis - transaction intention
@@ -401,17 +420,18 @@ class FortisMethodService
         $productTransactionId = $this->config->ccProductId();
 
         $intentData = [
-            'location_id'            => $locationId,
             'product_transaction_id' => $productTransactionId,
         ];
+
+        if ($locationId !== '') {
+            $intentData['location_id'] = $locationId;
+        }
 
         return $this->fortisApi->getClientToken($intentData, $user_id, $user_api_key, true);
     }
 
     /**
      * Prepare Fields
-     *
-     * @param Order $order
      *
      * @return array
      */
@@ -639,15 +659,19 @@ class FortisMethodService
     {
         $order = $payment->getOrder();
 
-        if ($order->getStatus() !== Order::STATE_PROCESSING) {
-            if ($this->isOrderVirtualOnly($order)) {
-                $order->setState(Order::STATE_NEW);
-                $order->setStatus(Order::STATE_NEW);
-                $this->orderRepository->save($order);
-            } else {
-                $order->setState(Order::STATE_PROCESSING);
-                $order->setStatus(Order::STATE_PROCESSING);
-            }
+        // Magento passes the amount in the store's base currency, but Fortis holds the order in the currency it was
+        // paid in (a euro order refunded for the 25.00 USD base amount is "more than the original amount"). The credit
+        // memo has the amount in the order's own currency.
+        $creditmemo = $payment->getCreditmemo();
+        if ($creditmemo && (float)$creditmemo->getBaseGrandTotal() > 0) {
+            $amount = (float)$creditmemo->getGrandTotal();
+        }
+
+        // A virtual order keeps its state: Magento works out the status after the refund (Complete after a partial
+        // refund, Closed after a full one) but never the state, so forcing New left a New order that read Complete
+        if ($order->getStatus() !== Order::STATE_PROCESSING && !$this->isOrderVirtualOnly($order)) {
+            $order->setState(Order::STATE_PROCESSING);
+            $order->setStatus(Order::STATE_PROCESSING);
         }
 
         $user_id      = $this->encryptor->decrypt($this->scopeConfig->getValue(self::CONFIG_PATH_USER_ID));
@@ -665,28 +689,34 @@ class FortisMethodService
             ) ? $rawDetailsInfo->payment_method : $paymentMethod;
         }
 
+        // PayPal/Venmo is not a card: it has no card number to price a surcharge from and no card product
+        $isApm                = $paymentMethod === 'apm';
         $transactionId        = $rawDetailsInfo?->id;
         $orderCurrency        = $order->getOrderCurrencyCode();
         $productTransactionId = $this->config->getProductIdForCurrency($orderCurrency);
+        // The description carries the order number, which is how the refund webhook finds the order
         $intentData           = [
-            'transaction_amount'     => (int)bcmul((string)$amount, '100', 0),
-            'transactionId'          => $transactionId,
-            'description'            => $order->getIncrementId(),
-            'tax'                    => 0,
-            'product_transaction_id' => $productTransactionId
+            'transaction_amount' => (int)bcmul((string)$amount, '100', 0),
+            'transactionId'      => $transactionId,
+            'description'        => $order->getIncrementId(),
+            'tax'                => 0,
         ];
 
-        $currency = $order->getOrderCurrencyCode();
-        $this->applySecondaryCurrency($intentData, $currency);
+        if (!$isApm) {
+            $intentData['product_transaction_id'] = $productTransactionId;
 
-        $postalCode = $rawDetailsInfo->billing_address->postal_code ?? $rawDetailsInfo->billing_zip ?? null;
+            $currency = $order->getOrderCurrencyCode();
+            $this->applySecondaryCurrency($intentData, $currency);
 
-        $this->populateTransactionIntent(
-            $rawDetailsInfo->first_six,
-            $postalCode,
-            $intentData['transaction_amount'],
-            $intentData
-        );
+            $postalCode = $rawDetailsInfo->billing_address->postal_code ?? $rawDetailsInfo->billing_zip ?? null;
+
+            $this->populateTransactionIntent(
+                $rawDetailsInfo->first_six,
+                $postalCode,
+                $intentData['transaction_amount'],
+                $intentData
+            );
+        }
 
         try {
             if ($paymentMethod !== 'ach') {
@@ -709,11 +739,18 @@ class FortisMethodService
                 $this->magentoOrderService->updateOrderRefundData($payment, $onlineRefundedAmount, $amount);
             }
 
+            // A card refund succeeds with reason 1000; a PayPal/Venmo refund with status 161 (Refunded)
+            $refunded = $isApm
+                ? (int)($data?->status_code ?? 0) === 161
+                : $data?->reason_code_id === 1000;
+
             /* Set Comment to Order*/
-            if ($data?->reason_code_id === 1000) {
+            if ($refunded) {
                 $order->addCommentToStatusHistory(
                     __(
-                        "Order Successfully Refunded with Transaction Id - $data->id Auth Code - $data->auth_code"
+                        $isApm
+                            ? "Order Successfully Refunded with Transaction Id - $data->id"
+                            : "Order Successfully Refunded with Transaction Id - $data->id Auth Code - $data->auth_code"
                     )
                 );
                 if (isset($intentData['surcharge_amount']) && $intentData['surcharge_amount'] > 0) {
@@ -729,9 +766,7 @@ class FortisMethodService
 
                 return true;
             } else {
-                $order->addCommentToStatusHistory(__("Refund not successful"));
-                $this->orderRepository->save($order);
-
+                // The catch below records the comment and logs it
                 throw new LocalizedException(__('Refund not successful.'));
             }
         } catch (Exception $exception) {
@@ -986,7 +1021,7 @@ class FortisMethodService
      * @param string $year
      *
      * @return string
-     * @throws Exception
+     * @throws \Exception
      */
     private function getExpirationDate(string $month, string $year)
     {

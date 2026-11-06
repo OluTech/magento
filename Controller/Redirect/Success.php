@@ -188,6 +188,7 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
      * @param InvoiceService $invoiceService
      * @param InvoiceSender $invoiceSender
      * @param Fortis $paymentMethod
+     * @param Config $config
      * @param OrderRepositoryInterface $orderRepository
      * @param StoreManagerInterface $storeManager
      * @param OrderSender $orderSender
@@ -209,7 +210,6 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
      * @param TransactionVerifier $transactionVerifier
      * @param QuoteRepository $quoteRepository
      * @param SearchCriteriaBuilder $searchCriteriaBuilder
-     * @param Config $config
      */
     public function __construct(
         PageFactory $pageFactory,
@@ -371,86 +371,52 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         $this->logger->debug($pre . 'bof');
         $order = $this->checkoutSession->getLastRealOrder();
         if (!$order->getId() && $orderId) {
-            $order = $this->setlastOrderDetails($orderId);
+            try {
+                $order = $this->setlastOrderDetails($orderId);
+            } catch (\Exception $e) {
+                $this->logger->error('Order recovery failed: ' . $e->getMessage());
+            }
         }
 
         if (!$order->getId()) {
+            
+            if (!$tokenised && !$isTicketTransaction) {
+                $resultJson = $this->resultJsonFactory->create();
+                return $resultJson->setData([
+                    'error'      => true,
+                    'redirectTo' => $redirectToCartPageString,
+                    'message'    => __('Your checkout session has expired. Please try again.')
+                ])->setHttpResponseCode(400);
+            }
+            
             $redirect->setUrl($redirectToCartPageString);
-
             return $redirect;
         }
 
         $recoveredTransaction = null;
         $payment              = $order->getPayment();
         if (!$payment || !$payment->getId()) {
-            $this->logger->warning('Success controller: payment object is null, attempting order recovery');
+            $recoveryResult = $this->recoverOrderFromTicketTransaction(
+                $order,
+                $payment,
+                $isTicketTransaction,
+                $dataArray,
+                $redirectToSuccessPageString
+            );
 
-            if ($isTicketTransaction && isset($dataArray['transactionId'])) {
-                try {
-                    $user_id       = $this->config->userId();
-                    $user_api_key  = $this->config->userApiKey();
-                    $transactionId = $dataArray['transactionId'];
+            if (isset($recoveryResult['redirect'])) {
+                $redirect->setUrl($recoveryResult['redirect']);
 
-                    $fortisTransactionObj = $this->fortisApi->getTransaction($transactionId, $user_id, $user_api_key);
-                    $recoveredTransaction = $fortisTransactionObj->data ?? $fortisTransactionObj;
-
-                    $orderIncrementId = $recoveredTransaction->description ?? null;
-                    if ($orderIncrementId) {
-                        $this->logger->info('Success controller: recovering order via increment_id from transaction', [
-                            'increment_id'   => $orderIncrementId,
-                            'transaction_id' => $transactionId
-                        ]);
-
-                        $searchCriteria = $this->searchCriteriaBuilder
-                            ->addFilter('increment_id', $orderIncrementId)
-                            ->create();
-                        $orders         = $this->orderRepository->getList($searchCriteria)->getItems();
-
-                        if (!empty($orders)) {
-                            $order   = reset($orders);
-                            $payment = $order->getPayment();
-                            $this->logger->info('Success controller: order recovered successfully', [
-                                'order_id'     => $order->getId(),
-                                'increment_id' => $order->getIncrementId()
-                            ]);
-
-                            if (!$payment || !$payment->getId()) {
-                                $this->logger->error(
-                                    'Success controller: recovered order has no payment, redirecting to success page'
-                                );
-                                $redirect->setUrl($redirectToSuccessPageString);
-                                return $redirect;
-                            }
-                        } else {
-                            $this->logger->error(
-                                'Success controller: order not found during recovery, redirecting to success page'
-                            );
-                            $redirect->setUrl($redirectToSuccessPageString);
-                            return $redirect;
-                        }
-                    } else {
-                        $this->logger->error(
-                            'Success controller: no description in transaction data, redirecting to success page'
-                        );
-                        $redirect->setUrl($redirectToSuccessPageString);
-                        return $redirect;
-                    }
-                } catch (\Exception $e) {
-                    $this->logger->error('Success controller: order recovery failed: ' . $e->getMessage());
-                    $redirect->setUrl($redirectToSuccessPageString);
-                    return $redirect;
-                }
-            } else {
-                $this->logger->error(
-                    'Success controller: not a ticket transaction or no transactionId, redirecting to success page'
-                );
-                $redirect->setUrl($redirectToSuccessPageString);
                 return $redirect;
             }
+
+            $order                = $recoveryResult['order'];
+            $payment              = $recoveryResult['payment'];
+            $recoveredTransaction = $recoveryResult['recoveredTransaction'];
         }
 
         $orderData      = $payment->getData();
-        $additionalData = $orderData['additional_information'];
+        $additionalData = $orderData['additional_information'] ?? [];
 
         $this->order = $order;
 
@@ -469,8 +435,17 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         if ((!$isTicketTransaction && !$tokenised && ((int)$order->getId() !== $orderId)) || !$data) {
             $this->checkoutSession->restoreQuote();
             $this->reactivateQuoteIfNeeded($order);
+            
+            if (!$tokenised && !$isTicketTransaction) {
+                $resultJson = $this->resultJsonFactory->create();
+                return $resultJson->setData([
+                    'error'      => true,
+                    'redirectTo' => $redirectToCartPageString,
+                    'message'    => __('Payment verification failed. Please try again.')
+                ])->setHttpResponseCode(400);
+            }
+            
             $redirect->setUrl($redirectToCartPageString);
-
             return $redirect;
         }
 
@@ -524,6 +499,16 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                 }
             } else {
                 $fortisTransaction = $api->getTransaction($data->id, $user_id, $user_api_key)->data;
+                if (($fortisTransaction->payment_method ?? '') === 'apm'
+                    && (string)($fortisTransaction->description ?? '') !== (string)$order->getIncrementId()
+                ) {
+                    try {
+                        $this->fortisApi->patchTransactionDescription($data->id, $order->getIncrementId());
+                        $fortisTransaction->description = $order->getIncrementId();
+                    } catch (\Exception $e) {
+                        $this->logger->error('Could not set APM transaction description: ' . $e->getMessage());
+                    }
+                }
             }
 
             $orderTotal    = (int)bcmul($order->getGrandTotal(), '100', 0);
@@ -572,11 +557,11 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                 if ($status == 131) {
                     $message = "ACH Transaction: " . self::$achResponseStatuses[$status];
                     $this->messageManager->addNoticeMessage($message);
-                    $this->order->addStatusToHistory(__($message));
                     $status = Order::STATE_HOLDED;
                     // Save Transaction Response
                     $this->createTransaction($data);
                     $order->setState($status)->setStatus($status);
+                    $order->addCommentToStatusHistory($message);
                     $this->orderRepository->save($order);
 
                     // Check for stored card and save if necessary
@@ -594,8 +579,9 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                     }
                 }
             } else {
-                // Handle response from CC transaction
-                if (!$tokenised && !$isTicketTransaction &&
+                // Handle response from CC / APM transaction
+                $isApmTransaction = ($fortisTransaction->payment_method ?? '') === 'apm';
+                if (!$tokenised && !$isTicketTransaction && !$isApmTransaction &&
                     ($fortisTransaction->product_transaction_id !== $product_transaction_id_order && !empty(
                         $this->config->getConfig('product_transaction_id')
                     ))) {
@@ -603,11 +589,12 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                         __('Product transaction ids do not match')
                     );
                 }
-                $accountType = $fortisTransaction->account_type;
+                $accountType = $fortisTransaction->account_type ?? 'apm';
                 switch ($status) {
                     case 1000:  // Success for ticket transaction
                     case 101:   // Success for non-ticket transaction
                     case 102:
+                    case 151:  // PayPal/Venmo Sale
                         // Check for stored card and save if necessary
                         $this->fortisMethodService->saveVaultData($order, $data);
 
@@ -631,6 +618,7 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                         $invoice = $this->invoiceService->prepareInvoice($order);
                         $invoice->setRequestedCaptureCase(Invoice::CAPTURE_ONLINE);
 
+                        $surchargeData   = null;
                         $surchargeAmount = 0.00;
                         if (isset($surchargeData)) {
                             $surchargeAmount = $surchargeData['surcharge_amount'];
@@ -705,6 +693,22 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                             $redirect->setUrl($redirectToSuccessPageString);
                         }
                         break;
+                    case 152:  // PayPal/Venmo Order Started — pending, hold order
+                        $message = 'PayPal payment pending (status 152 — awaiting PayPal confirmation)';
+                        $this->createTransaction($data);
+                        $order->setState(Order::STATE_HOLDED)->setStatus(Order::STATE_HOLDED);
+                        $order->addCommentToStatusHistory($message);
+                        $this->orderRepository->save($order);
+                        if (!$tokenised) {
+                            $resultJson = $this->resultJsonFactory->create();
+
+                            return $resultJson->setData([
+                                                            'redirectTo' => $redirectToSuccessPageString,
+                                                        ]);
+                        } else {
+                            $redirect->setUrl($redirectToSuccessPageString);
+                        }
+                        break;
                     default:
                         if (isset($this->responseCodes[$status])) {
                             $message = "Not Authorised: " . $this->responseCodes[$status];
@@ -712,8 +716,8 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                             $message = 'Not Authorised: Reason Unknown';
                         }
                         $this->messageManager->addNoticeMessage($message);
-                        $this->order->addStatusToHistory(__("Failed: $message "));
                         $this->order->cancel();
+                        $this->order->addCommentToStatusHistory("Failed: $message ");
                         $this->orderRepository->save($this->order);
                         $this->checkoutSession->restoreQuote();
                         $this->reactivateQuoteIfNeeded($this->order);
@@ -741,6 +745,15 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
                 $this->reactivateQuoteIfNeeded($order);
             }
 
+            if (!$tokenised && !$isTicketTransaction) {
+                // AJAX request - return JSON
+                $resultJson = $this->resultJsonFactory->create();
+                return $resultJson->setData([
+                    'error'   => true,
+                    'message' => $e->getMessage() ?: __('Payment verification failed. Please try again.')
+                ])->setHttpResponseCode(500);
+            }
+
             if ($tokenised || $isTicketTransaction) {
                 $resultJson = $this->resultJsonFactory->create();
                 return $resultJson->setData([
@@ -756,6 +769,95 @@ class Success implements HttpPostActionInterface, HttpGetActionInterface, CsrfAw
         }
 
         return $redirect;
+    }
+
+    /**
+     * Attempt to recover order/payment when checkout session has no payment object.
+     *
+     * @param Order $order
+     * @param Payment|null $payment
+     * @param bool $isTicketTransaction
+     * @param array|null $dataArray
+     * @param string $redirectToSuccessPageString
+     * @return array
+     */
+    private function recoverOrderFromTicketTransaction(
+        Order $order,
+        ?Payment $payment,
+        bool $isTicketTransaction,
+        ?array $dataArray,
+        string $redirectToSuccessPageString
+    ): array {
+        $this->logger->warning('Success controller: payment object is null, attempting order recovery');
+
+        if (!$isTicketTransaction || !isset($dataArray['transactionId'])) {
+            $this->logger->error(
+                'Success controller: not a ticket transaction or no transactionId, redirecting to success page'
+            );
+
+            return ['redirect' => $redirectToSuccessPageString];
+        }
+
+        try {
+            $user_id       = $this->paymentMethod->getSpecialConfigData('user_id');
+            $user_api_key  = $this->paymentMethod->getSpecialConfigData('user_api_key');
+            $transactionId = $dataArray['transactionId'];
+
+            $fortisTransactionObj = $this->fortisApi->getTransaction($transactionId, $user_id, $user_api_key);
+            $recoveredTransaction = $fortisTransactionObj->data ?? $fortisTransactionObj;
+            $orderIncrementId     = $recoveredTransaction->description ?? null;
+
+            if (!$orderIncrementId) {
+                $this->logger->error(
+                    'Success controller: no description in transaction data, redirecting to success page'
+                );
+
+                return ['redirect' => $redirectToSuccessPageString];
+            }
+
+            $this->logger->info('Success controller: recovering order via increment_id from transaction', [
+                'increment_id'   => $orderIncrementId,
+                'transaction_id' => $transactionId
+            ]);
+
+            $searchCriteria = $this->searchCriteriaBuilder
+                ->addFilter('increment_id', $orderIncrementId)
+                ->create();
+            $orders         = $this->orderRepository->getList($searchCriteria)->getItems();
+
+            if (empty($orders)) {
+                $this->logger->error(
+                    'Success controller: order not found during recovery, redirecting to success page'
+                );
+
+                return ['redirect' => $redirectToSuccessPageString];
+            }
+
+            $order   = reset($orders);
+            $payment = $order->getPayment();
+            $this->logger->info('Success controller: order recovered successfully', [
+                'order_id'     => $order->getId(),
+                'increment_id' => $order->getIncrementId()
+            ]);
+
+            if (!$payment || !$payment->getId()) {
+                $this->logger->error(
+                    'Success controller: recovered order has no payment, redirecting to success page'
+                );
+
+                return ['redirect' => $redirectToSuccessPageString];
+            }
+
+            return [
+                'order'                => $order,
+                'payment'              => $payment,
+                'recoveredTransaction' => $recoveredTransaction,
+            ];
+        } catch (\Exception $e) {
+            $this->logger->error('Success controller: order recovery failed: ' . $e->getMessage());
+
+            return ['redirect' => $redirectToSuccessPageString];
+        }
     }
 
     /**

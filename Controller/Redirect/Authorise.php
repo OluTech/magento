@@ -199,6 +199,7 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
      * @param CheckoutSession $checkoutSession
      * @param LoggerInterface $logger
      * @param Fortis $paymentMethod
+     * @param Config $config
      * @param OrderRepositoryInterface $orderRepository
      * @param StoreManagerInterface $storeManager
      * @param OrderSender $orderSender
@@ -421,6 +422,7 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
                     $this->orderRepository->save($order);
                 }
 
+                $surchargeData   = null;
                 $surchargeAmount = 0.00;
                 if (isset($surchargeData)) {
                     $surchargeAmount = $surchargeData['surcharge_amount'];
@@ -486,8 +488,8 @@ class Authorise implements HttpPostActionInterface, HttpGetActionInterface, Csrf
                     $message = 'Not Authorised: Reason Unknown';
                 }
                 $this->messageManager->addNoticeMessage($message);
-                $this->order->addStatusToHistory(__("Failed: $message "));
                 $this->order->cancel();
+                $this->order->addCommentToStatusHistory("Failed: $message ");
                 $this->orderRepository->save($order);
                 $this->checkoutSession->restoreQuote();
                 $this->reactivateQuoteIfNeeded($this->order);

@@ -7,16 +7,17 @@
     let ticketIntentionData = null;
 
     function invalidateCartSection() {
+        // Ask Magento to refresh the cart itself. Deleting its storage keys by hand makes its next section update throw.
         try {
-            window.localStorage.removeItem('mage-cache-storage');
-            window.localStorage.removeItem('mage-cache-storage-section-invalidation');
-            window.localStorage.removeItem('mage-cache-sessid');
-            var version = 'V' + Date.now();
-            var expires = new Date(Date.now() + 86400000).toUTCString();
-            document.cookie = 'private_content_version=' + version + '; path=/; expires=' + expires + '; SameSite=Lax';
+            require('Magento_Customer/js/customer-data').invalidate(['cart']);
         } catch (e) {
-            window.localStorage.clear();
+            require(['Magento_Customer/js/customer-data'], function (customerData) {
+                customerData.invalidate(['cart']);
+            });
         }
+        var version = 'V' + Date.now();
+        var expires = new Date(Date.now() + 86400000).toUTCString();
+        document.cookie = 'private_content_version=' + version + '; path=/; expires=' + expires + '; SameSite=Lax';
     }
 
     function reEnablePlaceOrderButton() {

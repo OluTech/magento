@@ -188,12 +188,21 @@ class CheckoutProcessor
         try {
             $quote = $this->checkoutSession->getQuote();
 
+            if (!$quote || !$quote->getId()) {
+                return null;
+            }
+
             $billingAddress = $quote->getBillingAddress();
+
+            if (!$billingAddress) {
+                return null;
+            }
 
             $postalCode = $billingAddress->getPostcode();
 
             return $postalCode ?: null;
         } catch (Exception $e) {
+            $this->logger->debug('Error getting billing postal code: ' . $e->getMessage());
             return null;
         }
     }
